@@ -9,12 +9,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -164,75 +166,80 @@ fun SignInScreen(model: AppModel) {
             Brush.verticalGradient(0f to MaterialTheme.colorScheme.primaryContainer.copy(alpha = if (LocalExtended.current.dark) 0.35f else 0.55f), 0.45f to MaterialTheme.colorScheme.background),
         ),
     ) {
-        Column(
-            Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Column(Modifier.widthIn(max = 460.dp).fillMaxWidth()) {
-                Spacer(Modifier.height(56.dp))
-                Image(painterResource(R.drawable.brand_logo), Brand.name, Modifier.size(76.dp).clip(RoundedCornerShape(20.dp)))
-                Spacer(Modifier.height(20.dp))
-                Text(Brand.name, style = MaterialTheme.typography.titleMedium, color = primary)
-                AnimatedContent(askServer, transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "signin") { serverStep ->
-                    Column {
-                        if (serverStep) {
-                            Text(s.serverTitle, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(top = 4.dp))
-                            Text(s.serverHint, style = MaterialTheme.typography.bodyLarge, color = LocalExtended.current.muted, modifier = Modifier.padding(top = 8.dp, bottom = 24.dp))
-                            Field(
-                                draft, { draft = it; error = null }, s.serverLabel, placeholder = s.serverPlaceholder,
-                                keyboard = KeyboardType.Uri, imeAction = ImeAction.Go, onDone = { connect() },
-                                leading = { androidx.compose.material3.Icon(Icons.Outlined.Dns, null) },
-                            )
-                            error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp)) }
-                            Spacer(Modifier.height(16.dp))
-                            PrimaryButton(s.connect, enabled = draft.isNotBlank(), busy = busy) { connect() }
-                            if (directory != null || hosted != null) {
-                                TextButton({ mode = if (directory != null) "directory" else "account"; askServer = false; error = null }, Modifier.fillMaxWidth().padding(top = 12.dp)) {
-                                    Text(s.useHosted(Brand.hostedLabel))
-                                }
-                            }
-                        } else {
-                            Text(s.title, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(top = 4.dp))
-                            Text(s.subtitle, style = MaterialTheme.typography.bodyLarge, color = LocalExtended.current.muted, modifier = Modifier.padding(top = 8.dp, bottom = 20.dp))
-                            if (mode == "server") {
-                                Row(
-                                    Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.surfaceContainer)
-                                        .clickable { askServer = true; error = null }.padding(horizontal = 14.dp, vertical = 12.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    androidx.compose.material3.Icon(Icons.Outlined.Dns, null, tint = primary, modifier = Modifier.size(20.dp))
-                                    Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
-                                        Text(s.connectedTo, style = MaterialTheme.typography.labelMedium, color = LocalExtended.current.muted)
-                                        Text(ServerAddress.display(server), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-                                    }
-                                    Text(s.changeServer, color = primary, style = MaterialTheme.typography.labelLarge)
-                                }
+        // The form sits in the middle of the screen; the links stay at the bottom.
+        // When the keyboard is up, or the screen is short, it all scrolls.
+        BoxWithConstraints(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding()) {
+            val screen = maxHeight
+            Column(
+                Modifier.fillMaxSize().verticalScroll(rememberScrollState()).heightIn(min = screen).padding(horizontal = 24.dp, vertical = 16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Spacer(Modifier.weight(1f))
+                Column(Modifier.widthIn(max = 460.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Image(painterResource(R.drawable.brand_logo), Brand.name, Modifier.size(76.dp).clip(RoundedCornerShape(20.dp)))
+                    Spacer(Modifier.height(16.dp))
+                    Text(Brand.name, style = MaterialTheme.typography.titleMedium, color = primary)
+                    AnimatedContent(askServer, transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "signin") { serverStep ->
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            if (serverStep) {
+                                Text(s.serverTitle, style = MaterialTheme.typography.headlineMedium, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 4.dp))
+                                Text(s.serverHint, style = MaterialTheme.typography.bodyLarge, color = LocalExtended.current.muted, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 8.dp, bottom = 24.dp))
+                                Field(
+                                    draft, { draft = it; error = null }, s.serverLabel, placeholder = s.serverPlaceholder,
+                                    keyboard = KeyboardType.Uri, imeAction = ImeAction.Go, onDone = { connect() },
+                                    leading = { androidx.compose.material3.Icon(Icons.Outlined.Dns, null) },
+                                )
+                                error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) }
                                 Spacer(Modifier.height(16.dp))
-                            }
-                            if (mode == "account") {
-                                Field(account, { account = it; error = null }, s.accountLabel, placeholder = s.accountPlaceholder, supporting = s.accountHint, keyboard = KeyboardType.Uri)
-                                Spacer(Modifier.height(8.dp))
-                            }
-                            Field(email, { email = it; error = null }, s.emailLabel, placeholder = s.emailPlaceholder, keyboard = KeyboardType.Email, enabled = !busy)
-                            Spacer(Modifier.height(12.dp))
-                            Field(password, { password = it; error = null }, s.passwordLabel, password = true, imeAction = ImeAction.Go, onDone = { submit() }, enabled = !busy)
-                            error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 8.dp)) }
-                            model.signInNotice?.takeIf { error == null }?.let {
-                                Text(it, color = LocalExtended.current.muted, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 8.dp))
-                            }
-                            Spacer(Modifier.height(20.dp))
-                            PrimaryButton(s.submit, enabled = email.isNotBlank() && password.isNotEmpty(), busy = busy) { submit() }
-                            TextButton({ forgot = true }, Modifier.fillMaxWidth().padding(top = 8.dp)) { Text(s.forgot) }
-                            if (mode != "server") {
-                                TextButton({ askServer = true; error = null }, Modifier.fillMaxWidth()) { Text(s.otherAddress) }
+                                PrimaryButton(s.connect, enabled = draft.isNotBlank(), busy = busy) { connect() }
+                                if (directory != null || hosted != null) {
+                                    TextButton({ mode = if (directory != null) "directory" else "account"; askServer = false; error = null }, Modifier.fillMaxWidth().padding(top = 12.dp)) {
+                                        Text(s.useHosted(Brand.hostedLabel))
+                                    }
+                                }
+                            } else {
+                                Text(s.title, style = MaterialTheme.typography.headlineMedium, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 4.dp))
+                                Text(s.subtitle, style = MaterialTheme.typography.bodyLarge, color = LocalExtended.current.muted, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 8.dp, bottom = 24.dp))
+                                if (mode == "server") {
+                                    Row(
+                                        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.surfaceContainer)
+                                            .clickable { askServer = true; error = null }.padding(horizontal = 14.dp, vertical = 12.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        androidx.compose.material3.Icon(Icons.Outlined.Dns, null, tint = primary, modifier = Modifier.size(20.dp))
+                                        Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                                            Text(s.connectedTo, style = MaterialTheme.typography.labelMedium, color = LocalExtended.current.muted)
+                                            Text(ServerAddress.display(server), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                                        }
+                                        Text(s.changeServer, color = primary, style = MaterialTheme.typography.labelLarge)
+                                    }
+                                    Spacer(Modifier.height(16.dp))
+                                }
+                                if (mode == "account") {
+                                    Field(account, { account = it; error = null }, s.accountLabel, placeholder = s.accountPlaceholder, supporting = s.accountHint, keyboard = KeyboardType.Uri)
+                                    Spacer(Modifier.height(8.dp))
+                                }
+                                Field(email, { email = it; error = null }, s.emailLabel, placeholder = s.emailPlaceholder, keyboard = KeyboardType.Email, enabled = !busy)
+                                Spacer(Modifier.height(12.dp))
+                                Field(password, { password = it; error = null }, s.passwordLabel, password = true, imeAction = ImeAction.Go, onDone = { submit() }, enabled = !busy)
+                                error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) }
+                                model.signInNotice?.takeIf { error == null }?.let {
+                                    Text(it, color = LocalExtended.current.muted, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
+                                }
+                                Spacer(Modifier.height(20.dp))
+                                PrimaryButton(s.submit, enabled = email.isNotBlank() && password.isNotEmpty(), busy = busy) { submit() }
+                                TextButton({ forgot = true }, Modifier.fillMaxWidth().padding(top = 8.dp)) { Text(s.forgot) }
+                                if (mode != "server") {
+                                    TextButton({ askServer = true; error = null }, Modifier.fillMaxWidth()) { Text(s.otherAddress) }
+                                }
                             }
                         }
                     }
                 }
-                Spacer(Modifier.height(24.dp))
-                Row(Modifier.fillMaxWidth().padding(bottom = 24.dp), horizontalArrangement = Arrangement.spacedBy(24.dp, Alignment.CenterHorizontally)) {
-                    Brand.privacyPolicyUrl?.let { url -> Text(s.privacy, color = LocalExtended.current.muted, modifier = Modifier.clickable { context.openUrl(url.toString()) }) }
-                    Brand.supportUrl?.let { url -> Text(s.support, color = LocalExtended.current.muted, modifier = Modifier.clickable { context.openUrl(url.toString()) }) }
+                Spacer(Modifier.weight(1f))
+                Row(Modifier.widthIn(max = 460.dp).fillMaxWidth().padding(top = 24.dp), horizontalArrangement = Arrangement.spacedBy(24.dp, Alignment.CenterHorizontally)) {
+                    Brand.privacyPolicyUrl?.let { url -> Text(s.privacy, color = LocalExtended.current.muted, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.clickable { context.openUrl(url.toString()) }.padding(8.dp)) }
+                    Brand.supportUrl?.let { url -> Text(s.support, color = LocalExtended.current.muted, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.clickable { context.openUrl(url.toString()) }.padding(8.dp)) }
                 }
             }
         }

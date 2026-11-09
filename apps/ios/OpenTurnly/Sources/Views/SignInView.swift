@@ -43,7 +43,7 @@ private struct SignInHeader: View {
     let subtitle: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(spacing: 0) {
             Image("BrandLogoWhite")
                 .resizable().scaledToFit()
                 .frame(width: 38, height: 38)
@@ -54,7 +54,7 @@ private struct SignInHeader: View {
                 )
                 .shadow(color: Brand.primaryColor.opacity(0.35), radius: 14, y: 6)
                 .accessibilityLabel(Brand.name)
-                .padding(.bottom, 28)
+                .padding(.bottom, 24)
             Text(title)
                 .font(.largeTitle.weight(.bold))
                 .foregroundStyle(Theme.ink)
@@ -65,7 +65,8 @@ private struct SignInHeader: View {
                 .padding(.top, 8)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .multilineTextAlignment(.center)
+        .frame(maxWidth: .infinity)
     }
 }
 
@@ -78,6 +79,32 @@ private struct SignInBackground: View {
                 .frame(height: 360)
         }
         .ignoresSafeArea()
+    }
+}
+
+/// The frame of every sign-in screen: the form in the middle, the brand's links
+/// at the bottom, and all of it scrolling when the keyboard needs the room.
+private struct SignInScaffold<Content: View>: View {
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        GeometryReader { proxy in
+            ScrollView {
+                VStack(spacing: 0) {
+                    Spacer(minLength: 16)
+                    content.frame(maxWidth: 460)
+                    Spacer(minLength: 24)
+                    BrandLinks()
+                }
+                .padding(.horizontal, 24)
+                .padding(.vertical, 16)
+                .frame(maxWidth: .infinity, minHeight: proxy.size.height)
+            }
+            .scrollBounceBehavior(.basedOnSize)
+            .scrollDismissesKeyboard(.interactively)
+        }
+        .background(SignInBackground())
+        .toolbar(.hidden, for: .navigationBar)
     }
 }
 
@@ -124,8 +151,8 @@ private struct ServerEntry: View {
     @FocusState private var focused: Bool
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
+        SignInScaffold {
+            VStack(spacing: 24) {
                 SignInHeader(title: L.SignIn.serverTitle, subtitle: L.SignIn.serverHint(Brand.name))
                 if let notice = model.signInNotice {
                     NoticeBanner(text: notice)
@@ -149,17 +176,8 @@ private struct ServerEntry: View {
                         .foregroundStyle(Theme.muted)
                         .frame(maxWidth: .infinity, minHeight: 44)
                 }
-                BrandLinks()
             }
-            .padding(.horizontal, 24)
-            .padding(.top, 40)
-            .padding(.bottom, 24)
-            .frame(maxWidth: 520)
-            .frame(maxWidth: .infinity)
         }
-        .scrollDismissesKeyboard(.interactively)
-        .background(SignInBackground())
-        .toolbar(.hidden, for: .navigationBar)
         .onAppear { if draft.isEmpty { focused = true } }
     }
 
@@ -193,8 +211,8 @@ private struct AccountEntry: View {
     @State private var error: String?
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
+        SignInScaffold {
+            VStack(spacing: 24) {
                 SignInHeader(title: L.SignIn.title, subtitle: L.SignIn.accountHint)
                 InputBox(label: L.SignIn.accountLabel) {
                     TextField(L.SignIn.accountPlaceholder, text: $draft)
@@ -208,15 +226,8 @@ private struct AccountEntry: View {
                 Button(L.SignIn.otherAddress) { path.append(.server) }
                     .foregroundStyle(Theme.muted)
                     .frame(maxWidth: .infinity, minHeight: 44)
-                BrandLinks()
             }
-            .padding(.horizontal, 24)
-            .padding(.top, 40)
-            .frame(maxWidth: 520)
-            .frame(maxWidth: .infinity)
         }
-        .background(SignInBackground())
-        .toolbar(.hidden, for: .navigationBar)
     }
 
     private func proceed() {
@@ -260,8 +271,8 @@ private struct LoginForm: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
+        SignInScaffold {
+            VStack(spacing: 20) {
                 SignInHeader(title: L.SignIn.title, subtitle: subtitle)
                     .padding(.bottom, 4)
                 if let notice = model.signInNotice {
@@ -300,14 +311,12 @@ private struct LoginForm: View {
                         .accessibilityLabel(reveal ? L.SignIn.hidePassword : L.SignIn.showPassword)
                     }
                 }
-                HStack {
-                    Spacer()
-                    Button(L.SignIn.forgot) { forgot = true }
-                        .font(.subheadline)
-                        .foregroundStyle(Brand.primaryColor)
-                }
                 FieldError(text: error)
                 PrimaryButton(title: L.SignIn.submit, busy: busy, disabled: !canSubmit) { Task { await submit() } }
+                Button(L.SignIn.forgot) { forgot = true }
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(Brand.primaryColor)
+                    .frame(minHeight: 32)
                 VStack(spacing: 4) {
                     switch target {
                     case .directory:
@@ -320,17 +329,8 @@ private struct LoginForm: View {
                 }
                 .foregroundStyle(Theme.muted)
                 .frame(maxWidth: .infinity, minHeight: 44)
-                BrandLinks()
             }
-            .padding(.horizontal, 24)
-            .padding(.top, 40)
-            .padding(.bottom, 24)
-            .frame(maxWidth: 520)
-            .frame(maxWidth: .infinity)
         }
-        .scrollDismissesKeyboard(.interactively)
-        .background(SignInBackground())
-        .toolbar(.hidden, for: .navigationBar)
         .alert(L.SignIn.forgotTitle, isPresented: $forgot) {
             Button(L.Common.ok, role: .cancel) {}
         } message: { Text(L.SignIn.forgotBody) }
