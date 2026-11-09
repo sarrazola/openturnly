@@ -522,8 +522,11 @@ export type AutomationDelivery = {
   error: string | null;
   createdAt: string;
   sentAt: string | null;
-  /** How far a WhatsApp message got: sent, delivered, read or failed. */
+  /** How far a message got: sent, delivered, read or failed. */
   messageStatus: string | null;
+  /** What the provider charged for the message, once it says, e.g. "0.059200". */
+  cost: string | null;
+  costCurrency: string | null;
 };
 
 /** The install's own WhatsApp number. The token and app secret never come back. */
@@ -568,6 +571,26 @@ export type EmailOverview = {
   active: "own" | "default" | null;
   default: string | null;
   connection: EmailConnection | null;
+};
+
+/** The install's own Twilio account. The key's secret never comes back. */
+export type SmsConnection = {
+  id: string;
+  accountSid: string;
+  apiKeySid: string;
+  /** A number with its country code, or a messaging service (MG…). */
+  sender: string;
+  status: "disconnected" | "connected" | "error";
+  lastError: string | null;
+  lastConnectedAt: string | null;
+  hasApiKeySecret: boolean;
+};
+
+/** Which account texts go out on, and the environment's sender, if any. */
+export type SmsOverview = {
+  active: "own" | "default" | null;
+  default: string | null;
+  connection: SmsConnection | null;
 };
 
 export type WhatsappTemplate = {

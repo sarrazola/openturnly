@@ -12,6 +12,10 @@ import {
   instantToZoned,
   renderEmailText,
   renderJsonTemplate,
+  renderTemplate,
+  type SmsAction,
+  smsTemplate,
+  smsText,
   todayIn,
   toMinorUnits,
   type WebhookAction,
@@ -20,7 +24,7 @@ import {
   whatsappVariables,
   zonedTimeToInstant,
 } from "@openturnly/core";
-import { and, asc, eq, gt, inArray, lt, lte, sql } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, isNull, like, lt, lte, or, sql } from "drizzle-orm";
 import type { Config } from "../config.ts";
 import type { Db } from "../db/client.ts";
 import {
@@ -40,6 +44,7 @@ import {
 import { isInternalAddress } from "./client-ip.ts";
 import type { Email } from "./email.ts";
 import type { Payments } from "./payments.ts";
+import type { Sms, SmsMessageState } from "./sms.ts";
 import type { Whatsapp, WhatsappStatusUpdate, WhatsappVariable } from "./whatsapp.ts";
 
 /** Reminders and follow-ups that came due while the server was down still go out, up to this late. */
@@ -49,6 +54,13 @@ const RETRY_DELAYS_MS = [60_000, 5 * 60_000, 30 * 60_000];
 const TIMEOUT_MS = 10_000;
 /** How long the delivery history is kept. */
 const HISTORY_DAYS = 30;
+/**
+ * A text's price comes after it's sent, sometimes after its last update: messages without
+ * one are asked about again this often, for this long, this many per sweep.
+ */
+const SMS_RECHECK_MS = 10 * 60_000;
+const SMS_PRICE_WINDOW_MS = 24 * 60 * 60_000;
+const SMS_RECHECKS_PER_SWEEP = 10;
 
 export function newAutomationSecret() {
   return `whsec_${randomBytes(24).toString("base64url")}`;
@@ -152,7 +164,7 @@ export function automationValues(
 }
 
 /** A step that sends something, as opposed to one that waits. */
-type SendAction = WebhookAction | WhatsappAction | EmailAction;
+type SendAction = WebhookAction | WhatsappAction | EmailAction | SmsAction;
 
 /**
  * What a step sends, fixed when it's queued: its chosen fields and extra values, its own
@@ -181,6 +193,16 @@ export function buildPayload(
       body: renderEmailText(action.body, values),
       readySubject: renderEmailText(ready?.subject[action.language] ?? "", values),
       readyBody: renderEmailText(ready?.body[action.language] ?? "", values),
+    };
+  }
+  if (action.type === "sms") {
+    const customer = values.customer as { phone?: string | null } | undefined;
+    const ready = smsTemplate(action.template);
+    return {
+      to: customer?.phone ?? null,
+      // Both go in the queue, like an email's: the account decides which one is sent.
+      body: renderTemplate(action.body, values),
+      readyBody: renderTemplate(ready?.body[action.language] ?? "", values),
     };
   }
   // A body written by hand, in the receiver's own format (checked when the flow was saved).
@@ -243,13 +265,13 @@ type SendResult = {
   durationMs: number;
   /** Start of what the receiver answered, for tests. */
   response: string | null;
-  /** WhatsApp's id for the message. */
+  /** The provider's id for the message. */
   messageId?: string | null;
   /** False when trying again can't help: a number that isn't on WhatsApp, say. */
   retry?: boolean;
 };
 
-/** How far a WhatsApp message got: updates can arrive out of order and never go back. */
+/** How far a message got: updates can arrive out of order and never go back. */
 const MESSAGE_PROGRESS = ["sent", "delivered", "read"];
 
 /** How much of a receiver's answer a test shows. */
@@ -267,12 +289,14 @@ export function createAutomations({
   config,
   whatsapp,
   email,
+  sms,
   payments,
 }: {
   db: Db;
   config: Config;
   whatsapp: Whatsapp;
   email: Email;
+  sms: Sms;
   /** Open payments are caught up on every sweep, which frees times nobody paid for. */
   payments?: Pick<Payments, "sweep">;
 }) {
@@ -426,6 +450,97 @@ export function createAutomations({
     });
   };
 
+  /**
+   * Twilio reports on a text at the address given with it, which has to be reachable from
+   * the internet; on a machine of one's own, the sweep asks instead.
+   */
+  const reachable = !/^https?:\/\/(localhost|127\.|\[::1\]|[^/]*\.localhost)/i.test(config.appUrl);
+
+  /** Sends a queued text, or says why it can't go. */
+  const sendSms = async (
+    payload: Record<string, unknown>,
+    deliveryId: string | null,
+  ): Promise<SendResult> => {
+    const refuse = (error: string): SendResult => ({
+      ok: false,
+      status: null,
+      error,
+      durationMs: 0,
+      response: null,
+      retry: false,
+    });
+    const to = payload.to;
+    if (typeof to !== "string" || !to) return refuse("sms_no_phone");
+    const sender = await sms.sender();
+    if (!sender) return refuse("sms_not_connected");
+    // Like email, the environment's account only carries the ready-made texts.
+    const own = sender.source === "own";
+    const body = smsText(String((own && payload.body) || payload.readyBody)).trim();
+    if (!body) return refuse("sms_empty");
+    return sms.send(sender, {
+      to,
+      body,
+      ...(deliveryId && reachable ? { statusUrl: sms.statusUrl(deliveryId) } : {}),
+    });
+  };
+
+  /** Records what Twilio says about a text: how far it got and what it cost. */
+  const recordSmsState = async (
+    deliveryId: string,
+    state: SmsMessageState | null,
+    now = Date.now(),
+  ) => {
+    const [delivery] = await db
+      .select({ messageStatus: automationDeliveries.messageStatus })
+      .from(automationDeliveries)
+      .where(eq(automationDeliveries.id, deliveryId));
+    if (!delivery) return;
+    const progressed =
+      state?.status &&
+      state.status !== "failed" &&
+      MESSAGE_PROGRESS.indexOf(state.status) >
+        MESSAGE_PROGRESS.indexOf(delivery.messageStatus ?? "");
+    await db
+      .update(automationDeliveries)
+      .set({
+        messageCheckedAt: new Date(now),
+        ...(state?.cost ? { cost: state.cost, costCurrency: state.currency } : {}),
+        ...(state?.status === "failed"
+          ? { status: "failed" as const, messageStatus: "failed", error: state.error }
+          : progressed
+            ? { messageStatus: state.status }
+            : {}),
+      })
+      .where(eq(automationDeliveries.id, deliveryId));
+  };
+
+  /**
+   * Asks Twilio about texts still without a price: its report can come before the price,
+   * or not reach a server that isn't on the internet.
+   */
+  const checkSmsPrices = async (now = Date.now()) => {
+    const unpriced = await db
+      .select({ id: automationDeliveries.id, messageId: automationDeliveries.messageId })
+      .from(automationDeliveries)
+      .where(
+        and(
+          like(automationDeliveries.messageId, "SM%"),
+          isNull(automationDeliveries.cost),
+          gt(automationDeliveries.sentAt, new Date(now - SMS_PRICE_WINDOW_MS)),
+          lt(automationDeliveries.sentAt, new Date(now - 60_000)),
+          or(
+            isNull(automationDeliveries.messageCheckedAt),
+            lt(automationDeliveries.messageCheckedAt, new Date(now - SMS_RECHECK_MS)),
+          ),
+        ),
+      )
+      .orderBy(asc(automationDeliveries.sentAt))
+      .limit(SMS_RECHECKS_PER_SWEEP);
+    for (const { id, messageId } of unpriced) {
+      if (messageId) await recordSmsState(id, await sms.messageState(messageId), now);
+    }
+  };
+
   const findBusiness = async (id: string) => {
     const [business] = await db.select().from(businesses).where(eq(businesses.id, id));
     return business;
@@ -466,7 +581,9 @@ export function createAutomations({
         ? await sendWhatsapp(delivery.payload, delivery.id)
         : action.type === "email"
           ? await sendEmail(business, delivery.payload)
-          : await post(automation.secret, action, delivery.event, delivery.id, delivery.payload);
+          : action.type === "sms"
+            ? await sendSms(delivery.payload, delivery.id)
+            : await post(automation.secret, action, delivery.event, delivery.id, delivery.payload);
     const attempts = delivery.attempts + 1;
     const retryIn = result.retry === false ? undefined : RETRY_DELAYS_MS[attempts - 1];
     await db
@@ -598,6 +715,20 @@ export function createAutomations({
       await db
         .delete(automationDeliveries)
         .where(lt(automationDeliveries.createdAt, new Date(now - HISTORY_DAYS * 86_400_000)));
+      await checkSmsPrices(now);
+    },
+
+    checkSmsPrices,
+
+    /** Records what Twilio reports about one of the texts sent from here. */
+    async recordSmsReport(deliveryId: string) {
+      const [delivery] = await db
+        .select({ messageId: automationDeliveries.messageId })
+        .from(automationDeliveries)
+        .where(eq(automationDeliveries.id, deliveryId));
+      if (!delivery?.messageId) return;
+      // The report itself isn't trusted: Twilio is asked about the message.
+      await recordSmsState(deliveryId, await sms.messageState(delivery.messageId));
     },
 
     /** Sends what's due in the queue. */
@@ -694,7 +825,9 @@ export function createAutomations({
                   }
                 : action.type === "email"
                   ? await sendEmail(business, payload)
-                  : await sendWhatsapp(payload, deliveryId);
+                  : action.type === "sms"
+                    ? await sendSms(payload, flow.id ? deliveryId : null)
+                    : await sendWhatsapp(payload, deliveryId);
           if (flow.id) {
             await db.insert(automationDeliveries).values({
               id: deliveryId,

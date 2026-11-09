@@ -4,6 +4,7 @@ import { EMAIL_PORTS, EMAIL_PROVIDER_IDS, EMAIL_TEMPLATE_NAMES } from "./email.t
 import { SERVICE_PAYMENT_MODES } from "./payments.ts";
 import { normalizePhone } from "./phone.ts";
 import { checkSlug } from "./slug.ts";
+import { SMS_TEMPLATE_NAMES } from "./sms.ts";
 import { addDays, isDateString, isTimeString } from "./time.ts";
 
 export const LOCALES = ["es", "en"] as const;
@@ -828,10 +829,10 @@ const extraName = z
 
 /**
  * The steps of a flow, run in order: "webhook" sends to any URL that takes webhooks;
- * "whatsapp" and "email" message the appointment's customer; "wait" holds the steps after
- * it back for a while.
+ * "whatsapp", "email" and "sms" message the appointment's customer; "wait" holds the steps
+ * after it back for a while.
  */
-export const AUTOMATION_ACTION_TYPES = ["webhook", "whatsapp", "email", "wait"] as const;
+export const AUTOMATION_ACTION_TYPES = ["webhook", "whatsapp", "email", "sms", "wait"] as const;
 /** Steps in one flow, waits included. */
 export const MAX_AUTOMATION_ACTIONS = 10;
 /** Systems one flow can tell. */
@@ -1104,6 +1105,19 @@ export const emailActionSchema = z.object({
 });
 export type EmailAction = z.output<typeof emailActionSchema>;
 
+/**
+ * Texts the appointment's customer. Like an email, it starts from a ready-made text, and a
+ * business sending through its own account can reword it; empty keeps the ready-made one.
+ */
+export const smsActionSchema = z.object({
+  id: stepId,
+  type: z.literal("sms"),
+  template: z.enum(SMS_TEMPLATE_NAMES),
+  language: z.enum(LOCALES),
+  body: placeholderText(1000).default(""),
+});
+export type SmsAction = z.output<typeof smsActionSchema>;
+
 export const waitActionSchema = z.object({
   id: stepId,
   type: z.literal("wait"),
@@ -1115,6 +1129,7 @@ export const automationActionSchema = z.discriminatedUnion("type", [
   webhookActionSchema,
   whatsappActionSchema,
   emailActionSchema,
+  smsActionSchema,
   waitActionSchema,
 ]);
 export type AutomationAction = z.output<typeof automationActionSchema>;
@@ -1233,6 +1248,41 @@ export const emailTestSchema = z.object({
   language: z.enum(LOCALES),
 });
 export type EmailTestInput = z.input<typeof emailTestSchema>;
+
+const TWILIO_ACCOUNT_SID = /^AC[0-9a-f]{32}$/i;
+const TWILIO_KEY_SID = /^SK[0-9a-f]{32}$/i;
+const TWILIO_SERVICE_SID = /^MG[0-9a-f]{32}$/i;
+/** Where texts go out from: a number with its country code, or a messaging service. */
+export function isSmsSender(value: string) {
+  return /^\+[1-9]\d{6,14}$/.test(value) || TWILIO_SERVICE_SID.test(value);
+}
+
+/** A Twilio account to send texts on. A blank secret keeps the one already saved. */
+export const smsConnectionSchema = z.object({
+  accountSid: z
+    .string()
+    .trim()
+    .refine((value) => TWILIO_ACCOUNT_SID.test(value), "invalid_account_sid"),
+  apiKeySid: z
+    .string()
+    .trim()
+    .refine((value) => TWILIO_KEY_SID.test(value), "invalid_api_key_sid"),
+  apiKeySecret: z.string().trim().max(255).default(""),
+  sender: z
+    .string()
+    .trim()
+    .transform((value) => (value.startsWith("+") ? value.replace(/[\s().-]/g, "") : value))
+    .refine(isSmsSender, "invalid_sms_sender"),
+});
+export type SmsConnectionInput = z.input<typeof smsConnectionSchema>;
+
+/** Sends one ready-made text to a chosen number, to see the account working. */
+export const smsTestSchema = z.object({
+  phone: z.string().trim().min(1).max(40),
+  template: z.enum(SMS_TEMPLATE_NAMES),
+  language: z.enum(LOCALES),
+});
+export type SmsTestInput = z.input<typeof smsTestSchema>;
 
 /**
  * Fills a text line by line, leaving out each line with a field that has no value, so an

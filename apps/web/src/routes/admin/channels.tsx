@@ -3,6 +3,8 @@ import {
   EMAIL_TEMPLATES,
   type EmailProvider,
   emailConnectionSchema,
+  SMS_TEMPLATES,
+  smsConnectionSchema,
   WHATSAPP_VARIABLE_DATA,
   whatsappConnectionSchema,
 } from "@openturnly/core";
@@ -35,6 +37,8 @@ import {
 import type {
   EmailConnection,
   EmailOverview,
+  SmsConnection,
+  SmsOverview,
   WhatsappConnection,
   WhatsappOverview,
   WhatsappTemplate,
@@ -42,6 +46,8 @@ import type {
 import {
   useEmail,
   useEmailMutations,
+  useSms,
+  useSmsMutations,
   useWhatsapp,
   useWhatsappMutations,
   useWhatsappTemplates,
@@ -85,16 +91,18 @@ export function ChannelsPage() {
   );
 }
 
-type Connectable = "whatsapp" | "email";
+type Connectable = "whatsapp" | "email" | "sms";
 
 /** How the install reaches customers: every business sends through what's set here. */
 export function ChannelsSection() {
   const { t } = useTranslation();
   const whatsapp = useWhatsapp();
   const email = useEmail();
+  const sms = useSms();
   const [open, setOpen] = useState<Connectable | null>(null);
   const number = whatsapp.data ? whatsappSummary(t, whatsapp.data) : "";
   const address = email.data ? emailSummary(t, email.data) : "";
+  const texts = sms.data ? smsSummary(t, sms.data) : "";
   return (
     <div className="space-y-3">
       <ChannelCard
@@ -118,7 +126,11 @@ export function ChannelsSection() {
       <ChannelCard
         icon={MessageSquare}
         title={t("channels.tabs.sms")}
-        detail={t("channels.smsSoon")}
+        loading={sms.isPending}
+        source={sms.data?.active ?? null}
+        sender={sms.data ? smsSender(sms.data) : null}
+        detail={texts}
+        onOpen={() => setOpen("sms")}
       />
 
       <Modal
@@ -138,6 +150,15 @@ export function ChannelsSection() {
         wide
       >
         <EmailChannel />
+      </Modal>
+      <Modal
+        open={open === "sms"}
+        onClose={() => setOpen(null)}
+        title={t("channels.tabs.sms")}
+        description={texts}
+        wide
+      >
+        <SmsChannel />
       </Modal>
     </div>
   );
@@ -233,6 +254,20 @@ function whatsappSender(t: TFunction, overview: WhatsappOverview) {
 function emailSender(overview: EmailOverview) {
   if (overview.active === "own") return overview.connection?.fromEmail ?? null;
   return overview.active === "default" ? overview.default : null;
+}
+
+/** The number or service sending texts right now, if any. */
+function smsSender(overview: SmsOverview) {
+  if (overview.active === "own") return overview.connection?.sender ?? null;
+  return overview.active === "default" ? overview.default : null;
+}
+
+/** Which account is sending texts right now, in plain words. */
+function smsSummary(t: TFunction, overview: SmsOverview) {
+  const number = smsSender(overview);
+  if (overview.active === "own" && number) return t("sms.sendingOwn", { number });
+  if (overview.active === "default" && number) return t("sms.sendingDefault", { number });
+  return t("sms.notSending");
 }
 
 /** Which number is sending right now, in plain words. */
@@ -829,6 +864,252 @@ function EmailTestCard() {
           )}
         </Field>
         <Button type="submit" variant="secondary" disabled={test.isPending || !to.trim()}>
+          <Send className="size-4" aria-hidden />
+          {t("whatsapp.sendTest")}
+        </Button>
+      </form>
+    </SettingsCard>
+  );
+}
+
+const SMS_FAILURES = [
+  "sms_login",
+  "sms_number_not_found",
+  "sms_number_no_sms",
+  "sms_invalid_phone",
+  "sms_country_blocked",
+  "sms_unsubscribed",
+  "sms_not_mobile",
+  "sms_sender_invalid",
+  "sms_unreachable",
+  "timeout",
+] as const;
+
+/** A refusal from Twilio in words; anything else is its own answer. */
+function useSmsFailure() {
+  const { t } = useTranslation();
+  return (error: string | null) =>
+    (SMS_FAILURES as readonly (string | null)[]).includes(error)
+      ? t(`sms.failures.${error as (typeof SMS_FAILURES)[number]}`)
+      : error;
+}
+
+function SmsChannel() {
+  const { t } = useTranslation();
+  const sms = useSms();
+  const [ownForm, setOwnForm] = useState(false);
+
+  if (sms.isPending) return <Spinner />;
+  if (sms.isError) return <Alert>{errorMessage(t, sms.error)}</Alert>;
+  const overview = sms.data;
+  const showForm = ownForm || overview.connection !== null || overview.default === null;
+
+  return (
+    <section className="space-y-4">
+      {overview.default && !showForm && (
+        <div>
+          <Button variant="secondary" onClick={() => setOwnForm(true)}>
+            <Plug className="size-4" aria-hidden />
+            {t("sms.useOwn")}
+          </Button>
+        </div>
+      )}
+      {showForm && <OwnSmsCard connection={overview.connection} overview={overview} />}
+      {overview.active && <SmsTestCard />}
+    </section>
+  );
+}
+
+/** The Twilio account's details: a key of its own and where texts go out from. */
+function OwnSmsCard({
+  connection,
+  overview,
+}: {
+  connection: SmsConnection | null;
+  overview: SmsOverview;
+}) {
+  const { t } = useTranslation();
+  const { save, connect, remove } = useSmsMutations();
+  const confirm = useConfirm();
+  const failure = useSmsFailure();
+  const [accountSid, setAccountSid] = useState(connection?.accountSid ?? "");
+  const [apiKeySid, setApiKeySid] = useState(connection?.apiKeySid ?? "");
+  const [apiKeySecret, setApiKeySecret] = useState("");
+  const [sender, setSender] = useState(connection?.sender ?? "");
+  const [errors, setErrors] = useState<FieldErrors>({});
+  const error = (field: string) => fieldMessage(t, field, errors[field]);
+
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    const input = validate(smsConnectionSchema, { accountSid, apiKeySid, apiKeySecret, sender });
+    setErrors(input.errors ?? {});
+    if (!input.data) return;
+    save.mutate(input.data, {
+      onSuccess: () => {
+        setApiKeySecret("");
+        // Saved details are worth nothing until Twilio accepts them.
+        connect.mutate(undefined, {
+          onSuccess: ({ connection: saved }) => {
+            if (saved?.status === "connected") toast.success(t("sms.connected"));
+            else toast.error(failure(saved?.lastError ?? null) ?? t("sms.notConnected"));
+          },
+          onError: (problem) => toast.error(errorMessage(t, problem)),
+        });
+      },
+      onError: (problem) => {
+        setErrors(apiFieldErrors(problem));
+        toast.error(errorMessage(t, problem));
+      },
+    });
+  };
+
+  const forget = async () => {
+    const ok = await confirm({
+      title: t("sms.removeTitle"),
+      description: overview.default ? t("sms.removeToDefault") : t("sms.removeBody"),
+      confirmLabel: t("sms.remove"),
+      tone: "danger",
+    });
+    if (!ok) return;
+    remove.mutate(undefined, {
+      onSuccess: () => toast.success(t("sms.removed")),
+      onError: (problem) => toast.error(errorMessage(t, problem)),
+    });
+  };
+
+  return (
+    <SettingsCard
+      title={t("sms.ownTitle")}
+      description={t("sms.ownHint")}
+      action={
+        connection && (
+          <Badge tone={STATUS_TONES[connection.status]}>
+            {t(`whatsapp.status.${connection.status}`)}
+          </Badge>
+        )
+      }
+    >
+      <form onSubmit={submit} className="space-y-4">
+        {connection?.lastError && <Alert>{failure(connection.lastError)}</Alert>}
+        <div className="grid gap-4 md:grid-cols-2">
+          <Field
+            label={t("sms.accountSid")}
+            hint={t("sms.accountSidHint")}
+            error={error("accountSid")}
+          >
+            {(props) => (
+              <Input
+                {...props}
+                autoComplete="off"
+                spellCheck={false}
+                value={accountSid}
+                onChange={(event) => setAccountSid(event.target.value)}
+              />
+            )}
+          </Field>
+          <Field label={t("sms.sender")} hint={t("sms.senderHint")} error={error("sender")}>
+            {(props) => (
+              <Input
+                {...props}
+                autoComplete="off"
+                spellCheck={false}
+                placeholder="+15551234567"
+                value={sender}
+                onChange={(event) => setSender(event.target.value)}
+              />
+            )}
+          </Field>
+          <Field
+            label={t("sms.apiKeySid")}
+            hint={t("sms.apiKeySidHint")}
+            error={error("apiKeySid")}
+          >
+            {(props) => (
+              <Input
+                {...props}
+                autoComplete="off"
+                spellCheck={false}
+                value={apiKeySid}
+                onChange={(event) => setApiKeySid(event.target.value)}
+              />
+            )}
+          </Field>
+          <Field
+            label={t("sms.apiKeySecret")}
+            hint={connection?.hasApiKeySecret ? t("whatsapp.keepSaved") : undefined}
+          >
+            {(props) => (
+              <PasswordInput
+                {...props}
+                autoComplete="off"
+                value={apiKeySecret}
+                onChange={(event) => setApiKeySecret(event.target.value)}
+              />
+            )}
+          </Field>
+        </div>
+        <p className="text-[13px] text-zinc-500">{t("sms.countries")}</p>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <Button type="submit" disabled={save.isPending || connect.isPending}>
+            {t("whatsapp.saveConnect")}
+          </Button>
+          {connection && (
+            <Button
+              type="button"
+              variant="ghost"
+              className="text-zinc-500 hover:text-red-600"
+              onClick={forget}
+            >
+              <Trash2 className="size-4" aria-hidden />
+              {t("sms.remove")}
+            </Button>
+          )}
+        </div>
+      </form>
+    </SettingsCard>
+  );
+}
+
+/** Sends one ready-made text with example data. */
+function SmsTestCard() {
+  const { t, i18n } = useTranslation();
+  const { test } = useSmsMutations();
+  const failure = useSmsFailure();
+  const [phone, setPhone] = useState("");
+  const send = (event: FormEvent) => {
+    event.preventDefault();
+    const [template] = SMS_TEMPLATES;
+    if (!template) return;
+    test.mutate(
+      {
+        phone,
+        template: template.name,
+        language: i18n.resolvedLanguage === "en" ? "en" : "es",
+      },
+      {
+        onSuccess: (result) => {
+          if (result.ok) toast.success(t("sms.testSent"));
+          else toast.error(failure(result.error) ?? t("sms.testFailed"));
+        },
+        onError: (problem) => toast.error(errorMessage(t, problem)),
+      },
+    );
+  };
+  return (
+    <SettingsCard title={t("sms.testTitle")} description={t("sms.testHint")}>
+      <form onSubmit={send} className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
+        <Field label={t("whatsapp.testPhone")}>
+          {(props) => (
+            <Input
+              {...props}
+              type="tel"
+              placeholder="+57 300 000 0000"
+              value={phone}
+              onChange={(event) => setPhone(event.target.value)}
+            />
+          )}
+        </Field>
+        <Button type="submit" variant="secondary" disabled={test.isPending || !phone.trim()}>
           <Send className="size-4" aria-hidden />
           {t("whatsapp.sendTest")}
         </Button>

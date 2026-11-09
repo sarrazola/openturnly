@@ -5,6 +5,11 @@ import {
   emailTestSchema,
   normalizePhone,
   renderEmailText,
+  renderTemplate,
+  smsConnectionSchema,
+  smsTemplate,
+  smsTestSchema,
+  smsText,
   whatsappConnectionSchema,
   whatsappTestSchema,
   whatsappVariables,
@@ -15,6 +20,8 @@ import {
   businesses,
   type EmailConnection,
   emailConnections,
+  type SmsConnection,
+  smsConnections,
   type WhatsappConnection,
   whatsappConnections,
 } from "../db/schema.ts";
@@ -35,7 +42,7 @@ import { createToken } from "../lib/tokens.ts";
  * My account → Channels: how the install reaches customers. It belongs to whoever runs the
  * install, not to one business: every business sends through what's set here.
  */
-export function channelRoutes({ db, config, whatsapp, email }: Deps) {
+export function channelRoutes({ db, config, whatsapp, email, sms }: Deps) {
   /** A test needs a business's name and data to fill the message with. */
   const anyBusiness = async () => {
     const [business] = await db.select().from(businesses).limit(1);
@@ -90,6 +97,28 @@ export function channelRoutes({ db, config, whatsapp, email }: Deps) {
       active: sender?.source ?? null,
       default: email.defaultAddress(),
       connection: presentEmail(await email.findConnection()),
+    };
+  };
+
+  /** The saved account as the owner sees it: never the key's secret. */
+  const presentSms = (connection: SmsConnection | null) =>
+    connection && {
+      id: connection.id,
+      accountSid: connection.accountSid,
+      apiKeySid: connection.apiKeySid,
+      sender: connection.sender,
+      status: connection.status,
+      lastError: connection.lastError,
+      lastConnectedAt: connection.lastConnectedAt,
+      hasApiKeySecret: Boolean(connection.encryptedApiKeySecret),
+    };
+
+  const smsOverview = async () => {
+    const sender = await sms.sender();
+    return {
+      active: sender?.source ?? null,
+      default: sms.defaultNumber(),
+      connection: presentSms(await sms.findConnection()),
     };
   };
 
@@ -298,17 +327,105 @@ export function channelRoutes({ db, config, whatsapp, email }: Deps) {
         });
         return c.json({ ok: result.ok, error: result.error });
       })
+
+      .get("/sms", async (c) => c.json(await smsOverview()))
+
+      /** Saves the install's Twilio account; it's used once `connect` checks it. */
+      .put("/sms", async (c) => {
+        const input = await parseBody(c, smsConnectionSchema);
+        const current = await sms.findConnection();
+        const { apiKeySecret, ...settings } = input;
+        const values = {
+          ...settings,
+          // Blank keeps what's saved, so the form can be sent again without retyping it.
+          ...(apiKeySecret
+            ? { encryptedApiKeySecret: encryptSecret(config.secret, apiKeySecret) }
+            : {}),
+        };
+        // Other details have to prove themselves before anything goes out with them.
+        const changed =
+          !current ||
+          Boolean(apiKeySecret) ||
+          current.accountSid !== input.accountSid ||
+          current.apiKeySid !== input.apiKeySid ||
+          current.sender !== input.sender;
+        if (current) {
+          await db
+            .update(smsConnections)
+            .set({
+              ...values,
+              ...(changed ? { status: "disconnected" as const, lastError: null } : {}),
+              updatedAt: new Date(),
+            })
+            .where(eq(smsConnections.id, current.id));
+        } else {
+          await db.insert(smsConnections).values(values);
+        }
+        return c.json(await smsOverview());
+      })
+
+      /** Checks the saved account with Twilio; from then on texts go out on it. */
+      .post("/sms/connect", async (c) => {
+        const connection = await sms.findConnection();
+        if (!connection) throw apiError(404, "sms_not_saved");
+        const sender = sms.ownSender(connection);
+        if (!sender) throw apiError(409, "sms_credentials_missing");
+        const answer = await sms.verify(sender);
+        await db
+          .update(smsConnections)
+          .set(
+            answer.ok
+              ? {
+                  status: "connected",
+                  lastError: null,
+                  lastConnectedAt: new Date(),
+                  updatedAt: new Date(),
+                }
+              : { status: "error", lastError: answer.error, updatedAt: new Date() },
+          )
+          .where(eq(smsConnections.id, connection.id));
+        return c.json(await smsOverview());
+      })
+
+      /** Forgets the install's account: back to the environment's, if there is one. */
+      .delete("/sms", async (c) => {
+        await db.delete(smsConnections);
+        return c.json(await smsOverview());
+      })
+
+      /** Sends one ready-made text now, with example data, to see the account working. */
+      .post("/sms/test", async (c) => {
+        const input = await parseBody(c, smsTestSchema);
+        const business = await anyBusiness();
+        const phone = normalizePhone(input.phone, businessCountry(business) ?? undefined);
+        if (!phone) throw apiError(400, "validation_failed", { phone: "invalid_phone" });
+        const sender = await sms.sender();
+        if (!sender) throw apiError(409, "sms_not_connected");
+        const ready = smsTemplate(input.template);
+        if (!ready) throw apiError(404, "not_found");
+        const values = sampleValues(business, AUTOMATION_EVENTS.before, config.appUrl);
+        const result = await sms.send(sender, {
+          to: phone,
+          body: smsText(renderTemplate(ready.body[input.language], values)),
+        });
+        return c.json({ ok: result.ok, error: result.error, messageId: result.messageId });
+      })
   );
 }
 
 /** What a business's admins need to build a flow: what's connected, and its templates. */
-export function businessChannelRoutes({ whatsapp, email }: Deps) {
+export function businessChannelRoutes({ whatsapp, email, sms }: Deps) {
   return new Hono<BusinessEnv>()
     .get("/", async (c) => {
-      const [whatsappSender, emailSender] = await Promise.all([whatsapp.sender(), email.sender()]);
+      const [whatsappSender, emailSender, smsSender] = await Promise.all([
+        whatsapp.sender(),
+        email.sender(),
+        sms.sender(),
+      ]);
       return c.json({
         whatsapp: whatsappSender?.source ?? null,
         email: emailSender?.source ?? null,
+        sms: smsSender?.source ?? null,
       });
     })
     .get("/whatsapp-templates", async (c) => {

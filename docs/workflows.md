@@ -11,6 +11,7 @@ steps:
 - **Send WhatsApp**: messages the appointment's customer with an approved template
   ([docs/whatsapp.md](docs/whatsapp.md)).
 - **Send email**: emails the appointment's customer ([docs/email.md](docs/email.md)).
+- **Send SMS**: texts the appointment's customer ([docs/sms.md](docs/sms.md)).
 - **Notify another system**: sends the appointment's data to a webhook (up to 5 sending steps
   per flow).
 - **Wait**: pauses the flow; the steps after it go out once that time has passed.
