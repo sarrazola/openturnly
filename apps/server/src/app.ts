@@ -20,6 +20,7 @@ import { invitationRoutes } from "./routes/invitations.ts";
 import { mcpRoutes } from "./routes/mcp.ts";
 import { meRoutes } from "./routes/me.ts";
 import { metaRoutes } from "./routes/meta.ts";
+import { mobileRoutes } from "./routes/mobile.ts";
 import { paymentWebhookRoutes } from "./routes/payments.ts";
 import { publicRoutes } from "./routes/public.ts";
 import { businessScopedRoutes } from "./routes/scoped.ts";
@@ -97,6 +98,7 @@ export function createApp({ db, auth, config }: Pick<Deps, "db" | "auth" | "conf
 
   app.route("/api/setup", setupRoutes(deps));
   app.route("/api/me", meRoutes(deps));
+  app.route("/api/mobile", mobileRoutes(deps));
   app.route("/api/meta", metaRoutes());
   app.route("/api/businesses", businessRoutes(deps));
   app.route("/api/businesses/:businessId", businessScopedRoutes(deps));
