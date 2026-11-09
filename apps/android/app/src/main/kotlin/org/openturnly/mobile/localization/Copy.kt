@@ -19,15 +19,10 @@ object Copy {
     val checkout = CheckoutCopy
     val more = MoreCopy
     val services = ServicesCopy
-    val team = ProfessionalsCopy
-    val hours = HoursCopy
     val business = BusinessCopy
     val reports = ReportsCopy
     val account = AccountCopy
-    val cash = CashCopy
-    val inventory = InventoryCopy
     val giftCards = GiftCardsCopy
-    val access = AccessCopy
     val errors = ErrorsCopy
 }
 

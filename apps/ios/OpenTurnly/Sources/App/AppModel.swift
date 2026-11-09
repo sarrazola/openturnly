@@ -176,6 +176,9 @@ final class Workspace {
     /// The public booking page.
     var bookingURL: URL? { URL(string: "\(session.server)/\(business.slug)") }
 
+    /// The web panel on the same server, for everything the app leaves out.
+    var webPanelURL: URL? { URL(string: "\(session.server)/admin") }
+
     func absoluteURL(_ relative: String?) -> URL? {
         guard let relative, !relative.isEmpty else { return nil }
         if relative.hasPrefix("http") { return URL(string: relative) }

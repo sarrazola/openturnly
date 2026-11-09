@@ -1,9 +1,10 @@
 import SwiftUI
 
-/// Everything that isn't the agenda, customers or sales.
+/// The booking link, the numbers, the account; everything else is in the web panel.
 struct MoreView: View {
     @Environment(AppModel.self) private var model
     @Environment(Workspace.self) private var workspace
+    @Environment(\.openURL) private var openURL
     @State private var confirmingSignOut = false
     @State private var switching = false
 
@@ -33,24 +34,27 @@ struct MoreView: View {
                 .disabled(model.businesses.count < 2)
             }
 
-            if workspace.isAdmin {
-                Section(L.More.business) {
-                    row(.businessInfo, L.More.businessInfo, "storefront.fill", "#0f766e")
-                    row(.hours, L.More.hours, "clock.fill", "#0284c7")
-                    row(.services, L.More.services, "scissors", "#7c3aed")
-                    row(.professionals, L.More.professionals, "person.2.fill", "#db2777")
-                    row(.team, L.More.team, "person.badge.key.fill", "#475569")
-                }
-                Section(L.More.money) {
+            Section {
+                row(.bookingLink, L.More.bookingLink, "qrcode", "#0f766e")
+                if workspace.isAdmin {
                     row(.reports, L.More.reports, "chart.bar.xaxis", "#d97706")
-                    row(.cash, L.More.cash, "banknote.fill", "#16a34a")
-                    row(.inventory, L.More.inventory, "shippingbox.fill", "#0891b2")
-                    row(.giftCards, L.More.giftCards, "giftcard.fill", "#e11d48")
                 }
-            } else {
-                Section(L.More.business) {
-                    row(.hours, L.More.hours, "clock.fill", "#0284c7")
-                    row(.services, L.More.services, "scissors", "#7c3aed")
+            }
+
+            if workspace.isAdmin, let panel = workspace.webPanelURL {
+                Section {
+                    Button {
+                        openURL(panel)
+                    } label: {
+                        HStack(spacing: 14) {
+                            IconTile(symbol: "safari.fill", color: Color(hex: "#475569"))
+                            Text(L.More.webPanel).foregroundStyle(Theme.ink)
+                            Spacer()
+                            Image(systemName: "arrow.up.right").font(.footnote.weight(.semibold)).foregroundStyle(Theme.subtle)
+                        }
+                    }
+                } footer: {
+                    Text(L.More.webPanelHint)
                 }
             }
 
@@ -71,11 +75,8 @@ struct MoreView: View {
                     Button(L.Common.cancel, role: .cancel) {}
                 }
             } footer: {
-                VStack(alignment: .leading, spacing: 4) {
-                    if workspace.isAdmin { Text(L.More.webOnly) }
-                    Text("\(Brand.name) · \(L.More.version(Brand.version))")
-                }
-                .padding(.top, 8)
+                Text("\(Brand.name) · \(L.More.version(Brand.version))")
+                    .padding(.top, 8)
             }
         }
         .listStyle(.insetGrouped)

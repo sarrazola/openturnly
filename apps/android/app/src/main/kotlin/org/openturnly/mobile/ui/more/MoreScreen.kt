@@ -12,22 +12,19 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Logout
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.BarChart
-import androidx.compose.material.icons.outlined.CardGiftcard
-import androidx.compose.material.icons.outlined.ContentCut
-import androidx.compose.material.icons.outlined.Groups
-import androidx.compose.material.icons.outlined.Inventory2
-import androidx.compose.material.icons.outlined.Payments
-import androidx.compose.material.icons.outlined.Schedule
-import androidx.compose.material.icons.outlined.Storefront
-import androidx.compose.material.icons.outlined.SupervisorAccount
+import androidx.compose.material.icons.outlined.Language
+import androidx.compose.material.icons.outlined.QrCode2
 import androidx.compose.material.icons.outlined.SwapHoriz
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -55,9 +52,8 @@ import org.openturnly.mobile.ui.NavRow
 import org.openturnly.mobile.ui.Route
 import org.openturnly.mobile.ui.SectionTitle
 import org.openturnly.mobile.ui.openUrl
-import org.openturnly.mobile.ui.rememberLoader
 
-/** Everything that isn't the agenda, customers or sales, for the person's role. */
+/** The booking link, the numbers and the account; setting the business up is in the web panel. */
 @Composable
 fun MoreScreen(model: AppModel) {
     val ext = LocalExtended.current
@@ -65,14 +61,10 @@ fun MoreScreen(model: AppModel) {
     val business = model.business ?: return
     val admin = model.isAdmin
     var confirmSignOut by remember { mutableStateOf(false) }
-    val lowStock = if (admin) rememberLoader(business.id) {
-        model.call { products(it) }.count { product -> product.active && product.alerts.any { (location, alert) -> (product.stock[location] ?: 0L) <= alert } }
-    } else null
-
     Column(Modifier.fillMaxSize().statusBarsPadding().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 24.dp)) {
         Text(Copy.more.title, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(top = 16.dp, bottom = 16.dp))
         AppCard(padding = PaddingValues(0.dp)) {
-            Row(Modifier.fillMaxWidth().clickable { model.nav.push(Route.Business) }.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().clickable { model.nav.push(Route.BookingLink) }.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                 BusinessLogo(model, business, 56.dp)
                 Column(Modifier.weight(1f).padding(start = 14.dp)) {
                     Text(business.name, style = MaterialTheme.typography.titleLarge)
@@ -89,35 +81,21 @@ fun MoreScreen(model: AppModel) {
             }
         }
 
-        SectionTitle(Copy.more.manage, Modifier.padding(top = 12.dp))
-        AppCard(padding = PaddingValues(vertical = 4.dp)) {
-            NavRow(Copy.services.title, Icons.Outlined.ContentCut, subtitle = model.catalog.services.count { it.active }.takeIf { model.catalog.loaded }?.let { Copy.more.activeCount(it) }) { model.nav.push(Route.Services) }
-            Hairline(Modifier.padding(start = 66.dp))
-            NavRow(Copy.team.title, Icons.Outlined.Groups, iconTint = ext.person(1)) { model.nav.push(Route.Professionals) }
-            Hairline(Modifier.padding(start = 66.dp))
-            NavRow(Copy.hours.title, Icons.Outlined.Schedule, iconTint = ext.person(4)) { model.nav.push(Route.Hours) }
-            Hairline(Modifier.padding(start = 66.dp))
-            NavRow(Copy.business.title, Icons.Outlined.Storefront, iconTint = ext.person(2), subtitle = Copy.more.bookingPage) { model.nav.push(Route.Business) }
+        AppCard(Modifier.padding(top = 12.dp), padding = PaddingValues(vertical = 4.dp)) {
+            NavRow(Copy.more.bookingLink, Icons.Outlined.QrCode2, iconTint = ext.person(2)) { model.nav.push(Route.BookingLink) }
             if (admin) {
                 Hairline(Modifier.padding(start = 66.dp))
-                NavRow(Copy.access.title, Icons.Outlined.SupervisorAccount, iconTint = ext.person(5)) { model.nav.push(Route.Team) }
+                NavRow(Copy.reports.title, Icons.Outlined.BarChart, iconTint = ext.person(6)) { model.nav.push(Route.Reports) }
             }
         }
 
         if (admin) {
-            SectionTitle(Copy.more.money, Modifier.padding(top = 12.dp))
-            AppCard(padding = PaddingValues(vertical = 4.dp)) {
-                NavRow(Copy.reports.title, Icons.Outlined.BarChart, iconTint = ext.person(6)) { model.nav.push(Route.Reports) }
-                Hairline(Modifier.padding(start = 66.dp))
-                NavRow(Copy.cash.title, Icons.Outlined.Payments, iconTint = ext.person(0)) { model.nav.push(Route.Cash) }
-                Hairline(Modifier.padding(start = 66.dp))
-                NavRow(
-                    Copy.inventory.title, Icons.Outlined.Inventory2, iconTint = ext.person(7),
-                    subtitle = lowStock?.value?.takeIf { it > 0 }?.let { Copy.inventory.lowStockCount(it) },
-                ) { model.nav.push(Route.Inventory) }
-                Hairline(Modifier.padding(start = 66.dp))
-                NavRow(Copy.giftCards.title, Icons.Outlined.CardGiftcard, iconTint = ext.person(3)) { model.nav.push(Route.GiftCards) }
+            AppCard(Modifier.padding(top = 12.dp), padding = PaddingValues(vertical = 4.dp)) {
+                NavRow(Copy.more.webPanel, Icons.Outlined.Language, iconTint = ext.person(5), trailing = {
+                    Icon(Icons.AutoMirrored.Outlined.OpenInNew, null, tint = ext.muted, modifier = Modifier.size(18.dp))
+                }) { context.openUrl("${model.server}/admin") }
             }
+            Text(Copy.more.webPanelHint, style = MaterialTheme.typography.bodySmall, color = ext.muted, modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp))
         }
 
         SectionTitle(Copy.more.you, Modifier.padding(top = 12.dp))

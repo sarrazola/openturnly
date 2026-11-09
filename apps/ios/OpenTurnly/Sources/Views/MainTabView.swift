@@ -6,25 +6,16 @@ enum Route: Hashable {
     case customer(id: String, name: String)
     case sale(Sale)
     case saleId(String)
-    case services
-    case service(Service)
-    case professionals
-    case professional(Professional)
-    case hours
-    case businessInfo
+    case bookingLink
     case reports
     case account
-    case cash
-    case inventory
-    case product(Product)
-    case giftCards
-    case team
 }
 
 /// The bottom navigation: Agenda, Clientes, Ventas (admins) and Más.
 ///
-/// A professional only gets what the server lets them use: their own agenda and
-/// the read-only parts of "More".
+/// The app is for the day: appointments, customers and the day's sales. Setting
+/// the business up (hours, services, staff, stock) stays in the web panel.
+/// A professional gets their own agenda and "More".
 struct MainTabView: View {
     @Environment(Workspace.self) private var workspace
     @State private var tab: Tab = .agenda
@@ -76,19 +67,9 @@ private struct RouteDestinations: ViewModifier {
             case .customer(let id, let name): CustomerDetailView(customerId: id, name: name)
             case .sale(let sale): SaleDetailView(initial: sale)
             case .saleId(let id): SaleDetailView(saleId: id)
-            case .services: ServicesView()
-            case .service(let service): ServiceFormView(service: service)
-            case .professionals: ProfessionalsView()
-            case .professional(let professional): ProfessionalDetailView(professional: professional)
-            case .hours: HoursView()
-            case .businessInfo: BusinessInfoView()
+            case .bookingLink: BookingLinkView()
             case .reports: ReportsView()
             case .account: AccountView()
-            case .cash: CashView()
-            case .inventory: InventoryView()
-            case .product(let product): ProductDetailView(product: product)
-            case .giftCards: GiftCardsView()
-            case .team: TeamView()
             }
         }
     }

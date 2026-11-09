@@ -16,8 +16,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -36,10 +34,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -47,50 +42,33 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import java.io.File
 import org.openturnly.mobile.AppModel
-import org.openturnly.mobile.api.objWithout
 import org.openturnly.mobile.localization.Copy
 import org.openturnly.mobile.rules.QrCode
 import org.openturnly.mobile.ui.AppCard
 import org.openturnly.mobile.ui.BusinessLogo
 import org.openturnly.mobile.ui.DetailScaffold
-import org.openturnly.mobile.ui.Field
-import org.openturnly.mobile.ui.InfoRow
 import org.openturnly.mobile.ui.LocalExtended
-import org.openturnly.mobile.ui.PrimaryButton
 import org.openturnly.mobile.ui.SectionTitle
 import org.openturnly.mobile.ui.launch
 import org.openturnly.mobile.ui.openUrl
-import org.openturnly.mobile.ui.rememberAction
 import org.openturnly.mobile.ui.copyText
 import org.openturnly.mobile.ui.shareText
 
-/** The business's details, and its booking page to share as a link or a QR code. */
+/** The booking page to share with customers: its address, copy, share, open, and a QR code. */
 @Composable
-fun BusinessScreen(model: AppModel) {
+fun BookingLinkScreen(model: AppModel) {
     val ext = LocalExtended.current
     val context = LocalContext.current
     val business = model.business ?: return
     val link = "${model.server}/${business.slug}"
     val qr = remember(link) { QrCode.encode(link) }
-    var name by remember(business.id) { mutableStateOf(business.name) }
-    var description by remember(business.id) { mutableStateOf(business.description ?: "") }
-    var phone by remember(business.id) { mutableStateOf(business.phone ?: "") }
-    var email by remember(business.id) { mutableStateOf(business.email ?: "") }
-    var address by remember(business.id) { mutableStateOf(business.address ?: "") }
-    var errors by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
-    val action = rememberAction { failure ->
-        errors = failure.fields.mapNotNull { (k, _) -> failure.fieldMessage(k)?.let { k to it } }.toMap()
-        if (errors.isEmpty()) model.failure(failure)
-    }
 
-    DetailScaffold(title = Copy.business.title, onBack = { model.nav.pop() }) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 32.dp).imePadding(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    DetailScaffold(title = Copy.more.bookingLink, onBack = { model.nav.pop() }) { padding ->
+        Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 BusinessLogo(model, business, 64.dp)
                 Column(Modifier.padding(start = 14.dp)) {
@@ -131,44 +109,6 @@ fun BusinessScreen(model: AppModel) {
                         Icon(Icons.Outlined.QrCode2, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text(Copy.business.shareQr)
                     }
                 }
-            }
-
-            SectionTitle(Copy.business.details)
-            if (model.isAdmin) {
-                AppCard {
-                    Field(name, { name = it; errors = errors - "name" }, Copy.common.name, error = errors["name"])
-                    Field(description, { description = it }, Copy.common.description, singleLine = false, minLines = 2, error = errors["description"])
-                    Field(phone, { phone = it }, Copy.common.phone, keyboard = KeyboardType.Phone, error = errors["phone"])
-                    Field(email, { email = it; errors = errors - "email" }, Copy.common.email, keyboard = KeyboardType.Email, error = errors["email"])
-                    Field(address, { address = it }, Copy.common.address, error = errors["address"])
-                    PrimaryButton(Copy.common.saveChanges, Modifier.padding(top = 8.dp), busy = action.busy) {
-                        if (name.isBlank()) { errors = mapOf("name" to Copy.business.nameRequired); return@PrimaryButton }
-                        val changes = listOf(
-                            "name" to (name.trim() to business.name), "description" to (description.trim() to (business.description ?: "")),
-                            "phone" to (phone.trim() to (business.phone ?: "")), "email" to (email.trim() to (business.email ?: "")),
-                            "address" to (address.trim() to (business.address ?: "")),
-                        ).filter { (_, pair) -> pair.first != pair.second }.map { (key, pair) -> key to pair.first }
-                        if (changes.isEmpty()) { model.toast(Copy.common.saved); return@PrimaryButton }
-                        action.run {
-                            model.call { updateBusiness(it, objWithout(*changes.toTypedArray())) }
-                            model.refreshBusiness()
-                            model.toast(Copy.business.updated)
-                        }
-                    }
-                }
-            } else {
-                AppCard {
-                    InfoRow(Copy.common.phone, business.phone ?: "—")
-                    InfoRow(Copy.common.email, business.email ?: "—")
-                    InfoRow(Copy.common.address, business.address ?: "—")
-                }
-            }
-
-            SectionTitle(Copy.business.region)
-            AppCard {
-                InfoRow(Copy.business.timezone, business.timezone)
-                InfoRow(Copy.business.currency, business.currency)
-                InfoRow(Copy.business.language, if (business.locale == "es") "Español" else "English")
             }
         }
     }

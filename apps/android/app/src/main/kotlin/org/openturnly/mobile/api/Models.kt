@@ -94,9 +94,6 @@ data class Service(
 data class ServiceList(val services: List<Service> = emptyList())
 
 @Serializable
-data class ServiceEnvelope(val service: Service)
-
-@Serializable
 data class Professional(
     val id: String,
     val name: String = "",
@@ -112,32 +109,6 @@ data class Professional(
 
 @Serializable
 data class ProfessionalList(val professionals: List<Professional> = emptyList())
-
-@Serializable
-data class ProfessionalEnvelope(val professional: Professional)
-
-@Serializable
-data class HourRange(val weekday: Int, val start: String, val end: String)
-
-@Serializable
-data class Hours(
-    val locationId: String = "",
-    val business: List<HourRange> = emptyList(),
-    val professionals: Map<String, List<HourRange>> = emptyMap(),
-)
-
-@Serializable
-data class Closure(
-    val id: String,
-    val locationId: String? = null,
-    val resourceId: String? = null,
-    val date: String,
-    val endDate: String? = null,
-    val note: String? = null,
-)
-
-@Serializable
-data class ClosureList(val closures: List<Closure> = emptyList())
 
 @Serializable
 data class AppointmentCustomer(
@@ -361,9 +332,6 @@ data class GiftCard(
 )
 
 @Serializable
-data class GiftCardList(val giftCards: List<GiftCard> = emptyList())
-
-@Serializable
 data class GiftCardEnvelope(val giftCard: GiftCard)
 
 @Serializable
@@ -388,56 +356,6 @@ data class Product(
 
 @Serializable
 data class ProductList(val products: List<Product> = emptyList())
-
-@Serializable
-data class ProductAttribute(val id: String, val kind: String = "category", val name: String = "", val products: Int = 0)
-
-@Serializable
-data class ProductAttributeList(val attributes: List<ProductAttribute> = emptyList())
-
-@Serializable
-data class StockBalance(val balance: Long = 0)
-
-@Serializable
-data class CashFlows(
-    val sales: Long = 0, val deposits: Long = 0, val internal: Long = 0, val giftCards: Long = 0,
-    val otherIncome: Long = 0, val expenses: Long = 0, val result: Long = 0,
-)
-
-@Serializable
-data class CashByMethod(val cash: Long = 0, val card: Long = 0, val transfer: Long = 0, val other: Long = 0, val online: Long = 0)
-
-@Serializable
-data class CashSale(
-    val id: String, val number: Int = 0, val createdAt: String = "", val locationName: String? = null,
-    val customer: String? = null, val flow: String = "sales", val methods: List<String> = emptyList(), val amount: Long = 0,
-)
-
-@Serializable
-data class CashDeposit(
-    val id: String, val amount: Long = 0, val method: String = "cash", val note: String? = null,
-    val createdAt: String = "", val locationName: String? = null, val customer: String? = null,
-)
-
-@Serializable
-data class CashMovement(
-    val id: String, val kind: String = "income", val amount: Long = 0, val method: String? = null,
-    val category: String? = null, val description: String? = null, val createdAt: String = "",
-    val locationName: String? = null, val createdByName: String? = null,
-)
-
-@Serializable
-data class CashReport(
-    val flows: CashFlows = CashFlows(),
-    val byMethod: CashByMethod = CashByMethod(),
-    val sales: List<CashSale> = emptyList(),
-    val deposits: List<CashDeposit> = emptyList(),
-    val movements: List<CashMovement> = emptyList(),
-    val cashInDrawer: Long = 0,
-)
-
-@Serializable
-data class CashDrawer(val cashInDrawer: Long = 0)
 
 @Serializable
 data class Period(val from: String = "", val to: String = "")
@@ -499,20 +417,3 @@ data class CommissionRow(
 @Serializable
 data class CommissionsReport(val professionals: List<CommissionRow> = emptyList())
 
-@Serializable
-data class Member(
-    val userId: String, val name: String = "", val email: String = "", val role: String = "admin",
-    val resourceId: String? = null, val resourceName: String? = null,
-)
-
-@Serializable
-data class Invitation(val id: String, val email: String = "", val expiresAt: String = "", val createdAt: String = "")
-
-@Serializable
-data class AccessList(val members: List<Member> = emptyList(), val invitations: List<Invitation> = emptyList())
-
-@Serializable
-data class AccessResult(val status: String = "added", val inviteUrl: String? = null, val invitation: Invitation? = null)
-
-@Serializable
-data class Ok(val ok: Boolean = true)

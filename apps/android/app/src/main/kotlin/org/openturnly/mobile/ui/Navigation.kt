@@ -7,10 +7,7 @@ import androidx.compose.runtime.setValue
 import java.time.LocalDate
 import org.openturnly.mobile.api.Appointment
 import org.openturnly.mobile.api.CustomerSummary
-import org.openturnly.mobile.api.Product
-import org.openturnly.mobile.api.Professional
 import org.openturnly.mobile.api.Sale
-import org.openturnly.mobile.api.Service
 
 enum class Tab { AGENDA, CUSTOMERS, SALES, MORE }
 
@@ -23,19 +20,9 @@ sealed interface Route {
     data class CustomerDetail(val customer: CustomerSummary) : Route
     data class CustomerForm(val customer: CustomerSummary?) : Route
     data class SaleDetail(val saleId: String, val sale: Sale? = null) : Route
-    data object Services : Route
-    data class ServiceForm(val service: Service?) : Route
-    data object Professionals : Route
-    data class ProfessionalDetail(val professional: Professional?) : Route
-    data object Hours : Route
-    data object Business : Route
+    data object BookingLink : Route
     data object Reports : Route
     data object Account : Route
-    data object Cash : Route
-    data object Inventory : Route
-    data class ProductDetail(val product: Product) : Route
-    data object GiftCards : Route
-    data object Team : Route
 }
 
 /** A route on a stack, with an id so its saved state survives going back to it. */

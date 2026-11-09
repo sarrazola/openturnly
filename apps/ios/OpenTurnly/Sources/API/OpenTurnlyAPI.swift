@@ -75,10 +75,6 @@ struct OpenTurnlyAPI: Sendable {
 
     func business(_ id: String) async throws -> Business { try await (get(b(id)) as BusinessEnvelope).business }
 
-    func updateBusiness(_ id: String, _ changes: [String: JSON]) async throws -> Business {
-        try await (call("PATCH", b(id), .object(changes)) as BusinessEnvelope).business
-    }
-
     // MARK: Catalog
 
     func locations(_ business: String) async throws -> [Location] {
@@ -89,41 +85,8 @@ struct OpenTurnlyAPI: Sendable {
         try await (get(b(business) + "/services") as ServicesEnvelope).services
     }
 
-    func createService(_ business: String, _ body: [String: JSON]) async throws -> Service {
-        try await (call("POST", b(business) + "/services", .object(body)) as ServiceEnvelope).service
-    }
-
-    func updateService(_ business: String, _ id: String, _ changes: [String: JSON]) async throws -> Service {
-        try await (call("PATCH", b(business) + "/services/\(s(id))", .object(changes)) as ServiceEnvelope).service
-    }
-
     func professionals(_ business: String) async throws -> [Professional] {
         try await (get(b(business) + "/professionals") as ProfessionalsEnvelope).professionals
-    }
-
-    func updateProfessional(_ business: String, _ id: String, _ changes: [String: JSON]) async throws {
-        let _: ProfessionalEnvelope = try await call("PATCH", b(business) + "/professionals/\(s(id))", .object(changes))
-    }
-
-    func hours(_ business: String, locationId: String?) async throws -> HoursResponse {
-        try await get(b(business) + "/hours", [("locationId", locationId)])
-    }
-
-    func saveHours(_ business: String, locationId: String?, resourceId: String?, hours: [HoursRange]) async throws {
-        var body: [String: JSON] = [
-            "resourceId": .opt(resourceId),
-            "hours": .array(hours.map { ["weekday": .int($0.weekday), "start": .string($0.start), "end": .string($0.end)] }),
-        ]
-        if let locationId { body["locationId"] = .string(locationId) }
-        try await send("PUT", b(business) + "/hours", .object(body))
-    }
-
-    func holidays(_ business: String, language: String) async throws -> HolidaysResponse {
-        try await get(b(business) + "/holidays", [("lang", language)])
-    }
-
-    func closures(_ business: String) async throws -> [Closure] {
-        try await (get(b(business) + "/closures") as ClosuresEnvelope).closures
     }
 
     // MARK: Appointments
@@ -215,30 +178,14 @@ struct OpenTurnlyAPI: Sendable {
 
     // MARK: Gift cards
 
-    func giftCards(_ business: String) async throws -> [GiftCard] {
-        try await (get(b(business) + "/gift-cards") as GiftCardsEnvelope).giftCards
-    }
-
     func lookupGiftCard(_ business: String, code: String) async throws -> GiftCard {
         try await (get(b(business) + "/gift-cards/lookup", [("code", code.trimmingCharacters(in: .whitespaces).uppercased())]) as GiftCardEnvelope).giftCard
     }
 
-    func setGiftCardActive(_ business: String, _ id: String, active: Bool) async throws -> GiftCard {
-        try await (call("PATCH", b(business) + "/gift-cards/\(s(id))", ["active": .bool(active)]) as GiftCardEnvelope).giftCard
-    }
-
-    // MARK: Inventory and cash
+    // MARK: Products
 
     func products(_ business: String) async throws -> [Product] {
         try await (get(b(business) + "/products") as ProductsEnvelope).products
-    }
-
-    func cash(_ business: String, from: Date, to: Date, locationId: String? = nil) async throws -> CashSummary {
-        try await get(b(business) + "/cash", [("from", instant(from)), ("to", instant(to)), ("locationId", locationId)])
-    }
-
-    func addCashMovement(_ business: String, _ body: [String: JSON]) async throws {
-        try await send("POST", b(business) + "/cash/movements", .object(body))
     }
 
     // MARK: Reports
@@ -249,19 +196,5 @@ struct OpenTurnlyAPI: Sendable {
 
     func reportCommissions(_ business: String, from: LocalDate, to: LocalDate) async throws -> [ReportCommission] {
         try await (get(b(business) + "/reports/commissions", [("from", from.string), ("to", to.string)]) as CommissionsResponse).professionals
-    }
-
-    // MARK: Team
-
-    func access(_ business: String) async throws -> AccessResponse {
-        try await get(b(business) + "/access")
-    }
-
-    func invite(_ business: String, email: String) async throws -> InviteResponse {
-        try await call("POST", b(business) + "/access", ["email": .string(email)])
-    }
-
-    func deleteInvitation(_ business: String, _ id: String) async throws {
-        try await send("DELETE", b(business) + "/invitations/\(s(id))")
     }
 }

@@ -61,15 +61,16 @@ like any local address.
   and payment methods, a sale's detail and voiding it, and the checkout for an
   appointment or a walk-in sale: services and products, a discount code or gift
   card, a tip, the customer's deposits, and the payment split across methods.
-- **More**: services, professionals, opening hours, the business with its
-  booking link to share and a QR code, reports (summary, tips, commissions),
-  the cash register, inventory, gift cards, team access, the account and
-  signing out.
+- **More**: the booking link to share and its QR code, reports (summary, tips,
+  commissions), a shortcut to the web panel, the account and signing out.
 
 A professional sees their own agenda, books and moves their own appointments,
-searches customers to reach them, and reads services, the team and the hours,
-as the server allows. Charging, cancelling, no-shows, customer records,
-reports and settings are for owners and admins.
+and shares the booking link, as the server allows. Charging, cancelling,
+no-shows, customer records, sales and reports are for owners and admins.
+
+Setting the business up (opening hours, services, staff, team access, the cash
+register, inventory, gift cards and the rest of the settings) is done in the web
+panel; "More" opens it in the browser.
 
 ## Behaviour worth knowing
 

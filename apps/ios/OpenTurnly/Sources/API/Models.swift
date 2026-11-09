@@ -108,7 +108,6 @@ struct Service: Codable, Identifiable, Hashable {
 }
 
 struct ServicesEnvelope: Decodable { let services: [Service] }
-struct ServiceEnvelope: Decodable { let service: Service }
 
 struct Professional: Codable, Identifiable, Hashable {
     let id: String
@@ -124,43 +123,6 @@ struct Professional: Codable, Identifiable, Hashable {
 }
 
 struct ProfessionalsEnvelope: Decodable { let professionals: [Professional] }
-struct ProfessionalEnvelope: Decodable { let professional: Professional }
-
-/// One opening range: `weekday` 0 = Sunday … 6 = Saturday, wall-clock times.
-struct HoursRange: Codable, Hashable {
-    var weekday: Int
-    var start: String
-    var end: String
-}
-
-struct HoursResponse: Decodable {
-    let locationId: String?
-    let business: [HoursRange]
-    let professionals: [String: [HoursRange]]?
-}
-
-struct Holiday: Decodable, Hashable {
-    let date: String
-    let name: String
-    let closed: Bool
-}
-
-struct HolidaysResponse: Decodable {
-    let country: String?
-    let closedOnHolidays: Bool?
-    let holidays: [Holiday]
-}
-
-struct Closure: Decodable, Identifiable, Hashable {
-    let id: String
-    let locationId: String?
-    let resourceId: String?
-    let date: String
-    let endDate: String?
-    let note: String?
-}
-
-struct ClosuresEnvelope: Decodable { let closures: [Closure] }
 
 // MARK: Appointments
 
@@ -427,7 +389,6 @@ struct GiftCard: Decodable, Identifiable, Hashable {
     let customer: GiftCardCustomer?
 }
 
-struct GiftCardsEnvelope: Decodable { let giftCards: [GiftCard] }
 struct GiftCardEnvelope: Decodable { let giftCard: GiftCard }
 
 // MARK: Inventory
@@ -460,43 +421,6 @@ struct Product: Decodable, Identifiable, Hashable {
 struct ProductsEnvelope: Decodable { let products: [Product] }
 
 // MARK: Cash
-
-struct CashFlows: Decodable, Hashable {
-    let sales: Int
-    let deposits: Int
-    let `internal`: Int
-    let giftCards: Int
-    let otherIncome: Int
-    let expenses: Int
-    let result: Int
-}
-
-struct CashByMethod: Decodable, Hashable {
-    let cash: Int
-    let card: Int
-    let transfer: Int
-    let other: Int
-    let online: Int
-}
-
-struct CashMovement: Decodable, Identifiable, Hashable {
-    let id: String
-    let kind: String
-    let amount: Int
-    let method: String?
-    let category: String?
-    let description: String?
-    let createdAt: Date
-    let locationName: String?
-    let createdByName: String?
-}
-
-struct CashSummary: Decodable {
-    let flows: CashFlows
-    let byMethod: CashByMethod
-    let movements: [CashMovement]
-    let cashInDrawer: Int
-}
 
 // MARK: Reports
 
@@ -575,16 +499,6 @@ struct CommissionsResponse: Decodable { let professionals: [ReportCommission] }
 
 // MARK: Team
 
-struct Member: Decodable, Identifiable, Hashable {
-    let userId: String
-    let name: String
-    let email: String
-    let role: String
-    let resourceId: String?
-    let resourceName: String?
-    var id: String { userId }
-}
-
 struct Invitation: Decodable, Identifiable, Hashable {
     let id: String
     let email: String
@@ -592,15 +506,3 @@ struct Invitation: Decodable, Identifiable, Hashable {
     let createdAt: Date?
 }
 
-struct AccessResponse: Decodable {
-    let members: [Member]
-    let invitations: [Invitation]
-}
-
-struct InviteResponse: Decodable {
-    /// `added` (the e-mail already had an account) or `invited`.
-    let status: String
-    let inviteUrl: String?
-}
-
-struct OkResponse: Decodable { let ok: Bool? }

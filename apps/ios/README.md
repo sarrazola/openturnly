@@ -35,11 +35,15 @@ type `localhost:<port>` on the first screen.
 | Agenda | everyone | Week strip and calendar, professional and location filters, the day's appointments by morning, afternoon and evening, appointment detail (call, WhatsApp, e-mail, booking answers, customer notes), new appointment with the server's free times, reschedule, cancel, no-show and "they came", deposit, charge and close sale |
 | Clientes | admins | Searchable list, detail with visits and history, create and edit, book for a customer |
 | Ventas | admins | The day's sales and deposits with totals by payment method, sale detail and void, counter sale |
-| Más | everyone | Business details with the booking link, share and QR code; opening hours; services; staff; team access; reports; cash register; inventory; gift cards; my account; sign out |
+| Más | everyone | The booking link with share and QR code; reports (admins); a shortcut to the web panel (admins); my account; sign out |
 
-A professional only gets their own agenda: they can book with themselves and
-move their own appointments, and see services and opening hours. Everything the
-server refuses them is hidden rather than shown as an error.
+A professional only gets their own agenda: they can book with themselves, move
+their own appointments and share the booking link. Everything the server
+refuses them is hidden rather than shown as an error.
+
+Setting the business up (opening hours, services, staff, team access, the cash
+register, inventory, gift cards and the rest of the settings) is done in the web
+panel; "More" opens it in the browser.
 
 ## Layout
 

@@ -448,61 +448,17 @@ enum L {
 
     enum More {
         static var title: String { tr("More", "Más") }
-        static var business: String { tr("Business", "Negocio") }
-        static var businessInfo: String { tr("Business details", "Datos del negocio") }
-        static var bookingPage: String { tr("Booking page", "Página de reservas") }
-        static var hours: String { tr("Opening hours", "Horario del negocio") }
-        static var services: String { tr("Services", "Servicios") }
-        static var professionals: String { tr("Staff", "Profesionales") }
-        static var team: String { tr("Team access", "Equipo") }
-        static var money: String { tr("Money", "Dinero") }
-        static var cash: String { tr("Cash register", "Caja") }
-        static var inventory: String { tr("Inventory", "Inventario") }
-        static var giftCards: String { "Gift cards" }
+        static var bookingLink: String { tr("Booking link", "Link de reservas") }
         static var reports: String { tr("Reports", "Reportes") }
+        static var webPanel: String { tr("Open the web panel", "Abrir el panel web") }
+        static var webPanelHint: String {
+            tr("Hours, services, staff, cash register, inventory, gift cards and settings are managed in the web panel.",
+               "El horario, los servicios, el equipo, la caja, el inventario, las gift cards y la configuración se manejan en el panel web.")
+        }
         static var account: String { tr("My account", "Mi cuenta") }
         static var signOut: String { tr("Sign out", "Cerrar sesión") }
         static var signOutTitle: String { tr("Sign out of this phone?", "¿Cerrar sesión en este teléfono?") }
         static func version(_ value: String) -> String { tr("Version \(value)", "Versión \(value)") }
-        static var webOnly: String {
-            tr("Settings, automations and integrations are in the web panel.",
-               "La configuración, los flujos y las integraciones están en el panel web.")
-        }
-    }
-
-    enum Services {
-        static var title: String { tr("Services", "Servicios") }
-        static var new: String { tr("New service", "Nuevo servicio") }
-        static var edit: String { tr("Edit service", "Editar servicio") }
-        static var emptyTitle: String { tr("No services yet", "Aún no tienes servicios") }
-        static var emptyBody: String {
-            tr("Create the first one, for example \"Classic cut, 30 min\".", "Crea el primero, por ejemplo «Corte clásico, 30 min».")
-        }
-        static var name: String { tr("Name", "Nombre") }
-        static var namePlaceholder: String { tr("Classic cut", "Corte clásico") }
-        static var category: String { tr("Category", "Categoría") }
-        static var categoryPlaceholder: String { tr("E.g. Cuts, Beard, Color", "Ej. Cortes, Barba, Color") }
-        static var uncategorized: String { tr("Other", "Otros") }
-        static var duration: String { tr("Duration", "Duración") }
-        static var price: String { tr("Price", "Precio") }
-        static var description: String { tr("Description", "Descripción") }
-        static var descriptionPlaceholder: String { tr("What it includes, who it's for…", "Qué incluye, para quién es…") }
-        static var visible: String { tr("Visible", "Visible") }
-        static var hidden: String { tr("Hidden", "Oculto") }
-        static var active: String { tr("Visible on the booking page", "Visible en la página de reservas") }
-        static var activeHint: String { tr("If you turn it off, customers can't book it.", "Si lo apagas, tus clientes no podrán reservarlo.") }
-        static var created: String { tr("Service created", "Servicio creado") }
-        static var onlinePayment: String { tr("Online payment", "Cobro en línea") }
-        static func paymentMode(_ raw: String?) -> String {
-            switch raw {
-            case "optional": return tr("Optional", "Opcional")
-            case "deposit": return tr("Deposit", "Abono")
-            case "full": return tr("Full payment", "Pago completo")
-            default: return tr("None", "Sin cobro")
-            }
-        }
-        static var priceRequired: String { tr("Enter a price.", "Escribe un precio.") }
-        static var nameRequired: String { tr("Enter a name.", "Escribe un nombre.") }
     }
 
     enum Professionals {
@@ -637,36 +593,6 @@ enum L {
         static var appearance: String { tr("Appearance follows your phone's light or dark mode.", "La apariencia sigue el modo claro u oscuro de tu teléfono.") }
     }
 
-    enum Cash {
-        static var title: String { tr("Cash register", "Caja") }
-        static var inDrawer: String { tr("Cash in the drawer", "Efectivo en caja") }
-        static var flows: String { tr("Money in and out", "Entradas y salidas") }
-        static var sales: String { tr("Sales", "Ventas") }
-        static var deposits: String { tr("Deposits", "Abonos") }
-        static var `internal`: String { tr("Internal sales", "Ventas internas") }
-        static var giftCards: String { "Gift cards" }
-        static var otherIncome: String { tr("Other income", "Otros ingresos") }
-        static var expenses: String { tr("Expenses", "Egresos") }
-        static var result: String { tr("Result", "Resultado") }
-        static var movements: String { tr("Movements", "Movimientos") }
-        static var noMovements: String { tr("No movements in this period.", "No hay movimientos en este periodo.") }
-        static var income: String { tr("Income", "Ingreso") }
-        static var expense: String { tr("Expense", "Egreso") }
-        static var newMovement: String { tr("New movement", "Nuevo movimiento") }
-        static var category: String { tr("Category", "Categoría") }
-        static var saved: String { tr("Movement recorded", "Movimiento registrado") }
-        static func kind(_ raw: String) -> String {
-            switch raw {
-            case "income": return income
-            case "expense": return expense
-            case "transfer_out": return tr("Transfer (out)", "Traspaso (sale)")
-            case "transfer_in": return tr("Transfer (in)", "Traspaso (entra)")
-            case "adjustment": return tr("Cash count", "Cuadre de caja")
-            default: return raw
-            }
-        }
-    }
-
     enum Inventory {
         static var title: String { tr("Inventory", "Inventario") }
         static var emptyTitle: String { tr("No products yet", "Aún no tienes productos") }
@@ -712,34 +638,6 @@ enum L {
         static func until(_ date: String) -> String { tr("Until \(date)", "Hasta el \(date)") }
         static var activate: String { tr("Activate", "Activar") }
         static var deactivate: String { tr("Deactivate", "Desactivar") }
-    }
-
-    enum Team {
-        static var title: String { tr("Team access", "Equipo") }
-        static var hint: String {
-            tr("People who can sign in to this business. Staff members only see their own calendar.",
-               "Las personas que pueden entrar a este negocio. Los profesionales solo ven su propia agenda.")
-        }
-        static var members: String { tr("People with access", "Personas con acceso") }
-        static var invitations: String { tr("Pending invitations", "Invitaciones pendientes") }
-        static var invite: String { tr("Invite by email", "Invitar por email") }
-        static var inviteHint: String {
-            tr("If the email already has an account, they get access right away as an admin. Otherwise you get a link to send them, valid for 7 days.",
-               "Si el email ya tiene cuenta, recibe acceso de inmediato como administrador. Si no, te damos un enlace para enviarle, válido por 7 días.")
-        }
-        static var send: String { tr("Invite", "Invitar") }
-        static var added: String { tr("They have access now", "Ya tiene acceso") }
-        static var invited: String { tr("Invitation created", "Invitación creada") }
-        static var inviteLink: String { tr("Invitation link", "Enlace de invitación") }
-        static var shareLink: String { tr("Share the link", "Compartir el enlace") }
-        static var linkOnce: String {
-            tr("Send it now: it's shown only once.", "Envíalo ahora: solo se muestra una vez.")
-        }
-        static func expires(_ date: String) -> String { tr("Expires \(date)", "Vence el \(date)") }
-        static var revoke: String { tr("Revoke", "Revocar") }
-        static var empty: String { tr("Only you have access for now.", "Por ahora solo tú tienes acceso.") }
-        static func linked(_ name: String) -> String { tr("Profile: \(name)", "Perfil: \(name)") }
-        static var invalidEmail: String { tr("Enter a valid email.", "Escribe un email válido.") }
     }
 
     enum Errors {

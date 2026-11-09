@@ -67,19 +67,9 @@ import org.openturnly.mobile.ui.customers.CustomerDetailScreen
 import org.openturnly.mobile.ui.customers.CustomerFormScreen
 import org.openturnly.mobile.ui.customers.CustomersScreen
 import org.openturnly.mobile.ui.more.AccountScreen
-import org.openturnly.mobile.ui.more.BusinessScreen
-import org.openturnly.mobile.ui.more.CashScreen
-import org.openturnly.mobile.ui.more.GiftCardsScreen
-import org.openturnly.mobile.ui.more.HoursScreen
-import org.openturnly.mobile.ui.more.InventoryScreen
+import org.openturnly.mobile.ui.more.BookingLinkScreen
 import org.openturnly.mobile.ui.more.MoreScreen
-import org.openturnly.mobile.ui.more.ProductDetailScreen
-import org.openturnly.mobile.ui.more.ProfessionalDetailScreen
-import org.openturnly.mobile.ui.more.ProfessionalsScreen
 import org.openturnly.mobile.ui.more.ReportsScreen
-import org.openturnly.mobile.ui.more.ServiceFormScreen
-import org.openturnly.mobile.ui.more.ServicesScreen
-import org.openturnly.mobile.ui.more.TeamScreen
 import org.openturnly.mobile.ui.sales.CheckoutScreen
 import org.openturnly.mobile.ui.sales.SaleDetailScreen
 import org.openturnly.mobile.ui.sales.SalesScreen
@@ -97,11 +87,13 @@ fun MainScaffold(model: AppModel) {
     val holder = rememberSaveableStateHolder()
     val items = buildList {
         add(TabItem(Tab.AGENDA, Copy.nav.agenda, Icons.Outlined.CalendarMonth, Icons.Filled.CalendarMonth))
-        add(TabItem(Tab.CUSTOMERS, Copy.nav.customers, Icons.Outlined.People, Icons.Filled.People))
-        if (model.isAdmin) add(TabItem(Tab.SALES, Copy.nav.sales, Icons.Outlined.PointOfSale, Icons.Filled.PointOfSale))
+        if (model.isAdmin) {
+            add(TabItem(Tab.CUSTOMERS, Copy.nav.customers, Icons.Outlined.People, Icons.Filled.People))
+            add(TabItem(Tab.SALES, Copy.nav.sales, Icons.Outlined.PointOfSale, Icons.Filled.PointOfSale))
+        }
         add(TabItem(Tab.MORE, Copy.nav.more, Icons.Outlined.Menu, Icons.Filled.Menu))
     }
-    if (nav.tab == Tab.SALES && !model.isAdmin) nav.select(Tab.AGENDA)
+    if ((nav.tab == Tab.SALES || nav.tab == Tab.CUSTOMERS) && !model.isAdmin) nav.select(Tab.AGENDA)
 
     BackHandler(enabled = nav.top != null) { nav.pop() }
     BackHandler(enabled = nav.top == null && nav.tab != Tab.AGENDA) { nav.select(Tab.AGENDA) }
@@ -192,19 +184,9 @@ private fun RouteScreen(model: AppModel, route: Route) {
         is Route.CustomerDetail -> CustomerDetailScreen(model, route.customer)
         is Route.CustomerForm -> CustomerFormScreen(model, route.customer)
         is Route.SaleDetail -> SaleDetailScreen(model, route.saleId, route.sale)
-        Route.Services -> ServicesScreen(model)
-        is Route.ServiceForm -> ServiceFormScreen(model, route.service)
-        Route.Professionals -> ProfessionalsScreen(model)
-        is Route.ProfessionalDetail -> ProfessionalDetailScreen(model, route.professional)
-        Route.Hours -> HoursScreen(model)
-        Route.Business -> BusinessScreen(model)
+        Route.BookingLink -> BookingLinkScreen(model)
         Route.Reports -> ReportsScreen(model)
         Route.Account -> AccountScreen(model)
-        Route.Cash -> CashScreen(model)
-        Route.Inventory -> InventoryScreen(model)
-        is Route.ProductDetail -> ProductDetailScreen(model, route.product)
-        Route.GiftCards -> GiftCardsScreen(model)
-        Route.Team -> TeamScreen(model)
     }
 }
 

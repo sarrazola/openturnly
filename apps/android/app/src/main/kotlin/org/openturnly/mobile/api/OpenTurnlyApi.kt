@@ -35,32 +35,12 @@ class OpenTurnlyApi(val server: String, val token: String) {
 
     suspend fun businesses(): List<Business> = get("/businesses", BusinessList.serializer()).businesses
     suspend fun business(id: String): Business = get(b(id), BusinessEnvelope.serializer()).business
-    suspend fun updateBusiness(id: String, body: JsonElement): Business = call("PATCH", b(id), BusinessEnvelope.serializer(), body).business
-    suspend fun access(id: String): AccessList = get("${b(id)}/access", AccessList.serializer())
-    suspend fun invite(id: String, email: String): AccessResult = call("POST", "${b(id)}/access", AccessResult.serializer(), obj("email" to email))
 
     // Catalog
 
     suspend fun locations(id: String): List<Location> = get("${b(id)}/locations", LocationList.serializer()).locations
     suspend fun services(id: String): List<Service> = get("${b(id)}/services", ServiceList.serializer()).services
-    suspend fun createService(id: String, body: JsonElement): Service = call("POST", "${b(id)}/services", ServiceEnvelope.serializer(), body).service
-    suspend fun updateService(id: String, serviceId: String, body: JsonElement): Service =
-        call("PATCH", "${b(id)}/services/${encodePath(serviceId)}", ServiceEnvelope.serializer(), body).service
-    suspend fun deleteService(id: String, serviceId: String) = send("DELETE", "${b(id)}/services/${encodePath(serviceId)}")
     suspend fun professionals(id: String): List<Professional> = get("${b(id)}/professionals", ProfessionalList.serializer()).professionals
-    suspend fun createProfessional(id: String, body: JsonElement): Professional =
-        call("POST", "${b(id)}/professionals", ProfessionalEnvelope.serializer(), body).professional
-    suspend fun updateProfessional(id: String, resourceId: String, body: JsonElement): Professional =
-        call("PATCH", "${b(id)}/professionals/${encodePath(resourceId)}", ProfessionalEnvelope.serializer(), body).professional
-
-    // Hours
-
-    suspend fun hours(id: String, locationId: String?): Hours = get("${b(id)}/hours" + query("locationId" to locationId), Hours.serializer())
-    suspend fun saveHours(id: String, locationId: String, resourceId: String?, hours: List<HourRange>) = send(
-        "PUT", "${b(id)}/hours",
-        obj("locationId" to locationId, "resourceId" to resourceId, "hours" to hours.map { mapOf("weekday" to it.weekday, "start" to it.start, "end" to it.end) }),
-    )
-    suspend fun closures(id: String): List<Closure> = get("${b(id)}/closures", ClosureList.serializer()).closures
 
     // Appointments
 
@@ -96,19 +76,11 @@ class OpenTurnlyApi(val server: String, val token: String) {
     suspend fun deposits(id: String, from: String? = null, to: String? = null, customerId: String? = null): List<Deposit> =
         get("${b(id)}/deposits" + query("from" to from, "to" to to, "customerId" to customerId), DepositList.serializer()).deposits
     suspend fun createDeposit(id: String, body: JsonElement): Deposit = call("POST", "${b(id)}/deposits", DepositEnvelope.serializer(), body).deposit
-    suspend fun giftCards(id: String): List<GiftCard> = get("${b(id)}/gift-cards", GiftCardList.serializer()).giftCards
     suspend fun lookupGiftCard(id: String, code: String): GiftCard = get("${b(id)}/gift-cards/lookup" + query("code" to code), GiftCardEnvelope.serializer()).giftCard
-    suspend fun updateGiftCard(id: String, giftCardId: String, body: JsonElement): GiftCard =
-        call("PATCH", "${b(id)}/gift-cards/${encodePath(giftCardId)}", GiftCardEnvelope.serializer(), body).giftCard
 
-    // Cash, inventory, reports
+    // Products and reports
 
-    suspend fun cash(id: String, from: String, to: String, locationId: String? = null): CashReport =
-        get("${b(id)}/cash" + query("from" to from, "to" to to, "locationId" to locationId), CashReport.serializer())
-    suspend fun addCashMovement(id: String, body: JsonElement): CashDrawer = call("POST", "${b(id)}/cash/movements", CashDrawer.serializer(), body)
     suspend fun products(id: String): List<Product> = get("${b(id)}/products", ProductList.serializer()).products
-    suspend fun productAttributes(id: String): List<ProductAttribute> = get("${b(id)}/product-attributes", ProductAttributeList.serializer()).attributes
-    suspend fun addStockMovement(id: String, body: JsonElement): StockBalance = call("POST", "${b(id)}/stock-movements", StockBalance.serializer(), body)
     suspend fun reportSummary(id: String, from: String, to: String, locationId: String? = null): ReportSummary =
         get("${b(id)}/reports/summary" + query("from" to from, "to" to to, "locationId" to locationId), ReportSummary.serializer())
     suspend fun reportTips(id: String, from: String, to: String, locationId: String? = null): TipsReport =

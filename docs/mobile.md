@@ -2,9 +2,9 @@
 
 OpenTurnly has two native apps for the people who run a business: the owner, the admins and
 the staff. One is for iPhone (SwiftUI), the other for Android (Kotlin and Jetpack Compose).
-They do from the phone what the web admin does: the agenda, booking and moving appointments,
-charging, customers, sales, reports and the business's settings. Customers keep booking from the
-booking page; the apps are not for them.
+They cover the day at the business: the agenda, booking and moving appointments, charging,
+customers and the day's sales. Setting the business up stays in the web admin, which the apps open
+from "More". Customers keep booking from the booking page; the apps are not for them.
 
 Both apps talk to your own server with the same API the web admin uses. They hold no data of
 their own and send nothing anywhere else: no analytics, no trackers.
@@ -13,15 +13,16 @@ their own and send nothing anywhere else: no analytics, no trackers.
 
 | Tab | Admins | Professionals |
 | --- | --- | --- |
-| Agenda | Every professional's appointments, with filters by professional and location. Book, move, cancel, mark no-shows, take deposits and charge. | Their own appointments. They book with themselves and move their own. |
+| Agenda | Every professional's appointments; the filter button narrows them to one professional or location. Book, move, cancel, mark no-shows, take deposits and charge. | Their own appointments. They book with themselves and move their own. |
 | Customers | Search, history, create and edit. | Only when booking. |
 | Sales | The day's sales and deposits, totals by payment method, void, counter sales. | — |
-| More | Business details with the booking link and its QR code, hours, services, staff, team access, reports, cash register, inventory, gift cards and their account. | Services and hours to read, and their account. |
+| More | The booking link and its QR code, reports, a shortcut to the web admin and their account. | The booking link and their account. |
 
 The server decides what each role may do. The apps only hide what the server would refuse.
 
-Some things stay in the web admin: deleting and merging customers, deleting services, creating
-products and gift cards, and closures, holidays and booking rules.
+Everything else is done in the web admin: opening hours, closures and holidays, services, staff
+and team access, the cash register, inventory, gift cards, the business's details and booking
+rules, and deleting or merging customers.
 
 ## Signing in
 
