@@ -384,6 +384,11 @@ export function appointmentRoutes({ db, automations, notifications }: Deps) {
           staffRules(business),
         );
         await automations.emit(appointment.id, "rescheduled", current.startsAt);
+        await notifications.appointmentRescheduled(
+          appointment.id,
+          current,
+          c.get("user")?.id ?? null,
+        );
         return c.json({ appointment });
       })
 
@@ -472,6 +477,7 @@ export function appointmentRoutes({ db, automations, notifications }: Deps) {
           .returning({ id: appointments.id, status: appointments.status });
         if (cancelled) {
           await automations.emit(cancelled.id, "cancelled");
+          await notifications.appointmentCancelled(cancelled.id, c.get("user")?.id ?? null);
           return c.json({ appointment: cancelled });
         }
         // Already cancelled: nothing changes and nothing is sent again.

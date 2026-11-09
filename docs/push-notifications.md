@@ -5,13 +5,14 @@ nothing, needs no account anywhere and costs nothing: `PUSH_PROVIDER` is `none`.
 
 ## What gets notified
 
-When an appointment is booked, from the booking page, the web admin, a phone app or an AI agent,
-the people who should know get a notification:
+When an appointment is booked, moved or cancelled, from the booking page, the web admin, a phone
+app or an AI agent, the people who should know get a notification:
 
-- the instance's owners and the business's admins, for every booking;
-- the professional it's booked with, for their own.
+- the instance's owners and the business's admins, for every appointment;
+- the professional it's with, for their own; when it moves to someone else, the one it was with
+  hears too.
 
-The person who booked it doesn't get one. Each notification is kept on the server, so the phone
+The person who made the change doesn't get one. Each notification is kept on the server, so the phone
 apps list them, count the unread ones on a bell in the agenda and on the app's icon, and mark them
 read when they're opened. This works with or without push.
 
@@ -75,6 +76,7 @@ The body:
 }
 ```
 
+`kind` is `appointment_booked`, `appointment_rescheduled` or `appointment_cancelled`.
 `userId` is the person it's for, as this install knows them. `badge` is their unread count, for
 the number on the app's icon. Answer `200`; to have the
 server forget tokens that will never work again, answer `{ "invalidTokens": ["…"] }`.

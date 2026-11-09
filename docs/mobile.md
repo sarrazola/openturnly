@@ -41,9 +41,9 @@ The server needs nothing new for this: the routes are part of every install.
 
 ## Notifications
 
-A bell in the agenda lists new bookings and counts the unread ones; the app's icon shows the
-same number. A build with its own push credentials can also receive them as push notifications,
-with a switch in "My account" to turn them off on that phone. See
+A bell in the agenda lists appointments booked, moved and cancelled, and counts the unread ones;
+the app's icon shows the same number. A build with its own push credentials can also receive them
+as push notifications, with a switch in "My account" to turn them off on that phone. See
 [push-notifications.md](push-notifications.md).
 
 ## Building them

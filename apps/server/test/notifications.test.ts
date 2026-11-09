@@ -176,6 +176,67 @@ describe("notifications of new bookings", () => {
   });
 });
 
+describe("notifications of moved and cancelled appointments", () => {
+  it("tell the professional it's with, and the one it was with when it changes hands", async () => {
+    const { sent, provider } = recordingPush();
+    const { app, owner, base, haircut, juan, pepe, book } = await shop(provider);
+    const juanPhone = await phone(app, "juan@example.com", "juan-password-1");
+    const pepePhone = await phone(app, "pepe@example.com", "pepe-password-1");
+    await juanPhone("POST", "/api/mobile/devices", { token: "juan-token", platform: "ios" });
+    await pepePhone("POST", "/api/mobile/devices", { token: "pepe-token", platform: "ios" });
+    const booked = (await book("09:00", juan.id)).body.appointment as { id: string };
+    sent.length = 0;
+    const to = (token: string) => sent.filter((m) => m.devices.some((d) => d.token === token));
+
+    // The owner moves it to 10:00, still with Juan: only Juan hears, with the old time.
+    const later = await owner.patch(`${base}/appointments/${booked.id}`, {
+      serviceId: haircut.id,
+      resourceId: juan.id,
+      date: nextSaturday(),
+      time: "10:00",
+    });
+    expect(later.status).toBe(200);
+    expect(to("pepe-token")).toHaveLength(0);
+    expect(to("juan-token")[0]).toMatchObject({
+      title: "Cita movida",
+      data: { kind: "appointment_rescheduled", appointmentId: booked.id },
+    });
+    expect(to("juan-token")[0]?.body).toMatch(/^Ana Pérez · Corte · .+ \(antes: .+\)$/);
+
+    // Then to Pepe at the same time: both hear; Juan is told who has it now.
+    sent.length = 0;
+    const handed = await owner.patch(`${base}/appointments/${booked.id}`, {
+      serviceId: haircut.id,
+      resourceId: pepe.id,
+      date: nextSaturday(),
+      time: "10:00",
+    });
+    expect(handed.status).toBe(200);
+    expect(to("juan-token")[0]?.body).toMatch(/ · con Pepe \(antes Juan\)$/);
+    expect(to("juan-token")[0]?.body).not.toContain("(antes:");
+    expect(to("pepe-token")[0]?.body).toMatch(/^Ana Pérez · Corte · [^(]+$/);
+
+    // Cancelled: Pepe hears; Juan, no longer involved, doesn't.
+    sent.length = 0;
+    expect((await owner.post(`${base}/appointments/${booked.id}/cancel`, {})).status).toBe(200);
+    expect(to("juan-token")).toHaveLength(0);
+    expect(to("pepe-token")[0]).toMatchObject({
+      title: "Cita cancelada",
+      data: { kind: "appointment_cancelled" },
+    });
+    // Cancelling it again changes nothing and tells nobody.
+    sent.length = 0;
+    await owner.post(`${base}/appointments/${booked.id}/cancel`, {});
+    expect(sent).toHaveLength(0);
+
+    // The owner made every change, so the owner has only the booking itself to read.
+    const ownerList = (await owner.get("/api/me/notifications")).body.notifications as {
+      kind: string;
+    }[];
+    expect(ownerList.map((n) => n.kind)).toEqual(["appointment_booked"]);
+  });
+});
+
 describe("phones registered for push", () => {
   it("stop receiving when the session ends, and a token belongs to its last person", async () => {
     const { sent, provider } = recordingPush();

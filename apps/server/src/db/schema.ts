@@ -1197,8 +1197,8 @@ export const devices = pgTable(
 );
 
 /**
- * Something a person should know about, such as a new booking: what the apps list and count
- * as unread, whether or not a push reached a phone.
+ * Something a person should know about, such as a booking made, moved or cancelled: what the
+ * apps list and count as unread, whether or not a push reached a phone.
  */
 export const notifications = pgTable(
   "notifications",
@@ -1213,7 +1213,9 @@ export const notifications = pgTable(
     appointmentId: text("appointment_id").references(() => appointments.id, {
       onDelete: "cascade",
     }),
-    kind: text("kind", { enum: ["appointment_booked"] }).notNull(),
+    kind: text("kind", {
+      enum: ["appointment_booked", "appointment_rescheduled", "appointment_cancelled"],
+    }).notNull(),
     title: text("title").notNull(),
     body: text("body").notNull(),
     readAt: instant("read_at"),
