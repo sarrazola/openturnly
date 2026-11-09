@@ -85,7 +85,8 @@ enum SimulatorFallback {
     }
 }
 
-/// Small, non-secret preferences: the business opened last on this phone.
+/// Small, non-secret preferences: the business opened last on this phone, and
+/// notifications on it.
 enum Preferences {
     private static let defaults = UserDefaults.standard
 
@@ -102,5 +103,21 @@ enum Preferences {
     static var lastServer: String? {
         get { defaults.string(forKey: "lastServer") }
         set { defaults.set(newValue, forKey: "lastServer") }
+    }
+
+    /// The push token the phone handed over last, to forget it on sign-out.
+    static var pushToken: String? {
+        get { defaults.string(forKey: "pushToken") }
+        set { defaults.set(newValue, forKey: "pushToken") }
+    }
+
+    /// The person switched notifications off on this phone, in "My account".
+    static func pushSwitchedOff(server: String, user: String) -> Bool {
+        defaults.bool(forKey: "pushOff|\(server)|\(user)")
+    }
+
+    static func setPushSwitchedOff(_ off: Bool, server: String, user: String) {
+        let key = "pushOff|\(server)|\(user)"
+        if off { defaults.set(true, forKey: key) } else { defaults.removeObject(forKey: key) }
     }
 }

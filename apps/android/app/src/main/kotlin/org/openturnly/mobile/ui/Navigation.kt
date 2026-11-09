@@ -23,6 +23,7 @@ sealed interface Route {
     data object BookingLink : Route
     data object Reports : Route
     data object Account : Route
+    data object Notifications : Route
 }
 
 /** A route on a stack, with an id so its saved state survives going back to it. */

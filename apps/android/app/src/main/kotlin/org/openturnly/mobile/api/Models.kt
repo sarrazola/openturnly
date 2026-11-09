@@ -417,3 +417,33 @@ data class CommissionRow(
 @Serializable
 data class CommissionsReport(val professionals: List<CommissionRow> = emptyList())
 
+
+/** What this server offers the apps: whether it sends push notifications at all. */
+@Serializable
+data class MobileSettings(val push: PushSettings = PushSettings())
+
+@Serializable
+data class PushSettings(val enabled: Boolean = false)
+
+/** One entry of the inbox, like a new booking. Dates are ISO 8601. */
+@Serializable
+data class AppNotification(
+    val id: String,
+    val kind: String = "",
+    val title: String = "",
+    val body: String = "",
+    val businessId: String? = null,
+    val appointmentId: String? = null,
+    val appointmentStartsAt: String? = null,
+    val createdAt: String = "",
+    val readAt: String? = null,
+) {
+    val unread: Boolean get() = readAt == null
+}
+
+/** The latest notifications, newest first: `unread` for the business asked about, `unreadTotal` across all. */
+@Serializable
+data class NotificationList(val notifications: List<AppNotification> = emptyList(), val unread: Int = 0, val unreadTotal: Int = 0)
+
+@Serializable
+data class NotificationsRead(val unreadTotal: Int = 0)

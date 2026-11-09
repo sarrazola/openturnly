@@ -23,6 +23,7 @@ object Copy {
     val reports = ReportsCopy
     val account = AccountCopy
     val giftCards = GiftCardsCopy
+    val notifications = NotificationsCopy
     val errors = ErrorsCopy
 }
 

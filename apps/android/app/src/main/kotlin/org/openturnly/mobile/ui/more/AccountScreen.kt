@@ -2,9 +2,15 @@
 
 package org.openturnly.mobile.ui.more
 
+import android.Manifest
+import android.content.Intent
+import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
@@ -12,18 +18,27 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import org.openturnly.mobile.AppModel
 import org.openturnly.mobile.localization.Copy
+import org.openturnly.mobile.push.Push
 import org.openturnly.mobile.rules.ServerAddress
 import org.openturnly.mobile.ui.AppCard
 import org.openturnly.mobile.ui.Avatar
@@ -33,9 +48,10 @@ import org.openturnly.mobile.ui.InfoRow
 import org.openturnly.mobile.ui.LocalExtended
 import org.openturnly.mobile.ui.PrimaryButton
 import org.openturnly.mobile.ui.SectionTitle
+import org.openturnly.mobile.ui.launch
 import org.openturnly.mobile.ui.rememberAction
 
-/** "Mi cuenta": name, sign-in e-mail and password. */
+/** "Mi cuenta": name, sign-in e-mail and password, and notifications on this phone. */
 @Composable
 fun AccountScreen(model: AppModel) {
     val ext = LocalExtended.current
@@ -100,11 +116,76 @@ fun AccountScreen(model: AppModel) {
                     }
                 }
             }
+            if (model.notifications.offered) PushSection(model)
             SectionTitle(Copy.account.session)
             AppCard {
                 InfoRow(Copy.account.server, ServerAddress.display(model.server))
                 model.business?.let { InfoRow(Copy.account.role, Copy.nav.role(it.access.role)) }
                 Text(Copy.account.theme, style = MaterialTheme.typography.bodySmall, color = ext.muted, modifier = Modifier.padding(top = 8.dp))
+            }
+        }
+    }
+}
+
+/**
+ * "Notifications on this phone", shown only when the brand and the server have
+ * push. Off takes this phone's token back from the server; on asks for the
+ * permission where the phone needs it, and a refusal points to the settings.
+ */
+@Composable
+private fun PushSection(model: AppModel) {
+    val ext = LocalExtended.current
+    val context = LocalContext.current
+    val state = model.notifications
+    var permitted by remember { mutableStateOf(Push.permitted(context)) }
+    var refused by remember { mutableStateOf(false) }
+    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        permitted = granted
+        refused = !granted
+        if (granted) state.register()
+    }
+    // Back from the phone's settings: the switch there may have changed.
+    val owner = LocalLifecycleOwner.current
+    DisposableEffect(owner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                val now = Push.permitted(context)
+                if (now && !permitted) state.register()
+                permitted = now
+                if (now) refused = false
+            }
+        }
+        owner.lifecycle.addObserver(observer)
+        onDispose { owner.lifecycle.removeObserver(observer) }
+    }
+    // Asked before and still not allowed (or switched off in the settings): only the settings can change it.
+    val blocked = !state.off && !permitted && (refused || state.permissionAsked || !Push.needsPermission(context))
+
+    SectionTitle(Copy.notifications.section)
+    AppCard {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f).padding(end = 12.dp)) {
+                Text(Copy.notifications.onThisPhone, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                Text(Copy.notifications.onThisPhoneHint, style = MaterialTheme.typography.bodySmall, color = ext.muted, modifier = Modifier.padding(top = 2.dp))
+            }
+            Switch(checked = !state.off, onCheckedChange = { on ->
+                if (!on) { state.switchOff(); return@Switch }
+                state.switchOn()
+                if (Push.needsPermission(context)) {
+                    state.markAsked()
+                    permission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
+            })
+        }
+        AnimatedVisibility(blocked) {
+            Column(Modifier.padding(top = 10.dp)) {
+                Text(Copy.notifications.blocked, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                OutlinedButton(
+                    onClick = {
+                        context.launch(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName))
+                    },
+                    modifier = Modifier.padding(top = 8.dp),
+                ) { Text(Copy.notifications.openSettings) }
             }
         }
     }

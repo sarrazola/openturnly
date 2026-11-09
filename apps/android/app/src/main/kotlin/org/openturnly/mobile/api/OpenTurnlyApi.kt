@@ -31,6 +31,17 @@ class OpenTurnlyApi(val server: String, val token: String) {
     suspend fun changePassword(currentPassword: String, newPassword: String) =
         send("POST", "/me/password", obj("currentPassword" to currentPassword, "newPassword" to newPassword))
 
+    // Notifications
+
+    suspend fun mobileSettings(): MobileSettings = get("/mobile/settings", MobileSettings.serializer())
+    /** Ties this phone's push token to the session: signing out stops it. */
+    suspend fun registerDevice(pushToken: String) = send("POST", "/mobile/devices", obj("token" to pushToken, "platform" to "android"))
+    suspend fun forgetDevice(pushToken: String) = send("DELETE", "/mobile/devices", obj("token" to pushToken))
+    suspend fun notifications(id: String): NotificationList = get("/me/notifications" + query("businessId" to id), NotificationList.serializer())
+    /** One business's notifications, or the ones listed; answers how many stay unread across all. */
+    suspend fun markNotificationsRead(businessId: String? = null, ids: List<String>? = null): Int =
+        call("POST", "/me/notifications/read", NotificationsRead.serializer(), objWithout("businessId" to (businessId ?: Omit), "ids" to (ids ?: Omit))).unreadTotal
+
     // Businesses
 
     suspend fun businesses(): List<Business> = get("/businesses", BusinessList.serializer()).businesses

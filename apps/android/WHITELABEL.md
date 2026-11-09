@@ -40,6 +40,44 @@ The directory receives `{email, password}` and answers
 `{accounts: [{server, name, token, user}]}`; with several accounts the app
 offers a picker. "Use another address" stays available for custom domains.
 
+## Push notifications
+
+The app always shows the server's notifications in its inbox (the bell on the
+agenda). To also ring the phone, through Firebase Cloud Messaging, add the
+values of your own Android app in a Firebase project. They are the ones its
+`google-services.json` lists:
+
+```
+BRAND_FIREBASE_PROJECT_ID=your-project          # project_info.project_id
+BRAND_FIREBASE_APPLICATION_ID=1:1234:android:ab # client_info.mobilesdk_app_id
+BRAND_FIREBASE_API_KEY=AIza...                  # api_key.current_key
+BRAND_FIREBASE_SENDER_ID=1234                   # project_info.project_number
+```
+
+The app starts Firebase itself from these values: there is no Google services
+Gradle plugin and no `google-services.json` in the build. With any of the four
+empty or missing (an older brand file), the build has no push at all: Firebase
+never starts, its automatic start-up is removed from the manifest, and the app
+never asks for notification permission.
+
+With them, and with a server whose `GET /api/mobile/settings` answers
+`{"push": {"enabled": true}}`, the app asks for permission once from the
+agenda, registers the phone's token with `POST /api/mobile/devices` and takes
+it back on sign-out or when the person switches notifications off under
+"My account". The server must be set up to send through the same Firebase
+project; see the server's documentation.
+
+Messages arrive as data: `title`, `body`, `badge` (unread across every
+business), `kind`, `notificationId`, `businessId`, `appointmentId` and
+`startsAt`, and a platform `notification` block's title and body are used when
+present. All of that is read in one file,
+`app/src/main/kotlin/org/openturnly/mobile/rules/NotificationData.kt`. If your
+delivery wraps the payload differently, replace that file in your copy, keeping
+its class and `parse` function; nothing else in the app reads a message's keys.
+
+The status bar icon is `brand/res/drawable/ic_notification.xml`: one colour on
+transparency. Replace it with your own mark under the same name.
+
 ## Assets
 
 Replace the files under `brand/res`: the adaptive launcher icon

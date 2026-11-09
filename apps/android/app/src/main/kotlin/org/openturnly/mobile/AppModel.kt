@@ -73,6 +73,7 @@ class AppModel(application: Application) : AndroidViewModel(application) {
     val snackbar = SnackbarHostState()
     val agenda = AgendaState(this)
     val customers = CustomersState(this)
+    val notifications = NotificationsState(this, application)
 
     private val context get() = getApplication<Application>()
     private var generation = 0
@@ -137,7 +138,8 @@ class AppModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun pickBusiness(list: List<Business>, storedId: String?) {
-        val remembered = list.firstOrNull { it.id == storedId }
+        // A tapped notification opens its own business, over the one last used.
+        val remembered = list.firstOrNull { it.id == notifications.tappedBusinessId } ?: list.firstOrNull { it.id == storedId }
         when {
             remembered != null -> openBusiness(remembered)
             list.size == 1 -> openBusiness(list.first())
@@ -162,6 +164,7 @@ class AppModel(application: Application) : AndroidViewModel(application) {
         screen = Screen.MAIN
         refreshCatalog()
         agenda.loadCurrent()
+        notifications.businessOpened(changed)
     }
 
     /** Re-reads the business (after editing it) and the list the switcher shows. */
@@ -207,6 +210,8 @@ class AppModel(application: Application) : AndroidViewModel(application) {
         signOutBusy = true
         val current = api
         viewModelScope.launch {
+            // This phone stops ringing first, while the session can still say so.
+            notifications.forgetDevice(current)
             runCatching { current?.signOut() }
             forget()
             signOutBusy = false
@@ -231,6 +236,7 @@ class AppModel(application: Application) : AndroidViewModel(application) {
         nav.reset()
         agenda.reset(LocalDate.now())
         customers.reset()
+        notifications.signedOut()
         showBusinessPicker = false
         screen = Screen.SIGN_IN
     }
@@ -267,6 +273,10 @@ class AppModel(application: Application) : AndroidViewModel(application) {
     fun failure(error: ApiException) = toast(error.message)
 
     val locale get() = AppLocale.locale
+
+    override fun onCleared() {
+        notifications.detach()
+    }
 }
 
 /**
@@ -341,6 +351,28 @@ class AgendaState(private val model: AppModel) {
     }
 
     fun find(id: String): Appointment? = weeks.values.asSequence().flatten().firstOrNull { it.id == id }
+
+    /**
+     * One appointment by id, fresh from the server. There is no route for a single
+     * one, so the week it starts in (by `startsAt`) is loaded again and kept like
+     * any loaded week. A notification is about a change, so a copy loaded before
+     * is not trusted. Null when it is not there.
+     */
+    suspend fun locate(id: String, startsAt: String?): Appointment? {
+        val start = BusinessTime.parse(startsAt) ?: return find(id)
+        val businessId = model.business?.id ?: return null
+        val week = BusinessTime.weekStart(BusinessTime.localDate(start, model.zone))
+        val (from, to) = BusinessTime.range(week, week.plusDays(6), model.zone)
+        val list = model.call { appointments(it, BusinessTime.iso(from), BusinessTime.iso(to)) }
+        if (model.business?.id != businessId) return null
+        weeks[week] = list
+        val found = list.firstOrNull { it.id == id } ?: return null
+        // Moved here from another loaded week: the copy there is out of date.
+        weeks.keys.filter { it != week }.forEach { other ->
+            weeks[other]?.takeIf { old -> old.any { it.id == id } }?.let { old -> weeks[other] = old.filterNot { it.id == id } }
+        }
+        return found
+    }
 
     /** After an action changed an appointment: reload the weeks it was and is in. */
     fun reloadFor(vararg days: LocalDate?) {

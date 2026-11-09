@@ -2,7 +2,7 @@
 #
 # The Xcode project is generated, never committed: `xcodegen generate` from this
 # directory writes OpenTurnly.xcodeproj. Identity (name, bundle identifier, team,
-# version, colour, hosted preset) comes from Brand/Brand.xcconfig, so a publisher
+# version, colour, hosted preset, push) comes from Brand/Brand.xcconfig, so a publisher
 # swaps that one file and the icon set and never edits this spec or the sources.
 #
 # Settings that must come from the brand file are referenced here as $(BRAND_*)
@@ -49,6 +49,14 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: $(BRAND_BUNDLE_IDENTIFIER)
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        # Push is opt-in per build. BRAND_APS_ENVIRONMENT picks the entitlements
+        # file, which carries that value; empty picks none, so a build without
+        # push asks Apple for no capability and signs like any other app. This is
+        # a build setting rather than XcodeGen's `entitlements:` key, which would
+        # attach the file to every build.
+        CODE_SIGN_ENTITLEMENTS: $(OPENTURNLY_ENTITLEMENTS_$(BRAND_APS_ENVIRONMENT))
+        OPENTURNLY_ENTITLEMENTS_development: OpenTurnly/OpenTurnly.entitlements
+        OPENTURNLY_ENTITLEMENTS_production: OpenTurnly/OpenTurnly.entitlements
     scheme:
       testTargets:
         - OpenTurnlyTests

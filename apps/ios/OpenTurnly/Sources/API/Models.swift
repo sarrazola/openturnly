@@ -506,3 +506,40 @@ struct Invitation: Decodable, Identifiable, Hashable {
     let createdAt: Date?
 }
 
+
+// MARK: Notifications
+
+/// What the signed-in server offers the app.
+struct MobileSettings: Decodable {
+    struct Push: Decodable { let enabled: Bool }
+    /// Missing on a server that predates push: the same as switched off.
+    let push: Push?
+
+    var pushEnabled: Bool { push?.enabled ?? false }
+}
+
+/// One entry in the notifications screen: an appointment booked, moved or cancelled.
+struct AppNotification: Decodable, Identifiable, Hashable {
+    let id: String
+    /// `appointment_booked`, `appointment_rescheduled` or `appointment_cancelled`;
+    /// a newer server may add others (see `NotificationKind`).
+    let kind: String
+    let title: String
+    let body: String
+    let businessId: String?
+    let appointmentId: String?
+    /// When the appointment is, so it can be found in the agenda.
+    let appointmentStartsAt: Date?
+    let createdAt: Date
+    let readAt: Date?
+}
+
+struct NotificationsPage: Decodable {
+    let notifications: [AppNotification]
+    /// Unread in the business asked about.
+    let unread: Int
+    /// Unread in every business, for the number on the app's icon.
+    let unreadTotal: Int
+}
+
+struct UnreadTotal: Decodable { let unreadTotal: Int }

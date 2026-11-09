@@ -99,4 +99,12 @@ enum Brand {
 
     static var privacyPolicyURL: URL? { localized("PrivacyPolicyURL") }
     static var supportURL: URL? { localized("SupportURL") }
+
+    /// The push gateway this build is entitled to: `development`, `production`,
+    /// or empty when the build has no push notifications at all.
+    static let apsEnvironment: String = value("ApsEnvironment").lowercased()
+
+    /// Whether this build may ask for notification permission and register the
+    /// phone. Without it the app never mentions push.
+    static var hasPush: Bool { !apsEnvironment.isEmpty }
 }

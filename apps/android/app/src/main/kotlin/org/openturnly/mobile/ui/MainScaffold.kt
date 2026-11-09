@@ -70,6 +70,7 @@ import org.openturnly.mobile.ui.more.AccountScreen
 import org.openturnly.mobile.ui.more.BookingLinkScreen
 import org.openturnly.mobile.ui.more.MoreScreen
 import org.openturnly.mobile.ui.more.ReportsScreen
+import org.openturnly.mobile.ui.notifications.NotificationsScreen
 import org.openturnly.mobile.ui.sales.CheckoutScreen
 import org.openturnly.mobile.ui.sales.SaleDetailScreen
 import org.openturnly.mobile.ui.sales.SalesScreen
@@ -98,10 +99,15 @@ fun MainScaffold(model: AppModel) {
     BackHandler(enabled = nav.top != null) { nav.pop() }
     BackHandler(enabled = nav.top == null && nav.tab != Tab.AGENDA) { nav.select(Tab.AGENDA) }
 
-    // Coming back to the app refreshes the day, and the clock keeps statuses honest.
+    // Coming back to the app refreshes the day and the bell, and the clock keeps statuses honest.
     val owner = LocalLifecycleOwner.current
     DisposableEffect(owner) {
-        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_START && model.business != null) model.agenda.refresh() }
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_START && model.business != null) {
+                model.agenda.refresh()
+                model.notifications.refreshCount()
+            }
+        }
         owner.lifecycle.addObserver(observer)
         onDispose { owner.lifecycle.removeObserver(observer) }
     }
@@ -187,6 +193,7 @@ private fun RouteScreen(model: AppModel, route: Route) {
         Route.BookingLink -> BookingLinkScreen(model)
         Route.Reports -> ReportsScreen(model)
         Route.Account -> AccountScreen(model)
+        Route.Notifications -> NotificationsScreen(model)
     }
 }
 

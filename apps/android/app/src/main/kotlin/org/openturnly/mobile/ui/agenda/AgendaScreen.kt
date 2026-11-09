@@ -2,6 +2,9 @@
 
 package org.openturnly.mobile.ui.agenda
 
+import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -100,6 +103,7 @@ import org.openturnly.mobile.ui.Field
 import org.openturnly.mobile.ui.LocalExtended
 import org.openturnly.mobile.ui.Route
 import org.openturnly.mobile.ui.Skeleton
+import org.openturnly.mobile.ui.notifications.NotificationBell
 import org.openturnly.mobile.ui.tabular
 
 private const val PAGES = 2000
@@ -126,6 +130,24 @@ fun AgendaScreen(model: AppModel) {
     val dayAppointments = agenda.appointmentsOn(agenda.date)
     val visible = dayAppointments?.let { Appointments.filter(it, agenda.professionalId, agenda.locationId, agenda.showCancelled) }
 
+    // The bell is fresh whenever the agenda shows. Once it has loaded, this phone registers
+    // for push, asking for the permission first (once) where the phone needs it.
+    val notifications = model.notifications
+    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) notifications.register()
+    }
+    LaunchedEffect(business.id) { notifications.refreshCount() }
+    val loaded = dayAppointments != null
+    LaunchedEffect(business.id, loaded, notifications.serverPush) {
+        if (!loaded) return@LaunchedEffect
+        if (notifications.shouldAskPermission()) {
+            notifications.markAsked()
+            permission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            notifications.register()
+        }
+    }
+
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().statusBarsPadding()) {
             // Header: the business (tap to switch) and the day.
@@ -145,6 +167,7 @@ fun AgendaScreen(model: AppModel) {
                 AnimatedVisibility(agenda.date != today, enter = fadeIn(), exit = fadeOut()) {
                     TextButton({ agenda.select(today) }) { Text(Copy.common.today) }
                 }
+                NotificationBell(model)
                 IconButton({ picking = true }) { Icon(Icons.Outlined.CalendarMonth, Copy.agenda.pickDay) }
                 if (canFilter) {
                     IconButton({ filtering = true }) {
@@ -162,7 +185,7 @@ fun AgendaScreen(model: AppModel) {
             )
             WeekStrip(model, today)
             ActiveFilters(model) { filtering = true }
-            PullToRefreshBox(isRefreshing = agenda.refreshing, onRefresh = { agenda.refresh(); model.refreshCatalog() }, modifier = Modifier.fillMaxSize()) {
+            PullToRefreshBox(isRefreshing = agenda.refreshing, onRefresh = { agenda.refresh(); model.refreshCatalog(); notifications.refreshCount() }, modifier = Modifier.fillMaxSize()) {
                 when {
                     visible == null && agenda.error != null -> Column(Modifier.fillMaxSize()) { ErrorState(agenda.error ?: Copy.agenda.loadFailed, { agenda.loadCurrent() }) }
                     visible == null -> AgendaSkeleton()

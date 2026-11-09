@@ -85,6 +85,10 @@ struct AccountView: View {
                 }
             }
 
+            if model.push.available {
+                notificationsSection
+            }
+
             Section {
                 Text(L.Account.appearance).font(.footnote).foregroundStyle(Theme.muted)
                 if let url = Brand.privacyPolicyURL {
@@ -102,6 +106,29 @@ struct AccountView: View {
             prepared = true
             name = user.name
             email = user.email
+        }
+        .task {
+            await model.push.loadSettings()
+            await model.push.refreshPermission()
+        }
+    }
+
+    /// Whether this phone gets notifications, and why not when Settings block them.
+    private var notificationsSection: some View {
+        let push = model.push
+        let blocked = !push.switchedOff && push.permission == .denied
+        return Section {
+            Toggle(L.Notifications.onThisPhone, isOn: Binding(
+                get: { !push.switchedOff },
+                set: { push.setOn($0) }
+            ))
+            if blocked, let url = URL(string: UIApplication.openNotificationSettingsURLString) {
+                Button(L.Notifications.openSettings) { openURL(url) }
+            }
+        } header: {
+            Text(L.Notifications.title)
+        } footer: {
+            Text(blocked ? L.Notifications.deniedHint(Brand.name) : L.Notifications.onThisPhoneHint)
         }
     }
 

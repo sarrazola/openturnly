@@ -19,12 +19,22 @@ final class AppModel {
     var signingOut = false
 
     let toasts = ToastCenter()
+    let push = PushController()
     private var generation = 0
+    /// A tapped notification waiting for the businesses to load.
+    private var pendingTap: NotificationData?
 
     init() {
         APIClient.shared.setUnauthorizedHandler { [weak self] in
             self?.sessionExpired()
         }
+        let events = PushEvents.shared
+        events.onToken = { [weak self] token in
+            guard let self else { return }
+            Task { await self.push.received(token) }
+        }
+        events.onArrival = { [weak self] data in self?.notificationArrived(data) }
+        events.onTap = { [weak self] data in self?.notificationTapped(data) }
     }
 
     var api: OpenTurnlyAPI? { session.map { OpenTurnlyAPI(server: $0.server, token: $0.token) } }
@@ -39,6 +49,7 @@ final class AppModel {
             return
         }
         session = stored
+        push.begin(stored)
         screen = .loading
         await loadBusinesses(generation: current)
     }
@@ -57,6 +68,7 @@ final class AppModel {
         let current = generation
         signInNotice = nil
         session = stored
+        push.begin(stored)
         screen = .loading
         await loadBusinesses(generation: current)
     }
@@ -90,6 +102,7 @@ final class AppModel {
             } else {
                 screen = .pickBusiness
             }
+            takePendingTap()
         } catch let error as APIError where error.isUnauthorized {
             // The unauthorized handler already signed out.
         } catch {
@@ -102,7 +115,7 @@ final class AppModel {
         guard let session else { return }
         Preferences.setLastBusiness(business.id, server: session.server, user: session.user.id)
         if workspace?.business.id != business.id {
-            workspace = Workspace(business: business, session: session, toasts: toasts)
+            workspace = Workspace(business: business, session: session, toasts: toasts, push: push)
         }
         screen = .main
     }
@@ -118,6 +131,7 @@ final class AppModel {
         guard !signingOut, let api else { return }
         signingOut = true
         // Ending the session on the server is best effort: the token is forgotten either way.
+        await push.signOut()
         try? await api.signOut()
         forget()
         signingOut = false
@@ -133,10 +147,49 @@ final class AppModel {
     private func forget() {
         generation += 1
         try? SessionStore.clear()
+        push.end()
+        pendingTap = nil
         session = nil
         businesses = []
         workspace = nil
         screen = .signIn
+    }
+
+    // MARK: Notifications
+
+    /// A notification arrived while the app is open: the bell and the agenda catch up.
+    private func notificationArrived(_ data: NotificationData) {
+        guard let workspace else { return }
+        Task { await workspace.refreshNotifications() }
+        if data.businessId == nil || data.businessId == workspace.id { workspace.changed() }
+    }
+
+    /// A notification was tapped: its business, then its appointment. One that
+    /// launched the app waits here until the saved session has loaded.
+    private func notificationTapped(_ data: NotificationData) {
+        guard screen != .signIn else { return }
+        pendingTap = data
+        takePendingTap()
+    }
+
+    private func takePendingTap() {
+        guard let tap = pendingTap, let api, !businesses.isEmpty, [.main, .pickBusiness].contains(screen) else { return }
+        pendingTap = nil
+        if let id = tap.businessId {
+            // Not one of this person's businesses (any more): nothing to open.
+            guard let business = businesses.first(where: { $0.id == id }) else { return }
+            if workspace?.business.id != id { open(business) }
+        }
+        guard let workspace else { return }
+        Task {
+            if let id = tap.notificationId, let unreadTotal = try? await api.markNotificationsRead(ids: [id]) {
+                push.setBadge(unreadTotal)
+            }
+            await workspace.refreshNotifications()
+        }
+        if let appointmentId = tap.appointmentId {
+            Task { await workspace.openAppointment(appointmentId, near: tap.startsAt, onTop: false) }
+        }
     }
 }
 
@@ -149,6 +202,7 @@ final class Workspace {
     let api: OpenTurnlyAPI
     let session: StoredSession
     let toasts: ToastCenter
+    let push: PushController
 
     var locations: [Location] = []
     var services: [Service] = []
@@ -158,10 +212,19 @@ final class Workspace {
     /// Bumped after a booking, a cancellation, a sale…: lists showing that data reload.
     var revision = 0
 
-    init(business: Business, session: StoredSession, toasts: ToastCenter) {
+    /// The tab showing, and the agenda's screens, so a notification can lead somewhere.
+    var tab: MainTabView.Tab = .agenda
+    var agendaPath: [Route] = []
+    /// Unread notifications in this business, for the bell.
+    var unread = 0
+    /// False against a server without notifications: the bell hides.
+    var hasNotifications = true
+
+    init(business: Business, session: StoredSession, toasts: ToastCenter, push: PushController) {
         self.business = business
         self.session = session
         self.toasts = toasts
+        self.push = push
         api = OpenTurnlyAPI(server: session.server, token: session.token)
     }
 
@@ -230,5 +293,41 @@ final class Workspace {
         let range = clock.range(day, through: day)
         let list = try await api.appointments(business.id, from: range.from, to: range.to, includeCancelled: true)
         return list.first { $0.id == id }
+    }
+
+    // MARK: Notifications
+
+    /// The bell's count and the icon's number, from the server.
+    func refreshNotifications() async {
+        guard hasNotifications else { return }
+        do {
+            let page = try await api.notifications(business.id)
+            showCounts(unread: page.unread, unreadTotal: page.unreadTotal)
+        } catch let error as APIError where error.status == 404 {
+            hasNotifications = false
+        } catch {
+            // The bell keeps its last count until the next refresh.
+        }
+    }
+
+    func showCounts(unread: Int, unreadTotal: Int) {
+        self.unread = unread
+        push.setBadge(unreadTotal)
+    }
+
+    /// An appointment's detail on the agenda, from the notifications screen
+    /// (`onTop`, so Back returns there) or from a tapped notification.
+    func openAppointment(_ id: String, near startsAt: Date?, onTop: Bool) async {
+        do {
+            guard let startsAt, let found = try await reloadAppointment(id, near: startsAt) else {
+                toasts.show(L.Appointment.gone, error: true)
+                return
+            }
+            tab = .agenda
+            if onTop { agendaPath.append(.appointment(found)) } else { agendaPath = [.appointment(found)] }
+        } catch is CancellationError {
+        } catch {
+            toasts.error(error)
+        }
     }
 }

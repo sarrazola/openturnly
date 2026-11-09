@@ -39,3 +39,9 @@ BRAND_PRIVACY_POLICY_URL_EN =
 BRAND_PRIVACY_POLICY_URL_ES =
 BRAND_SUPPORT_URL_EN =
 BRAND_SUPPORT_URL_ES =
+
+// Push notifications. Empty means this build has none: it never asks for
+// permission and never registers the phone. "development" or "production"
+// adds the aps-environment entitlement with that value, so the App ID needs the
+// Push Notifications capability. The server must be set up to deliver as well.
+BRAND_APS_ENVIRONMENT =

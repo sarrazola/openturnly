@@ -104,6 +104,18 @@ enum Fmt {
         return "\(dayWithYear(date)), \(clock.time(of: instant))"
     }
 
+    /// How long ago, for a notification: "Ahora", "hace 5 min", "hace 2 h", then the day.
+    static func ago(_ instant: Date, now: Date = Date(), clock: BusinessClock) -> String {
+        let seconds = now.timeIntervalSince(instant)
+        if seconds < 60 { return L.Notifications.justNow }
+        if seconds >= 7 * 86_400 { return dayShort(clock.localDate(of: instant)) }
+        let formatter = RelativeDateTimeFormatter()
+        formatter.locale = AppLocale.locale
+        formatter.unitsStyle = .short
+        formatter.dateTimeStyle = .numeric
+        return formatter.localizedString(for: instant, relativeTo: now)
+    }
+
     static func percent(_ value: Double, digits: Int = 0) -> String {
         let formatter = NumberFormatter()
         formatter.numberStyle = .percent

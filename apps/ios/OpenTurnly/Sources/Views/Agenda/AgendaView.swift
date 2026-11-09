@@ -58,6 +58,7 @@ final class AgendaModel {
 }
 
 struct AgendaView: View {
+    @Environment(AppModel.self) private var app
     @Environment(Workspace.self) private var workspace
     @Environment(ToastCenter.self) private var toasts
     @State private var model: AgendaModel?
@@ -80,6 +81,8 @@ struct AgendaView: View {
         .background(Theme.canvas)
         .onAppear {
             if model == nil { model = AgendaModel(today: workspace.clock.today()) }
+            // Also on coming back from a detail or another tab.
+            Task { await workspace.refreshNotifications() }
         }
     }
 
@@ -127,6 +130,7 @@ struct AgendaView: View {
         .refreshable {
             await workspace.loadCatalog(force: true)
             await model.load(workspace, force: true)
+            await workspace.refreshNotifications()
         }
         .navigationTitle(L.Agenda.title)
         .navigationBarTitleDisplayMode(.inline)
@@ -155,9 +159,16 @@ struct AgendaView: View {
                     }
                     .accessibilityLabel(L.Agenda.filters)
                 }
+                if workspace.hasNotifications {
+                    NotificationBell()
+                }
             }
         }
-        .task(id: model.weekStart) { await model.load(workspace) }
+        .task(id: model.weekStart) {
+            await model.load(workspace)
+            // The one place notification permission is asked: once the agenda is up.
+            if model.error == nil { await app.push.prepare() }
+        }
         .task(id: workspace.revision) {
             guard workspace.revision > 0 else { return }
             model.invalidate()

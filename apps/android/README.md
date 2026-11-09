@@ -4,9 +4,11 @@ A Kotlin and Jetpack Compose app for the people who run a business on
 OpenTurnly: the owner, the admins and the professionals. It does from the
 phone what they do in the web admin: the agenda, booking and moving
 appointments, charging them, customers, sales, and the business's settings. It
-is built with Android's own frameworks only (AndroidX, Compose, Material 3,
-kotlinx.serialization and coroutines): no analytics, no trackers, no
-third-party SDKs. The customers' booking page is not part of it.
+is built with Android's own frameworks (AndroidX, Compose, Material 3,
+kotlinx.serialization and coroutines), with no analytics and no trackers. The
+one other library is Firebase Cloud Messaging, the platform's push channel,
+which only starts when the brand file carries a Firebase app's values (see
+`WHITELABEL.md`). The customers' booking page is not part of it.
 
 It signs a person in with `/api/mobile/sign-in`, keeps the server and the
 bearer token in a file encrypted with a hardware-backed key, and calls the same
@@ -36,8 +38,9 @@ like any local address.
 | `brand/res` | Launcher icon layers, sign-in logo and icon background, beside the brand file |
 | `app/build.gradle.kts` | Reads the brand file into the application id, version and `BuildConfig` |
 | `app/src/main/kotlin/.../api` | Typed models and the API client; one function per route |
-| `app/src/main/kotlin/.../storage` | The encrypted session and the last server used |
-| `app/src/main/kotlin/.../rules` | Server addresses, money, business time, appointment states and actions, checkout arithmetic, phones, QR codes |
+| `app/src/main/kotlin/.../storage` | The encrypted session, the last server used and this phone's push settings |
+| `app/src/main/kotlin/.../push` | Firebase Cloud Messaging: starting it from the brand, the token, the messaging service and the posted notifications |
+| `app/src/main/kotlin/.../rules` | Server addresses, money, business time, appointment states and actions, checkout arithmetic, phones, QR codes, the inbox and reading a push message (`NotificationData.kt`) |
 | `app/src/main/kotlin/.../localization` | English and Spanish copy, chosen by the phone's language |
 | `app/src/main/kotlin/.../ui` | Theme, components and the screens: sign-in, agenda, customers, sales, more |
 | `app/src/test` | Unit tests for the rules that do not need a server |
@@ -61,6 +64,15 @@ like any local address.
   and payment methods, a sale's detail and voiding it, and the checkout for an
   appointment or a walk-in sale: services and products, a discount code or gift
   card, a tip, the customer's deposits, and the payment split across methods.
+- **Notifications**: a bell on the agenda with the open business's unread
+  count, and its inbox: new bookings, and appointments moved or cancelled,
+  newest first, with pull to refresh. Opening it marks them read; a row opens
+  the appointment. Owners, admins and the professional booked are notified,
+  never whoever made the change.
+- **Push** (when the brand carries Firebase and the server sends push): the
+  same notifications on the phone, even with the app closed. Tapping one opens
+  its business and the appointment. "My account" switches them off on this
+  phone.
 - **More**: the booking link to share and its QR code, reports (summary, tips,
   commissions), a shortcut to the web panel, the account and signing out.
 
@@ -86,6 +98,10 @@ panel; "More" opens it in the browser.
   and money is formatted with the business's currency using the server's own
   table of decimals (COP has none, for example).
 - A `401` from any call ends the session and returns to sign-in. Coming back
-  to the app refreshes the shown week.
+  to the app refreshes the shown week and the bell.
+- Push is asked for once, from the agenda after it loads, never on the sign-in
+  screens. Signing out takes this phone's token back from the server and
+  removes the app's notifications from the phone; reading everything removes
+  them too, and the launcher's dot with them.
 - The app follows the phone's light or dark theme and its language (Spanish
   or English).

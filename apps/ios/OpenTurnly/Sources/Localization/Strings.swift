@@ -593,6 +593,31 @@ enum L {
         static var appearance: String { tr("Appearance follows your phone's light or dark mode.", "La apariencia sigue el modo claro u oscuro de tu teléfono.") }
     }
 
+    enum Notifications {
+        static var title: String { tr("Notifications", "Avisos") }
+        static func bell(_ unread: Int) -> String {
+            switch unread {
+            case 0: return title
+            case 1: return tr("Notifications, 1 unread", "Avisos, 1 sin leer")
+            default: return tr("Notifications, \(unread) unread", "Avisos, \(unread) sin leer")
+            }
+        }
+        static var unreadLabel: String { tr("Unread", "Sin leer") }
+        static var justNow: String { tr("Just now", "Ahora") }
+        static var emptyTitle: String { tr("No notifications yet", "Sin avisos todavía") }
+        static var emptyBody: String { tr("New, moved and cancelled appointments will show up here.", "Aquí verás las citas nuevas, movidas y canceladas.") }
+        static var onThisPhone: String { tr("Notifications on this phone", "Avisos en este teléfono") }
+        static var onThisPhoneHint: String {
+            tr("A notice on this phone when one of your appointments is booked, moved or cancelled.",
+               "Un aviso en este teléfono cuando una de tus citas se reserva, se mueve o se cancela.")
+        }
+        static func deniedHint(_ app: String) -> String {
+            tr("Notifications for \(app) are turned off in your phone's Settings.",
+               "Los avisos de \(app) están desactivados en los Ajustes del teléfono.")
+        }
+        static var openSettings: String { tr("Open Settings", "Abrir Ajustes") }
+    }
+
     enum Inventory {
         static var title: String { tr("Inventory", "Inventario") }
         static var emptyTitle: String { tr("No products yet", "Aún no tienes productos") }

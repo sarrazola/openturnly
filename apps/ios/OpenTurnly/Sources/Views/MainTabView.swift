@@ -9,6 +9,7 @@ enum Route: Hashable {
     case bookingLink
     case reports
     case account
+    case notifications
 }
 
 /// The bottom navigation: Agenda, Clientes, Ventas (admins) and Más.
@@ -17,14 +18,16 @@ enum Route: Hashable {
 /// the business up (hours, services, staff, stock) stays in the web panel.
 /// A professional gets their own agenda and "More".
 struct MainTabView: View {
+    @Environment(AppModel.self) private var model
     @Environment(Workspace.self) private var workspace
-    @State private var tab: Tab = .agenda
+    @Environment(\.scenePhase) private var scenePhase
 
     enum Tab: Hashable { case agenda, customers, sales, more }
 
     var body: some View {
-        TabView(selection: $tab) {
-            NavigationStack {
+        @Bindable var workspace = workspace
+        TabView(selection: $workspace.tab) {
+            NavigationStack(path: $workspace.agendaPath) {
                 AgendaView()
                     .withRoutes()
             }
@@ -54,7 +57,14 @@ struct MainTabView: View {
             .tabItem { Label(L.Tabs.more, systemImage: "square.grid.2x2") }
             .tag(Tab.more)
         }
-        .onChange(of: tab) { _, _ in Haptics.selection() }
+        .onChange(of: workspace.tab) { _, _ in Haptics.selection() }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            Task {
+                await workspace.refreshNotifications()
+                await model.push.foregrounded()
+            }
+        }
         .task { await workspace.loadCatalog() }
     }
 }
@@ -70,6 +80,7 @@ private struct RouteDestinations: ViewModifier {
             case .bookingLink: BookingLinkView()
             case .reports: ReportsView()
             case .account: AccountView()
+            case .notifications: NotificationsView()
             }
         }
     }

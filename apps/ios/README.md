@@ -32,10 +32,10 @@ type `localhost:<port>` on the first screen.
 
 | Tab | For | Screens |
 | --- | --- | --- |
-| Agenda | everyone | Week strip and calendar, professional and location filters, the day's appointments by morning, afternoon and evening, appointment detail (call, WhatsApp, e-mail, booking answers, customer notes), new appointment with the server's free times, reschedule, cancel, no-show and "they came", deposit, charge and close sale |
+| Agenda | everyone | Week strip and calendar, professional and location filters, the day's appointments by morning, afternoon and evening, appointment detail (call, WhatsApp, e-mail, booking answers, customer notes), new appointment with the server's free times, reschedule, cancel, no-show and "they came", deposit, charge and close sale; a bell with the business's notifications (bookings made, moved or cancelled) |
 | Clientes | admins | Searchable list, detail with visits and history, create and edit, book for a customer |
 | Ventas | admins | The day's sales and deposits with totals by payment method, sale detail and void, counter sale |
-| Más | everyone | The booking link with share and QR code; reports (admins); a shortcut to the web panel (admins); my account; sign out |
+| Más | everyone | The booking link with share and QR code; reports (admins); a shortcut to the web panel (admins); my account, with notifications on this phone; sign out |
 
 A professional only gets their own agenda: they can book with themselves, move
 their own appointments and share the booking link. Everything the server
@@ -52,10 +52,12 @@ panel; "More" opens it in the browser.
 | `project.yml` | XcodeGen specification; identity settings reference `$(BRAND_*)` variables |
 | `Brand/Brand.xcconfig` | The identity this build compiles with (see `WHITELABEL.md`) |
 | `OpenTurnly/Info.plist` | Reads the brand variables into a `Brand` dictionary the app loads at launch |
-| `OpenTurnly/Sources/App` | Entry point, brand values, the session and the open business |
+| `OpenTurnly/OpenTurnly.entitlements` | The push entitlement, attached only when the brand turns push on |
+| `OpenTurnly/Sources/App` | Entry point and application delegate, brand values, the session and the open business |
 | `OpenTurnly/Sources/API` | Models and the client; one function per route |
+| `OpenTurnly/Sources/Push` | Permission, the phone's push token, and handing notifications to the screens |
 | `OpenTurnly/Sources/Storage` | Keychain-backed session and small preferences |
-| `OpenTurnly/Sources/Rules` | Money, business time, server addresses, phones, what each appointment allows, checkout arithmetic |
+| `OpenTurnly/Sources/Rules` | Money, business time, server addresses, phones, what each appointment allows, checkout arithmetic, reading a push's payload (`NotificationData.swift`) |
 | `OpenTurnly/Sources/Localization` | English and Spanish copy, chosen by the phone's language, and server errors in plain words |
 | `OpenTurnly/Sources/Theme` | Colours, cards, chips, skeletons, toasts and inputs |
 | `OpenTurnly/Sources/Views` | Sign-in, agenda, booking, customers, sales and the "More" screens |
@@ -80,4 +82,25 @@ panel; "More" opens it in the browser.
   Only there, the session is kept in a file inside the app's container so the
   app can still sign in; device builds are always signed and always use the
   Keychain.
-- No analytics, no trackers, no push notifications.
+- Notifications. The server keeps one per person for each booking made,
+  moved or cancelled that concerns them (never for the person who did it),
+  and the bell on the agenda lists the open business's. Opening the list
+  marks them read; tapping one opens its appointment. The bell, and the
+  number on the app's icon, refresh when the agenda appears, when the app
+  comes back to the foreground, on pull to refresh and when a notification
+  arrives.
+- Push notifications only exist in a build whose brand turns them on
+  (`BRAND_APS_ENVIRONMENT`, see `WHITELABEL.md`) and against a server that
+  says it sends them (`GET /api/mobile/settings`). Then, and only then, the
+  app asks for permission once, from the agenda after it has loaded, and
+  hands the phone's native token to the server, which delivers through
+  whatever it was set up with; no push SDK is bundled. Signing out, or
+  switching notifications off in "My account", forgets the token on the
+  server. A push carries the IDs of its business, appointment and
+  notification next to `aps`; `Sources/Rules/NotificationData.swift` is the
+  only code that reads them, so a publisher whose delivery wraps the payload
+  differently replaces that one file. A simulator build compiled without
+  code signing carries no entitlement and cannot register, but
+  `xcrun simctl push booted <bundle id> payload.json` still delivers a
+  payload to it.
+- No analytics and no trackers.

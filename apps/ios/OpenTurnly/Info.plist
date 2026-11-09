@@ -102,6 +102,8 @@
 		<string>$(BRAND_SUPPORT_URL_EN)</string>
 		<key>SupportURL_es</key>
 		<string>$(BRAND_SUPPORT_URL_ES)</string>
+		<key>ApsEnvironment</key>
+		<string>$(BRAND_APS_ENVIRONMENT)</string>
 	</dict>
 </dict>
 </plist>

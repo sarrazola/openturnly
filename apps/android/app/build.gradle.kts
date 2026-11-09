@@ -31,6 +31,9 @@ android {
             "BRAND_PRODUCT_NAME", "BRAND_PRIMARY_COLOR", "BRAND_DEFAULT_SERVER", "BRAND_HOSTED_LABEL",
             "BRAND_HOSTED_SERVER_TEMPLATE", "BRAND_HOSTED_SIGN_IN", "BRAND_PRIVACY_POLICY_URL_EN",
             "BRAND_PRIVACY_POLICY_URL_ES", "BRAND_SUPPORT_URL_EN", "BRAND_SUPPORT_URL_ES",
+            // A brand file without these (an older one) reads them as empty: no push.
+            "BRAND_FIREBASE_PROJECT_ID", "BRAND_FIREBASE_APPLICATION_ID", "BRAND_FIREBASE_API_KEY",
+            "BRAND_FIREBASE_SENDER_ID",
         ).forEach { key -> buildConfigField("String", key, brandField(key)) }
     }
 
@@ -98,6 +101,9 @@ dependencies {
     implementation("androidx.core:core-ktx:1.16.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+    // Push notifications. Firebase is started at runtime from the brand file's values, so
+    // there is no google-services plugin or file, and a build without them never starts it.
+    implementation("com.google.firebase:firebase-messaging:26.0.1")
     debugImplementation("androidx.compose.ui:ui-tooling")
     testImplementation("junit:junit:4.13.2")
 }

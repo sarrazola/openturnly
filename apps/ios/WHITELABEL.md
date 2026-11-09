@@ -54,6 +54,37 @@ BRAND_SUPPORT_URL_EN = yourdomain.com/support
 BRAND_SUPPORT_URL_ES = yourdomain.com/es/ayuda
 ```
 
+## Push notifications
+
+Off by default. A build without them never asks for notification permission
+and never registers the phone; people still see their notifications in the
+app's bell. To turn them on:
+
+```
+BRAND_APS_ENVIRONMENT = development
+```
+
+`development` or `production` is the value of the `aps-environment`
+entitlement the build is signed with (`OpenTurnly/OpenTurnly.entitlements`,
+attached by `project.yml` only when the value is set). Your App ID needs the
+Push Notifications capability, and the server the app talks to has to be set
+up to deliver: the app asks `GET /api/mobile/settings` and stays quiet when the
+server says it sends nothing.
+
+The app registers the phone's native APNs token with
+`POST /api/mobile/devices`, together with the gateway it belongs to:
+`sandbox` for a build signed for development, `production` otherwise. The
+provisioning profile inside the app decides when there is one, so an archive
+exported for the App Store or TestFlight registers as `production` even when
+the brand file says `development`; a simulator goes by the brand file.
+
+A push is expected to carry `aps.alert`, `aps.badge` (the person's unread
+notifications in every business) and, at the top level, `kind`,
+`notificationId`, `businessId`, `appointmentId` and `startsAt`. If your
+delivery service wraps those keys in its own envelope, replace
+`OpenTurnly/Sources/Rules/NotificationData.swift`, the only file that reads
+them.
+
 ## Assets
 
 In `OpenTurnly/Assets.xcassets`, replace:

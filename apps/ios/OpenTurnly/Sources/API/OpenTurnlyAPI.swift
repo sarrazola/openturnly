@@ -69,6 +69,36 @@ struct OpenTurnlyAPI: Sendable {
         try await send("POST", "/api/me/password", ["currentPassword": .string(current), "newPassword": .string(new)])
     }
 
+    // MARK: Notifications
+
+    func mobileSettings() async throws -> MobileSettings { try await get("/api/mobile/settings") }
+
+    /// Ties this phone's push token to the session: signing out stops it.
+    /// `environment` is `sandbox` or `production`, the gateway the token belongs to.
+    func registerDevice(token: String, environment: String) async throws {
+        try await send("POST", "/api/mobile/devices", [
+            "token": .string(token), "platform": "ios", "environment": .string(environment),
+        ])
+    }
+
+    /// Stops push notifications to this phone.
+    func forgetDevice(token: String) async throws {
+        try await send("DELETE", "/api/mobile/devices", ["token": .string(token)])
+    }
+
+    /// The latest notifications of one business (newest first, at most 50) and the unread counts.
+    func notifications(_ business: String) async throws -> NotificationsPage {
+        try await get("/api/me/notifications", [("businessId", business)])
+    }
+
+    /// Marks one business's notifications read, or only `ids`. Answers how many stay unread in all.
+    func markNotificationsRead(business: String? = nil, ids: [String]? = nil) async throws -> Int {
+        var body: [String: JSON] = [:]
+        if let business { body["businessId"] = .string(business) }
+        if let ids { body["ids"] = .array(ids.map(JSON.string)) }
+        return try await (call("POST", "/api/me/notifications/read", .object(body)) as UnreadTotal).unreadTotal
+    }
+
     // MARK: Businesses
 
     func businesses() async throws -> [Business] { try await (get("/api/businesses") as BusinessesEnvelope).businesses }
