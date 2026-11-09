@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { type BookingGuardSettings, DEFAULT_GUARD_SETTINGS } from "./lib/booking-guard.ts";
+import { loadPushSettings, type PushSettings } from "./lib/push.ts";
 
 /** The WhatsApp number every business of the install uses until it connects its own. */
 export type WhatsappDefaults = {
@@ -69,6 +70,8 @@ export type Config = {
   whatsappApiUrl: string;
   /** Where Mercado Pago's API lives. */
   mercadopagoApiUrl: string;
+  /** How notifications reach the phone apps: PUSH_PROVIDER, "none" unless set. */
+  push: PushSettings;
   /**
    * Sent with every message and handed back in its delivery updates, so several installs
    * sharing one number can tell theirs apart.
@@ -117,6 +120,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     whatsappApiUrl: (env.WHATSAPP_API_URL || WHATSAPP_API_URL).replace(/\/+$/, ""),
     whatsappCallbackTag: env.WHATSAPP_CALLBACK_TAG || null,
     mercadopagoApiUrl: (env.MERCADOPAGO_API_URL || MERCADOPAGO_API_URL).replace(/\/+$/, ""),
+    push: loadPushSettings(env),
   };
 }
 

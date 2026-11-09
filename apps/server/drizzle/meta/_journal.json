@@ -246,6 +246,13 @@
       "when": 1794199810268,
       "tag": "0034_sms_channel",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1794236938289,
+      "tag": "0035_push_notifications",
+      "breakpoints": true
     }
   ]
 }

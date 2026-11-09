@@ -10,6 +10,7 @@ import type { BusinessAccess } from "./access.ts";
 import type { Automations } from "./automations.ts";
 import type { BookingGuard } from "./booking-guard.ts";
 import type { Email } from "./email.ts";
+import type { Notifications } from "./notifications.ts";
 import type { Payments } from "./payments.ts";
 import type { Sms } from "./sms.ts";
 import type { Whatsapp } from "./whatsapp.ts";
@@ -24,6 +25,7 @@ export type Deps = {
   email: Email;
   sms: Sms;
   payments: Payments;
+  notifications: Notifications;
 };
 export type AppEnv = { Variables: { user: SessionUser | null } };
 /** Routes under /api/businesses/:businessId, after access was checked. */

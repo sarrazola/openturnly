@@ -5,6 +5,7 @@ import { createAuth } from "../src/auth.ts";
 import type { Config } from "../src/config.ts";
 import { openEmbeddedPostgres } from "../src/db/client.ts";
 import { type BookingGuardSettings, DEFAULT_GUARD_SETTINGS } from "../src/lib/booking-guard.ts";
+import type { PushProvider } from "../src/lib/push.ts";
 
 const APP_URL = "http://localhost:3000";
 
@@ -50,6 +51,7 @@ export async function createTestApp(
     sms?: Config["sms"];
     twilioApiUrl?: string;
     appUrl?: string;
+    push?: PushProvider | null;
   } = {},
 ) {
   const config: Config = {
@@ -71,10 +73,11 @@ export async function createTestApp(
     email: options.email ?? null,
     sms: options.sms ?? null,
     twilioApiUrl: options.twilioApiUrl ?? "http://127.0.0.1:1",
+    push: { provider: "none" },
   };
   const { db } = await openEmbeddedPostgres();
   const auth = createAuth({ db, config });
-  const app = createApp({ db, auth, config });
+  const app = createApp({ db, auth, config, push: options.push ?? null });
 
   /** A browser-like client that keeps its own cookies. */
   const client = () => {

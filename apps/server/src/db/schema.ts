@@ -1163,6 +1163,68 @@ export const automationDeliveries = pgTable(
   ],
 );
 
+// ---------------------------------------------------------------------------
+// Notifications to the phone apps.
+// ---------------------------------------------------------------------------
+
+/**
+ * A phone that may receive push notifications: the token Apple or Google gave the app, tied
+ * to the session it was registered with, so signing out (or the session ending) stops it.
+ */
+export const devices = pgTable(
+  "devices",
+  {
+    id: id(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    sessionId: text("session_id")
+      .notNull()
+      .references(() => sessions.id, { onDelete: "cascade" }),
+    platform: text("platform", { enum: ["ios", "android"] }).notNull(),
+    token: text("token").notNull(),
+    /** Apple's gateway for the token: "sandbox" for development builds. */
+    environment: text("environment", { enum: ["production", "sandbox"] })
+      .notNull()
+      .default("production"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("devices_token_idx").on(table.token),
+    index("devices_user_id_idx").on(table.userId),
+  ],
+);
+
+/**
+ * Something a person should know about, such as a new booking: what the apps list and count
+ * as unread, whether or not a push reached a phone.
+ */
+export const notifications = pgTable(
+  "notifications",
+  {
+    id: id(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    businessId: text("business_id")
+      .notNull()
+      .references(() => businesses.id, { onDelete: "cascade" }),
+    appointmentId: text("appointment_id").references(() => appointments.id, {
+      onDelete: "cascade",
+    }),
+    kind: text("kind", { enum: ["appointment_booked"] }).notNull(),
+    title: text("title").notNull(),
+    body: text("body").notNull(),
+    readAt: instant("read_at"),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    index("notifications_user_created_idx").on(table.userId, table.createdAt),
+    index("notifications_user_unread_idx").on(table.userId, table.readAt),
+  ],
+);
+
 export type User = typeof users.$inferSelect;
 export type Business = typeof businesses.$inferSelect;
 export type Location = typeof locations.$inferSelect;
@@ -1183,3 +1245,5 @@ export type AutomationDelivery = typeof automationDeliveries.$inferSelect;
 export type WhatsappConnection = typeof whatsappConnections.$inferSelect;
 export type EmailConnection = typeof emailConnections.$inferSelect;
 export type SmsConnection = typeof smsConnections.$inferSelect;
+export type Device = typeof devices.$inferSelect;
+export type Notification = typeof notifications.$inferSelect;

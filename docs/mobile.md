@@ -39,6 +39,13 @@ answers `401`, the app goes back to the sign-in screen and says why.
 
 The server needs nothing new for this: the routes are part of every install.
 
+## Notifications
+
+A bell in the agenda lists new bookings and counts the unread ones; the app's icon shows the
+same number. A build with its own push credentials can also receive them as push notifications,
+with a switch in "My account" to turn them off on that phone. See
+[push-notifications.md](push-notifications.md).
+
 ## Building them
 
 Each app has its own README with the details:

@@ -1,15 +1,23 @@
 import { accountUpdateSchema, passwordChangeSchema, TOURS } from "@openturnly/core";
-import { and, eq, ne } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, ne } from "drizzle-orm";
 import { Hono } from "hono";
-import { sessions, users, userTours } from "../db/schema.ts";
+import { z } from "zod";
+import { appointments, notifications, sessions, users, userTours } from "../db/schema.ts";
 import { verifyPassword } from "../lib/accounts.ts";
 import { type AppEnv, apiError, type Deps, parseBody, requireUser } from "../lib/http.ts";
+
+const readNotificationsSchema = z.object({
+  /** Only this business's; every business's when missing. */
+  businessId: z.string().min(1).optional(),
+  /** Only these; all of them when missing. */
+  ids: z.array(z.string().min(1)).max(200).optional(),
+});
 
 /** Wrong current passwords "My account" takes per person before it waits. */
 const MAX_WRONG_PASSWORDS = 5;
 const WRONG_PASSWORDS_WINDOW_MS = 15 * 60_000;
 
-export function meRoutes({ db, auth, guard }: Deps) {
+export function meRoutes({ db, auth, guard, notifications: notifier }: Deps) {
   // Changing the email or the password asks for the current one. Counting the wrong ones
   // per person keeps a session left open somewhere from being used to guess it; the count
   // lives in memory, like the sign-in limits, and clears after a right one.
@@ -102,6 +110,59 @@ export function meRoutes({ db, auth, guard }: Deps) {
       })
 
       /** Problems with the install itself, for its owner to fix. */
+      /**
+       * The person's latest notifications (one business's, or all), and how many are unread:
+       * in that business, and in all of them for the number on the app's icon.
+       */
+      .get("/notifications", async (c) => {
+        const user = requireUser(c);
+        const businessId = c.req.query("businessId") || null;
+        const mine = eq(notifications.userId, user.id);
+        const scope = businessId ? and(mine, eq(notifications.businessId, businessId)) : mine;
+        const list = await db
+          .select({
+            id: notifications.id,
+            kind: notifications.kind,
+            title: notifications.title,
+            body: notifications.body,
+            businessId: notifications.businessId,
+            appointmentId: notifications.appointmentId,
+            /** When the appointment is, so an app can open it in its agenda. */
+            appointmentStartsAt: appointments.startsAt,
+            createdAt: notifications.createdAt,
+            readAt: notifications.readAt,
+          })
+          .from(notifications)
+          .leftJoin(appointments, eq(appointments.id, notifications.appointmentId))
+          .where(scope)
+          .orderBy(desc(notifications.createdAt))
+          .limit(50);
+        const unreadTotal = await notifier.unreadCount(user.id);
+        const unread = businessId
+          ? await db.$count(notifications, and(scope, isNull(notifications.readAt)))
+          : unreadTotal;
+        return c.json({ notifications: list, unread, unreadTotal });
+      })
+
+      /** Marks notifications as read: some, one business's, or all. */
+      .post("/notifications/read", async (c) => {
+        const user = requireUser(c);
+        const input = await parseBody(c, readNotificationsSchema);
+        const conditions = [eq(notifications.userId, user.id), isNull(notifications.readAt)];
+        if (input.businessId) conditions.push(eq(notifications.businessId, input.businessId));
+        if (input.ids) {
+          if (input.ids.length === 0) {
+            return c.json({ unreadTotal: await notifier.unreadCount(user.id) });
+          }
+          conditions.push(inArray(notifications.id, input.ids));
+        }
+        await db
+          .update(notifications)
+          .set({ readAt: new Date() })
+          .where(and(...conditions));
+        return c.json({ unreadTotal: await notifier.unreadCount(user.id) });
+      })
+
       .get("/notices", (c) => {
         const user = requireUser(c);
         const notices =

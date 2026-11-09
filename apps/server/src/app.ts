@@ -11,7 +11,9 @@ import { createBookingGuard } from "./lib/booking-guard.ts";
 import { hasProxyHeaders, withClientIp } from "./lib/client-ip.ts";
 import { createEmail } from "./lib/email.ts";
 import type { AppEnv, Deps } from "./lib/http.ts";
+import { createNotifications } from "./lib/notifications.ts";
 import { createPayments } from "./lib/payments.ts";
+import { type PushProvider, pushProviderFromConfig } from "./lib/push.ts";
 import { createSms } from "./lib/sms.ts";
 import { createWhatsapp } from "./lib/whatsapp.ts";
 import { businessRoutes } from "./routes/businesses.ts";
@@ -28,18 +30,41 @@ import { setupRoutes } from "./routes/setup.ts";
 import { smsWebhookRoutes } from "./routes/sms.ts";
 import { whatsappWebhookRoutes } from "./routes/whatsapp.ts";
 
-export function createApp({ db, auth, config }: Pick<Deps, "db" | "auth" | "config">) {
+export function createApp({
+  db,
+  auth,
+  config,
+  push = pushProviderFromConfig(config),
+}: Pick<Deps, "db" | "auth" | "config"> & {
+  /** Delivers notifications to the phone apps; by default, what PUSH_PROVIDER says. */
+  push?: PushProvider | null;
+}) {
   const guard = createBookingGuard({ db, secret: config.secret, settings: config.bookingGuard });
   const whatsapp = createWhatsapp({ db, config });
   const email = createEmail({ db, config });
   const sms = createSms({ db, config });
+  const notifications = createNotifications({ db, push });
   const payments = createPayments({
     db,
     config,
-    onConfirmed: (appointmentId) => automations.emit(appointmentId, "created"),
+    onConfirmed: async (appointmentId) => {
+      await automations.emit(appointmentId, "created");
+      await notifications.appointmentBooked(appointmentId, null);
+    },
   });
   const automations = createAutomations({ db, config, whatsapp, email, sms, payments });
-  const deps: Deps = { db, auth, config, guard, automations, whatsapp, email, sms, payments };
+  const deps: Deps = {
+    db,
+    auth,
+    config,
+    guard,
+    automations,
+    whatsapp,
+    email,
+    sms,
+    payments,
+    notifications,
+  };
   const app = new Hono<AppEnv>();
 
   if (!config.isProduction && process.env.NODE_ENV !== "test") app.use(logger());
