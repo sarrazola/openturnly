@@ -31,15 +31,22 @@ export class ApiError extends Error {
   }
 }
 
-type RequestOptions = { method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"; body?: unknown };
+type RequestOptions = {
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+  body?: unknown;
+  headers?: Record<string, string>;
+};
 
-export async function api<T>(path: string, { method = "GET", body }: RequestOptions = {}) {
+export async function api<T>(path: string, { method = "GET", body, headers }: RequestOptions = {}) {
   let res: Response;
   try {
     res = await fetch(path, {
       method,
       credentials: "same-origin",
-      headers: body === undefined ? undefined : { "content-type": "application/json" },
+      headers: {
+        ...(body === undefined ? {} : { "content-type": "application/json" }),
+        ...headers,
+      },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
