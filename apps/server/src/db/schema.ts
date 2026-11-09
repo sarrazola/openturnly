@@ -182,6 +182,10 @@ export const businesses = pgTable("businesses", {
   bookingForm: jsonb("booking_form").$type<BookingForm>().notNull().default(DEFAULT_BOOKING_FORM),
   /** Filled with made-up services, team, customers and appointments to try OpenTurnly. */
   sample: boolean("sample").notNull().default(false),
+  /** A flow's survey link asks customers to rate their appointment (see lib/surveys.ts). */
+  surveyEnabled: boolean("survey_enabled").notNull().default(false),
+  /** How long a survey link stays open, counted from when it goes out. */
+  surveyValidHours: integer("survey_valid_hours").notNull().default(48),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
@@ -1227,6 +1231,39 @@ export const notifications = pgTable(
   ],
 );
 
+/**
+ * One survey per appointment: the short link a flow sends once it ends and, when the
+ * customer answers, their rating and comment. The customer is the appointment's.
+ */
+export const surveys = pgTable(
+  "surveys",
+  {
+    id: id(),
+    /** The link's code, /e/<code>: random, so links can't be guessed. */
+    code: text("code").notNull().unique(),
+    businessId: text("business_id")
+      .notNull()
+      .references(() => businesses.id, { onDelete: "cascade" }),
+    appointmentId: text("appointment_id")
+      .notNull()
+      .unique()
+      .references(() => appointments.id, { onDelete: "cascade" }),
+    /** When a flow sent the link; null while the step waits (or if it was never sent). */
+    sentAt: instant("sent_at"),
+    /** Set when it's sent: sent_at plus the business's survey_valid_hours. */
+    expiresAt: instant("expires_at"),
+    /** 1 to 5 stars; null until answered. */
+    rating: integer("rating"),
+    comment: text("comment"),
+    answeredAt: instant("answered_at"),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    index("surveys_business_answered_idx").on(table.businessId, table.answeredAt),
+    index("surveys_business_sent_idx").on(table.businessId, table.sentAt),
+  ],
+);
+
 export type User = typeof users.$inferSelect;
 export type Business = typeof businesses.$inferSelect;
 export type Location = typeof locations.$inferSelect;
@@ -1249,3 +1286,4 @@ export type EmailConnection = typeof emailConnections.$inferSelect;
 export type SmsConnection = typeof smsConnections.$inferSelect;
 export type Device = typeof devices.$inferSelect;
 export type Notification = typeof notifications.$inferSelect;
+export type Survey = typeof surveys.$inferSelect;

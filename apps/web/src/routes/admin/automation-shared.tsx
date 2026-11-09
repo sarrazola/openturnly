@@ -124,7 +124,7 @@ export function newWait(minutes = 60): WaitAction {
 
 /** Ready-made flows a business can start from. */
 export type Template = {
-  key: "reminder" | "booked" | "review";
+  key: "reminder" | "booked" | "review" | "survey";
   trigger: AutomationTrigger;
   offsetMin: number;
   /** Minutes the flow waits before telling the system, if any. */
@@ -134,6 +134,8 @@ export const TEMPLATES: Template[] = [
   { key: "reminder", trigger: "before", offsetMin: 60 },
   { key: "booked", trigger: "created", offsetMin: 0 },
   { key: "review", trigger: "after", offsetMin: 0, wait: 60 },
+  // An email with the ready-made survey text; the business turns surveys on in Encuestas.
+  { key: "survey", trigger: "after", offsetMin: 0, wait: 60 },
 ];
 
 /** Example values, shaped like what the server sends, for previews. */
@@ -163,6 +165,7 @@ export function sampleValues(business: Business, event: string, language: string
       answers: {},
       previous_date: null,
       previous_time: null,
+      survey_link: `${window.location.origin}/e/K7Q4XM2P`,
     },
     customer: {
       name: "Ana Pérez",

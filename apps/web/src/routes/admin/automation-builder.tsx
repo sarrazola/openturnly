@@ -131,7 +131,12 @@ type Draft = {
   active: boolean;
 };
 
-function toDraft(t: TFunction, automation: Automation | null, template?: Template): Draft {
+function toDraft(
+  t: TFunction,
+  automation: Automation | null,
+  template: Template | undefined,
+  language: "es" | "en",
+): Draft {
   if (template) {
     return {
       name: t(`automations.templates.${template.key}.name`),
@@ -139,7 +144,9 @@ function toDraft(t: TFunction, automation: Automation | null, template?: Templat
       offsetMin: template.offsetMin || 60,
       actions: [
         ...(template.wait ? [newWait(template.wait)] : []),
-        newWebhook(t(`automations.templates.${template.key}.message`)),
+        template.key === "survey"
+          ? { ...newEmail(language), template: "appointment_survey" as const }
+          : newWebhook(t(`automations.templates.${template.key}.message`)),
       ],
       active: true,
     };
@@ -183,7 +190,9 @@ function Builder({ automation, template }: { automation: Automation | null; temp
   const navigate = useNavigate();
   const { save, remove, test } = useAutomationMutations(business.id);
   const confirm = useConfirm();
-  const [draft, setDraft] = useState<Draft>(() => toDraft(t, automation, template));
+  const [draft, setDraft] = useState<Draft>(() =>
+    toDraft(t, automation, template, business.locale === "en" ? "en" : "es"),
+  );
   /** "trigger", a step's id, or null for the flow's overview. */
   const [selected, setSelected] = useState<string | null>(() =>
     template

@@ -7,6 +7,7 @@ export const SMS_TEMPLATE_NAMES = [
   "appointment_reminder",
   "appointment_rescheduled",
   "appointment_cancelled",
+  "appointment_survey",
 ] as const satisfies readonly EmailTemplateName[];
 export type SmsTemplateName = (typeof SMS_TEMPLATE_NAMES)[number];
 
@@ -50,6 +51,13 @@ export const SMS_TEMPLATES: readonly SmsTemplateDefinition[] = [
     body: {
       es: `Hola {{customer.first_name}}, tu cita en {{business.name}} del ${WHEN} fue cancelada.\n${CODE.es}`,
       en: `Hi {{customer.first_name}}, your appointment at {{business.name}} on ${WHEN} was cancelled.\n${CODE.en}`,
+    },
+  },
+  {
+    name: "appointment_survey",
+    body: {
+      es: "Hola {{customer.first_name}}, gracias por venir a {{business.name}}. ¿Como te fue? Califica tu visita: {{appointment.survey_link}}",
+      en: "Hi {{customer.first_name}}, thanks for visiting {{business.name}}. How was it? Rate your visit: {{appointment.survey_link}}",
     },
   },
 ];

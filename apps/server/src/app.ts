@@ -30,6 +30,7 @@ import { publicRoutes } from "./routes/public.ts";
 import { businessScopedRoutes } from "./routes/scoped.ts";
 import { setupRoutes } from "./routes/setup.ts";
 import { smsWebhookRoutes } from "./routes/sms.ts";
+import { surveyPublicRoutes } from "./routes/surveys.ts";
 import { whatsappWebhookRoutes } from "./routes/whatsapp.ts";
 
 const HOUR = 60 * 60_000;
@@ -154,6 +155,7 @@ export function createApp({
   app.route("/api/public/whatsapp", whatsappWebhookRoutes(deps));
   app.route("/api/public/sms", smsWebhookRoutes(deps));
   app.route("/api/public/payments", paymentWebhookRoutes(deps));
+  app.route("/api/public/surveys", surveyPublicRoutes(deps));
   app.route("/api/public", publicRoutes(deps));
   app.all("/api/*", (c) => c.json({ error: { code: "not_found" } }, 404));
   // Each business's MCP server for AI agents; its tools call this same app.

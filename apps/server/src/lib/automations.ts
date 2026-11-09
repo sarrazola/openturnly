@@ -45,6 +45,7 @@ import { isInternalAddress } from "./client-ip.ts";
 import type { Email } from "./email.ts";
 import type { Payments } from "./payments.ts";
 import type { Sms, SmsMessageState } from "./sms.ts";
+import { markSurveySent, surveyCodeFor, surveyHold, surveyUrl, usesSurveyLink } from "./surveys.ts";
 import type { Whatsapp, WhatsappStatusUpdate, WhatsappVariable } from "./whatsapp.ts";
 
 /** Reminders and follow-ups that came due while the server was down still go out, up to this late. */
@@ -91,6 +92,8 @@ export function automationValues(
   event: string,
   appUrl: string,
   previousStartsAt?: Date,
+  /** The survey's link, only in a flow that runs when the appointment ends. */
+  surveyLink?: string | null,
 ): Record<string, unknown> {
   const tz = business.timezone;
   const start = instantToZoned(appointment.startsAt.getTime(), tz);
@@ -144,6 +147,7 @@ export function automationValues(
       ),
       previous_date: previous?.date ?? null,
       previous_time: previous?.time ?? null,
+      survey_link: surveyLink ?? null,
     },
     customer: {
       name: `${customer.firstName} ${customer.lastName}`,
@@ -576,6 +580,15 @@ export function createAutomations({
     }
     const business = await findBusiness(automation.businessId);
     if (!business) return skip("business_removed");
+    // A survey goes out while the business has them on, and once a month per customer.
+    const survey =
+      automation.trigger === "after" && delivery.appointmentId && usesSurveyLink(action)
+        ? delivery.appointmentId
+        : null;
+    if (survey) {
+      const hold = await surveyHold(db, business, survey, now);
+      if (hold) return skip(hold);
+    }
     const result =
       action.type === "whatsapp"
         ? await sendWhatsapp(delivery.payload, delivery.id)
@@ -600,6 +613,7 @@ export function createAutomations({
             : { nextAttemptAt: new Date(now + retryIn) }),
       })
       .where(eq(automationDeliveries.id, delivery.id));
+    if (survey && result.ok) await markSurveySent(db, business, survey, now);
   };
 
   let running = false;
@@ -692,10 +706,27 @@ export function createAutomations({
             ),
           );
         const event = AUTOMATION_EVENTS[automation.trigger];
+        const steps = sendingSteps(automation);
+        const asksSurvey = !before && steps.some(({ action }) => usesSurveyLink(action));
         for (const row of due) {
           const at = before ? row.appointment.startsAt : row.appointment.endsAt;
-          const values = automationValues(row.business, row, event, config.appUrl);
-          for (const { action, delayMs } of sendingSteps(automation)) {
+          // The link is made now; its hours start when the message goes out.
+          const surveyLink =
+            asksSurvey && row.business.surveyEnabled
+              ? surveyUrl(
+                  config.appUrl,
+                  await surveyCodeFor(db, row.business.id, row.appointment.id),
+                )
+              : null;
+          const values = automationValues(
+            row.business,
+            row,
+            event,
+            config.appUrl,
+            undefined,
+            surveyLink,
+          );
+          for (const { action, delayMs } of steps) {
             await db
               .insert(automationDeliveries)
               .values({
@@ -904,5 +935,8 @@ export function sampleValues(business: Business, event: string, appUrl: string) 
     },
     event,
     appUrl,
+    undefined,
+    // A test carries an example link: it opens the "no longer open" page.
+    surveyUrl(appUrl, "EJEMPLO1"),
   );
 }

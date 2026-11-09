@@ -789,6 +789,7 @@ export const AUTOMATION_FIELDS = {
     "appointment.answers",
     "appointment.previous_date",
     "appointment.previous_time",
+    "appointment.survey_link",
   ],
   customer: [
     "customer.name",
@@ -1809,3 +1810,26 @@ export type GrantAccessInput = z.infer<typeof grantAccessSchema>;
 
 export const acceptInvitationSchema = z.object({ name: personName, password });
 export type AcceptInvitationInput = z.infer<typeof acceptInvitationSchema>;
+
+/** How long a survey link can stay open: a day, two days or a week. */
+export const SURVEY_VALID_HOURS = [24, 48, 168] as const;
+/** Longest comment a customer can leave with their rating. */
+export const SURVEY_COMMENT_MAX = 1000;
+
+/** A business's survey: on or off, and how long each link stays open. */
+export const surveySettingsSchema = z.object({
+  enabled: z.boolean().optional(),
+  validHours: z
+    .number()
+    .int()
+    .refine((value) => (SURVEY_VALID_HOURS as readonly number[]).includes(value), "invalid_value")
+    .optional(),
+});
+export type SurveySettingsInput = z.infer<typeof surveySettingsSchema>;
+
+/** A customer's answer: 1 to 5 stars and, if they want, a comment. */
+export const surveyAnswerSchema = z.object({
+  rating: z.number().int().min(1).max(5),
+  comment: optionalText(SURVEY_COMMENT_MAX).optional(),
+});
+export type SurveyAnswerInput = z.infer<typeof surveyAnswerSchema>;

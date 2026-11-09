@@ -28,3 +28,4 @@ export { ProfessionalsPage } from "./professionals.tsx";
 export { ReportsPage } from "./reports.tsx";
 export { SalesPage } from "./sales.tsx";
 export { ServicesPage } from "./services.tsx";
+export { SurveysPage } from "./surveys.tsx";

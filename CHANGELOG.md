@@ -29,6 +29,11 @@ All notable changes to OpenTurnly are documented here. The format follows
 - Text messages in workflows: a new step texts the customer a confirmation, a reminder, or a
   notice that their appointment moved or was cancelled, through Twilio. The workflow's history
   shows whether each one arrived and what it cost. See [docs/sms.md](docs/sms.md).
+- **Surveys**: after an appointment, a workflow sends the customer a short link to rate it from
+  1 to 5 stars and leave a comment. Each link belongs to one appointment, takes one answer and
+  closes after 24 hours, 48 hours or a week. **Surveys** in the menu shows the average, how many
+  answered and every comment, by period, professional and location. See
+  [docs/surveys.md](docs/surveys.md).
 - **Online payments** with Mercado Pago: each business connects its own account, and each
   service can ask for a deposit or the full price when booking. The money goes straight to the
   business, the time is held until it's paid, and a payment that arrives late either keeps the
