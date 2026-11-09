@@ -538,6 +538,16 @@ describe("automations", () => {
       automation: flow,
     });
     expect(refused.body.results[0]).toMatchObject({ ok: false, error: "internal_address" });
+    // An address written by hand in IPv6 never gets that far: the URL itself is refused.
+    const port = new URL(hook.url).port;
+    for (const host of ["[::ffff:127.0.0.1]", "[::ffff:7f00:1]"]) {
+      const literal = await strict.owner.post(`${strict.base}/automations/test`, {
+        automation: { ...flow, actions: [webhook(`http://${host}:${port}/hook`)] },
+      });
+      expect(literal.body.error.fields, host).toEqual({
+        "automation.actions.0.url": "invalid_url",
+      });
+    }
     expect(hook.received).toHaveLength(2);
   });
 });

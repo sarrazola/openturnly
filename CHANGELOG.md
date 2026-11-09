@@ -6,6 +6,14 @@ All notable changes to OpenTurnly are documented here. The format follows
 
 ## [Unreleased]
 
+### Security
+
+- Outgoing webhooks and a business's own email server: an IPv4 address written inside an
+  IPv6 one (`::ffff:7f00:1`, the way URLs spell `::ffff:127.0.0.1`) is now recognized as the
+  address it stands for, so it's refused like the IPv4 one when it's inside the server's
+  network. Addresses typed by hand were already refused, so this hardens the check rather
+  than closing a way in. Reported by José Senén Oviedo.
+
 ## [1.4.1] - 2026-11-09
 
 ### Added
