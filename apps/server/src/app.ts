@@ -12,6 +12,7 @@ import { hasProxyHeaders, withClientIp } from "./lib/client-ip.ts";
 import { createEmail } from "./lib/email.ts";
 import type { AppEnv, Deps } from "./lib/http.ts";
 import { createPayments } from "./lib/payments.ts";
+import { createSms } from "./lib/sms.ts";
 import { createWhatsapp } from "./lib/whatsapp.ts";
 import { businessRoutes } from "./routes/businesses.ts";
 import { channelRoutes } from "./routes/channels.ts";
@@ -23,19 +24,21 @@ import { paymentWebhookRoutes } from "./routes/payments.ts";
 import { publicRoutes } from "./routes/public.ts";
 import { businessScopedRoutes } from "./routes/scoped.ts";
 import { setupRoutes } from "./routes/setup.ts";
+import { smsWebhookRoutes } from "./routes/sms.ts";
 import { whatsappWebhookRoutes } from "./routes/whatsapp.ts";
 
 export function createApp({ db, auth, config }: Pick<Deps, "db" | "auth" | "config">) {
   const guard = createBookingGuard({ db, secret: config.secret, settings: config.bookingGuard });
   const whatsapp = createWhatsapp({ db, config });
   const email = createEmail({ db, config });
+  const sms = createSms({ db, config });
   const payments = createPayments({
     db,
     config,
     onConfirmed: (appointmentId) => automations.emit(appointmentId, "created"),
   });
-  const automations = createAutomations({ db, config, whatsapp, email, payments });
-  const deps: Deps = { db, auth, config, guard, automations, whatsapp, email, payments };
+  const automations = createAutomations({ db, config, whatsapp, email, sms, payments });
+  const deps: Deps = { db, auth, config, guard, automations, whatsapp, email, sms, payments };
   const app = new Hono<AppEnv>();
 
   if (!config.isProduction && process.env.NODE_ENV !== "test") app.use(logger());
@@ -100,6 +103,7 @@ export function createApp({ db, auth, config }: Pick<Deps, "db" | "auth" | "conf
   app.route("/api/channels", channelRoutes(deps));
   app.route("/api/invitations", invitationRoutes(deps));
   app.route("/api/public/whatsapp", whatsappWebhookRoutes(deps));
+  app.route("/api/public/sms", smsWebhookRoutes(deps));
   app.route("/api/public/payments", paymentWebhookRoutes(deps));
   app.route("/api/public", publicRoutes(deps));
   app.all("/api/*", (c) => c.json({ error: { code: "not_found" } }, 404));

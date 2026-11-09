@@ -24,6 +24,15 @@ export type EmailDefaults = {
   footer: string | null;
 };
 
+/** The Twilio account every business of the install texts on until it connects its own. */
+export type SmsDefaults = {
+  accountSid: string;
+  apiKeySid: string;
+  apiKeySecret: string;
+  /** A number with its country code, or a messaging service (MG…). */
+  sender: string;
+};
+
 export type Config = {
   isProduction: boolean;
   port: number;
@@ -49,6 +58,13 @@ export type Config = {
   whatsapp: WhatsappDefaults | null;
   /** Set with SMTP_HOST, SMTP_USER, SMTP_PASSWORD and EMAIL_FROM; null without them. */
   email: EmailDefaults | null;
+  /**
+   * Set with TWILIO_ACCOUNT_SID, TWILIO_API_KEY_SID, TWILIO_API_KEY_SECRET and
+   * TWILIO_FROM_NUMBER; null without them.
+   */
+  sms: SmsDefaults | null;
+  /** Where Twilio's API lives. */
+  twilioApiUrl: string;
   /** Where WhatsApp's API lives, with its version. */
   whatsappApiUrl: string;
   /** Where Mercado Pago's API lives. */
@@ -65,6 +81,7 @@ const WEB_DIST_DIR = fileURLToPath(new URL("../../web/dist", import.meta.url));
 const VITE_DEV_ORIGIN = "http://localhost:5173";
 const WHATSAPP_API_URL = "https://graph.facebook.com/v25.0";
 const MERCADOPAGO_API_URL = "https://api.mercadopago.com";
+const TWILIO_API_URL = "https://api.twilio.com";
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const isProduction = env.NODE_ENV === "production";
@@ -95,6 +112,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       : !isProduction,
     whatsapp: loadWhatsappDefaults(env),
     email: loadEmailDefaults(env),
+    sms: loadSmsDefaults(env),
+    twilioApiUrl: (env.TWILIO_API_URL || TWILIO_API_URL).replace(/\/+$/, ""),
     whatsappApiUrl: (env.WHATSAPP_API_URL || WHATSAPP_API_URL).replace(/\/+$/, ""),
     whatsappCallbackTag: env.WHATSAPP_CALLBACK_TAG || null,
     mercadopagoApiUrl: (env.MERCADOPAGO_API_URL || MERCADOPAGO_API_URL).replace(/\/+$/, ""),
@@ -112,6 +131,17 @@ function loadEmailDefaults(env: NodeJS.ProcessEnv): EmailDefaults | null {
     fromEmail: EMAIL_FROM,
     footer: env.EMAIL_FOOTER || null,
   };
+}
+
+function loadSmsDefaults(env: NodeJS.ProcessEnv): SmsDefaults | null {
+  const {
+    TWILIO_ACCOUNT_SID: accountSid,
+    TWILIO_API_KEY_SID: apiKeySid,
+    TWILIO_API_KEY_SECRET: apiKeySecret,
+    TWILIO_FROM_NUMBER: sender,
+  } = env;
+  if (!accountSid || !apiKeySid || !apiKeySecret || !sender) return null;
+  return { accountSid, apiKeySid, apiKeySecret, sender: sender.replace(/[\s().-]/g, "") };
 }
 
 function loadWhatsappDefaults(env: NodeJS.ProcessEnv): WhatsappDefaults | null {

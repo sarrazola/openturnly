@@ -4,6 +4,8 @@ import {
   addDays,
   EMAIL_TEMPLATE_NAMES,
   type EmailAction,
+  SMS_TEMPLATE_NAMES,
+  type SmsAction,
   todayIn,
   type WaitAction,
   type WebhookAction,
@@ -66,7 +68,9 @@ export function stepTitle(t: TFunction, action: AutomationAction) {
     return t("automations.timing.wait", { time: duration(t, action.minutes) });
   }
   if (action.type === "whatsapp") return action.template || t("automations.step.untitled");
-  if (action.type === "email") return t(`automations.email.templates.${action.template}`);
+  if (action.type === "email" || action.type === "sms") {
+    return t(`automations.email.templates.${action.template}`);
+  }
   try {
     return new URL(action.url).host;
   } catch {
@@ -100,6 +104,16 @@ export function newEmail(language: "es" | "en"): EmailAction {
     template: EMAIL_TEMPLATE_NAMES[0],
     language,
     subject: "",
+    body: "",
+  };
+}
+
+export function newSms(language: "es" | "en"): SmsAction {
+  return {
+    id: crypto.randomUUID(),
+    type: "sms",
+    template: SMS_TEMPLATE_NAMES[0],
+    language,
     body: "",
   };
 }

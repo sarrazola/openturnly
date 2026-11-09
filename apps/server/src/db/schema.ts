@@ -31,6 +31,7 @@ import {
   integer,
   json,
   jsonb,
+  numeric,
   pgTable,
   primaryKey,
   text,
@@ -1093,6 +1094,28 @@ export const emailConnections = pgTable("email_connections", {
   updatedAt: updatedAt(),
 });
 
+export const SMS_STATUSES = ["disconnected", "connected", "error"] as const;
+
+/**
+ * The install's own Twilio account for text messages, set by its owner: every business
+ * sends on it. Without one that's connected, texts go out on the account from the
+ * environment, when there is one. The key's secret is encrypted (see lib/secrets.ts) and
+ * never leaves the server. There's one row at most.
+ */
+export const smsConnections = pgTable("sms_connections", {
+  id: id(),
+  accountSid: text("account_sid").notNull(),
+  apiKeySid: text("api_key_sid").notNull(),
+  encryptedApiKeySecret: text("encrypted_api_key_secret"),
+  /** A number with its country code, or a messaging service (MG…). */
+  sender: text("sender").notNull(),
+  status: text("status", { enum: SMS_STATUSES }).notNull().default("disconnected"),
+  lastError: text("last_error"),
+  lastConnectedAt: instant("last_connected_at"),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+
 /** "skipped": not sent because the step or the appointment no longer applies. */
 export const DELIVERY_STATUSES = ["pending", "sent", "failed", "skipped"] as const;
 
@@ -1122,9 +1145,14 @@ export const automationDeliveries = pgTable(
     responseStatus: integer("response_status"),
     error: text("error"),
     sentAt: instant("sent_at"),
-    /** WhatsApp's id for the message, and how far it got: sent, delivered, read or failed. */
+    /** The provider's id for the message, and how far it got: sent, delivered, read or failed. */
     messageId: text("message_id"),
     messageStatus: text("message_status"),
+    /** What the provider charged for the message, once it says. */
+    cost: numeric("cost", { precision: 12, scale: 6 }),
+    costCurrency: text("cost_currency"),
+    /** When the provider was last asked about the message, so it isn't asked every minute. */
+    messageCheckedAt: instant("message_checked_at"),
     createdAt: createdAt(),
   },
   (table) => [
@@ -1154,3 +1182,4 @@ export type Automation = typeof automations.$inferSelect;
 export type AutomationDelivery = typeof automationDeliveries.$inferSelect;
 export type WhatsappConnection = typeof whatsappConnections.$inferSelect;
 export type EmailConnection = typeof emailConnections.$inferSelect;
+export type SmsConnection = typeof smsConnections.$inferSelect;

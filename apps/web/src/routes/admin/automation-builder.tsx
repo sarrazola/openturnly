@@ -19,6 +19,11 @@ import {
   renderEmailText,
   renderJsonTemplate,
   renderTemplate,
+  SMS_TEMPLATE_NAMES,
+  type SmsAction,
+  smsSegments,
+  smsTemplate,
+  smsText,
   WEBHOOK_AUTH_TYPES,
   WEBHOOK_BODY_MODES,
   WEBHOOK_METHODS,
@@ -39,6 +44,7 @@ import {
   type LucideIcon,
   Mail,
   MessageCircle,
+  MessageSquare,
   Play,
   Plus,
   RefreshCw,
@@ -72,6 +78,7 @@ import {
   isTimed,
   MESSAGE,
   newEmail,
+  newSms,
   newWait,
   newWebhook,
   newWhatsapp,
@@ -422,7 +429,9 @@ function Builder({ automation, template }: { automation: Automation | null; temp
                         ? MessageCircle
                         : action.type === "email"
                           ? Mail
-                          : Webhook
+                          : action.type === "sms"
+                            ? MessageSquare
+                            : Webhook
                   }
                   tone={action.type === "wait" ? "wait" : "webhook"}
                   eyebrow={t(`automations.builder.kinds.${action.type}`)}
@@ -506,6 +515,21 @@ function Builder({ automation, template }: { automation: Automation | null; temp
               onTest={() => runTest(selectedStep.id)}
               onClose={() => setSelected(null)}
             />
+          ) : selectedStep?.type === "sms" ? (
+            <SmsPanel
+              key={selectedStep.id}
+              step={selectedStep}
+              trigger={draft.trigger ?? "created"}
+              errors={errors}
+              index={selectedIndex}
+              result={results[selectedStep.id]}
+              testing={test.isPending}
+              testWith={testWith}
+              onTestWith={setTestWith}
+              onChange={(change) => updateStep(selectedStep.id, change)}
+              onTest={() => runTest(selectedStep.id)}
+              onClose={() => setSelected(null)}
+            />
           ) : selectedStep?.type === "webhook" ? (
             <StepPanel
               key={selectedStep.id}
@@ -544,7 +568,7 @@ function AddStep({
   const ref = useRef<HTMLDivElement>(null);
   useClickOutside(open, [ref], () => setOpen(false));
   const options: {
-    key: "webhook" | "whatsapp" | "email" | "wait";
+    key: "webhook" | "whatsapp" | "email" | "sms" | "wait";
     icon: LucideIcon;
     make: () => AutomationAction;
   }[] = [
@@ -555,6 +579,11 @@ function AddStep({
             key: "email" as const,
             icon: Mail,
             make: () => newEmail(business.locale === "en" ? "en" : "es"),
+          },
+          {
+            key: "sms" as const,
+            icon: MessageSquare,
+            make: () => newSms(business.locale === "en" ? "en" : "es"),
           },
           { key: "webhook" as const, icon: Webhook, make: () => newWebhook() },
         ]
@@ -1723,8 +1752,157 @@ function EmailPanel({
   );
 }
 
+/** An SMS step: which text, its words when the account allows changing them, and its parts. */
+function SmsPanel({
+  index,
+  step,
+  trigger,
+  errors,
+  result,
+  testing,
+  testWith,
+  onTestWith,
+  onChange,
+  onTest,
+  onClose,
+}: {
+  index: number;
+  step: SmsAction;
+  trigger: AutomationTrigger;
+  errors: FieldErrors;
+  result: AutomationStepResult | undefined;
+  testing: boolean;
+  testWith: string;
+  onTestWith: (id: string) => void;
+  onChange: (change: Partial<SmsAction>) => void;
+  onTest: () => void;
+  onClose: () => void;
+}) {
+  const { t, i18n } = useTranslation();
+  const { business } = useBusinessContext();
+  const channels = useBusinessChannels(business.id);
+  const sample = useMemo(
+    () => sampleValues(business, AUTOMATION_EVENTS[trigger], i18n.resolvedLanguage ?? "es"),
+    [business, trigger, i18n.resolvedLanguage],
+  );
+  const ready = smsTemplate(step.template);
+  const editable = channels.data?.sms === "own";
+  const body = (editable && step.body) || ready?.body[step.language] || "";
+  // What the customer gets: filled in, and with the letters an SMS can't carry swapped.
+  const written = renderTemplate(body, sample);
+  const sent = smsText(written).trim();
+  const parts = smsSegments(sent);
+  const problem = (field: string) => fieldMessage(t, field, errors[`actions.${index}.${field}`]);
+
+  return (
+    <div className="space-y-5">
+      <PanelTitle
+        icon={MessageSquare}
+        title={t("automations.sms.title")}
+        hint={t("automations.sms.hint")}
+        onClose={onClose}
+      />
+      {channels.data?.sms === null && (
+        <p className="text-[13px] text-amber-700">{t("automations.sms.notConnected")}</p>
+      )}
+      <Field label={t("automations.sms.template")}>
+        {(props) => (
+          <Select
+            {...props}
+            value={step.template}
+            onChange={(event) =>
+              onChange({ template: event.target.value as SmsAction["template"], body: "" })
+            }
+          >
+            {SMS_TEMPLATE_NAMES.map((name) => (
+              <option key={name} value={name}>
+                {t(`automations.email.templates.${name}`)}
+              </option>
+            ))}
+          </Select>
+        )}
+      </Field>
+      <Field label={t("automations.sms.language")}>
+        {(props) => (
+          <Select
+            {...props}
+            value={step.language}
+            onChange={(event) =>
+              onChange({ language: event.target.value as SmsAction["language"], body: "" })
+            }
+          >
+            <option value="es">Español</option>
+            <option value="en">English</option>
+          </Select>
+        )}
+      </Field>
+      {editable ? (
+        <Field label={t("automations.sms.body")} error={problem("body")}>
+          {(props) => (
+            <TemplateEditor
+              {...props}
+              rows={4}
+              value={body}
+              sample={sample}
+              onChange={(value) => onChange({ body: value })}
+            />
+          )}
+        </Field>
+      ) : (
+        <p className="text-xs text-zinc-500">{t("automations.sms.fixed")}</p>
+      )}
+      <div className="space-y-1.5">
+        <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-[13px] whitespace-pre-line text-zinc-800">
+          {sent}
+        </div>
+        <p
+          className={cn(
+            "text-xs",
+            parts.segments > 1 || parts.unicode ? "text-amber-700" : "text-zinc-500",
+          )}
+        >
+          {t("automations.sms.parts", { count: parts.segments, characters: parts.characters })}
+        </p>
+        {parts.unicode ? (
+          <p className="text-xs text-amber-700">{t("automations.sms.unicode")}</p>
+        ) : (
+          sent !== written.trim() && (
+            <p className="text-xs text-zinc-500">{t("automations.sms.plain")}</p>
+          )
+        )}
+      </div>
+      <div className="space-y-2">
+        <TestAppointmentPicker value={testWith} onChange={onTestWith} />
+        <Button variant="secondary" disabled={testing || !testWith} onClick={onTest}>
+          <Play className="size-4" aria-hidden />
+          {t("automations.whatsapp.test")}
+        </Button>
+      </div>
+      {result && <StepResult result={result} />}
+    </div>
+  );
+}
+
+/** Twilio's refusals worth a plain word, as the Channels page words them. */
+const SMS_REASONS = new Set([
+  "sms_login",
+  "sms_invalid_phone",
+  "sms_country_blocked",
+  "sms_unsubscribed",
+  "sms_not_mobile",
+  "sms_sender_invalid",
+  "sms_unreachable",
+]);
+
 function failureReason(t: TFunction, error: string | null): string {
   if (!error) return "";
+  if (error === "sms_no_phone") return t("automations.result.smsNoPhone");
+  if (error === "sms_not_connected") return t("automations.result.smsNotConnected");
+  if (error === "sms_empty") return t("automations.result.smsEmpty");
+  if (SMS_REASONS.has(error)) return t(`sms.failures.${error}` as "sms.failures.sms_login");
+  if (error.startsWith("twilio_")) {
+    return t("automations.result.twilio", { code: error.slice("twilio_".length) });
+  }
   if (error === "email_no_address") return t("automations.result.emailNoAddress");
   if (error === "email_not_connected") return t("automations.result.emailNotConnected");
   if (error === "email_login") return t("email.failures.email_login");
@@ -1880,6 +2058,21 @@ function PairsEditor({
   );
 }
 
+/** What a provider charged, with the few decimals a single message needs: "US$0,0592". */
+function providerCost(amount: string, currency: string | null, locale = "es") {
+  const value = Number(amount);
+  try {
+    return new Intl.NumberFormat(locale, {
+      style: "currency",
+      currency: currency ?? "USD",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 4,
+    }).format(value);
+  } catch {
+    return `${currency ?? ""} ${value}`.trim();
+  }
+}
+
 /** For a saved automation: its latest sends and its signing secret. */
 function SavedTools({ automation }: { automation: Automation }) {
   const { t, i18n } = useTranslation();
@@ -1906,6 +2099,15 @@ function SavedTools({ automation }: { automation: Automation }) {
                 <span className="min-w-0 truncate text-zinc-700">
                   {time(delivery.createdAt)} · {names.get(delivery.actionId ?? "") ?? "—"}
                   {delivery.payload.test ? ` · ${t("automations.testLabel")}` : ""}
+                  {delivery.cost
+                    ? ` · ${t("automations.cost", {
+                        amount: providerCost(
+                          delivery.cost,
+                          delivery.costCurrency,
+                          i18n.resolvedLanguage,
+                        ),
+                      })}`
+                    : ""}
                 </span>
                 <StatusBadge
                   status={delivery.status}

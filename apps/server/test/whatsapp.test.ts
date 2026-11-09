@@ -373,7 +373,11 @@ describe("WhatsApp", () => {
     expect((await admin.get("/api/channels/whatsapp")).status).toBe(403);
     expect((await admin.put("/api/channels/whatsapp", OWN_NUMBER)).status).toBe(403);
     // Building a flow only needs to know what's connected.
-    expect((await admin.get(`${base}/channels`)).body).toEqual({ whatsapp: null, email: null });
+    expect((await admin.get(`${base}/channels`)).body).toEqual({
+      whatsapp: null,
+      email: null,
+      sms: null,
+    });
   });
 
   describe("webhook", () => {

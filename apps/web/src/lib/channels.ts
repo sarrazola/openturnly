@@ -1,13 +1,25 @@
 import type {
   EmailConnectionInput,
   EmailTestInput,
+  SmsConnectionInput,
+  SmsTestInput,
   WhatsappConnectionInput,
   WhatsappTestInput,
 } from "@openturnly/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, type EmailOverview, type WhatsappOverview, type WhatsappTemplate } from "./api.ts";
+import {
+  api,
+  type EmailOverview,
+  type SmsOverview,
+  type WhatsappOverview,
+  type WhatsappTemplate,
+} from "./api.ts";
 
-const keys = { whatsapp: ["channels", "whatsapp"] as const, email: ["channels", "email"] as const };
+const keys = {
+  whatsapp: ["channels", "whatsapp"] as const,
+  email: ["channels", "email"] as const,
+  sms: ["channels", "sms"] as const,
+};
 
 type WhatsappTemplates = {
   source: "own" | "default" | null;
@@ -90,6 +102,37 @@ export function useEmailMutations() {
   };
 }
 
+export function useSms() {
+  return useQuery({
+    queryKey: keys.sms,
+    queryFn: () => api<SmsOverview>("/api/channels/sms"),
+  });
+}
+
+export function useSmsMutations() {
+  const queryClient = useQueryClient();
+  const refresh = () => queryClient.invalidateQueries({ queryKey: keys.sms });
+  const base = "/api/channels/sms";
+  return {
+    save: useMutation({
+      mutationFn: (body: SmsConnectionInput) => api<SmsOverview>(base, { method: "PUT", body }),
+      onSuccess: refresh,
+    }),
+    connect: useMutation({
+      mutationFn: () => api<SmsOverview>(`${base}/connect`, { method: "POST" }),
+      onSuccess: refresh,
+    }),
+    remove: useMutation({
+      mutationFn: () => api<SmsOverview>(base, { method: "DELETE" }),
+      onSuccess: refresh,
+    }),
+    test: useMutation({
+      mutationFn: (body: SmsTestInput) =>
+        api<{ ok: boolean; error: string | null }>(`${base}/test`, { method: "POST", body }),
+    }),
+  };
+}
+
 type Source = "own" | "default" | null;
 
 /** What a business's flows can send through, whoever set it up. */
@@ -97,7 +140,9 @@ export function useBusinessChannels(businessId: string) {
   return useQuery({
     queryKey: ["businesses", businessId, "channels"],
     queryFn: () =>
-      api<{ whatsapp: Source; email: Source }>(`/api/businesses/${businessId}/channels`),
+      api<{ whatsapp: Source; email: Source; sms: Source }>(
+        `/api/businesses/${businessId}/channels`,
+      ),
   });
 }
 

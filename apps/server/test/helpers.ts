@@ -47,12 +47,15 @@ export async function createTestApp(
     mercadopagoApiUrl?: string;
     whatsappCallbackTag?: string;
     email?: Config["email"];
+    sms?: Config["sms"];
+    twilioApiUrl?: string;
+    appUrl?: string;
   } = {},
 ) {
   const config: Config = {
     isProduction: false,
     port: 3000,
-    appUrl: APP_URL,
+    appUrl: options.appUrl ?? APP_URL,
     dataDir: "",
     databaseUrl: undefined,
     secret: "test-secret-that-is-long-enough-for-better-auth",
@@ -66,6 +69,8 @@ export async function createTestApp(
     mercadopagoApiUrl: options.mercadopagoApiUrl ?? "http://127.0.0.1:1",
     whatsappCallbackTag: options.whatsappCallbackTag ?? null,
     email: options.email ?? null,
+    sms: options.sms ?? null,
+    twilioApiUrl: options.twilioApiUrl ?? "http://127.0.0.1:1",
   };
   const { db } = await openEmbeddedPostgres();
   const auth = createAuth({ db, config });

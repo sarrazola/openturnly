@@ -127,6 +127,8 @@ updates, read the [self-hosting guide](docs/self-hosting.md), or follow the
   ([docs/whatsapp.md](docs/whatsapp.md)).
 - **Email reminders and confirmations** through any provider that takes SMTP
   ([docs/email.md](docs/email.md)).
+- **Text message reminders and confirmations** through Twilio, with what each one cost
+  ([docs/sms.md](docs/sms.md)).
 - **Online payments** at booking, a deposit or the full price, straight to the business's own
   Mercado Pago account ([docs/payments.md](docs/payments.md)).
 - **Protection against fake bookings**: self-hosted proof of work (ALTCHA), rate limits and
