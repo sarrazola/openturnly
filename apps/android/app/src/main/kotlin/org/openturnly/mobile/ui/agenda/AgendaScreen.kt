@@ -11,7 +11,6 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,32 +27,39 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.EventAvailable
 import androidx.compose.material.icons.outlined.FilterAltOff
+import androidx.compose.material.icons.outlined.FilterList
+import androidx.compose.material.icons.outlined.Groups
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -69,6 +75,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -89,6 +96,7 @@ import org.openturnly.mobile.ui.BusinessLogo
 import org.openturnly.mobile.ui.Chip
 import org.openturnly.mobile.ui.EmptyState
 import org.openturnly.mobile.ui.ErrorState
+import org.openturnly.mobile.ui.Field
 import org.openturnly.mobile.ui.LocalExtended
 import org.openturnly.mobile.ui.Route
 import org.openturnly.mobile.ui.Skeleton
@@ -110,6 +118,8 @@ fun AgendaScreen(model: AppModel) {
     val catalog = model.catalog
     val business = model.business ?: return
     var picking by remember { mutableStateOf(false) }
+    var filtering by remember { mutableStateOf(false) }
+    val canFilter = model.isAdmin || catalog.locations.count { it.active } > 1
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
 
@@ -136,13 +146,22 @@ fun AgendaScreen(model: AppModel) {
                     TextButton({ agenda.select(today) }) { Text(Copy.common.today) }
                 }
                 IconButton({ picking = true }) { Icon(Icons.Outlined.CalendarMonth, Copy.agenda.pickDay) }
+                if (canFilter) {
+                    IconButton({ filtering = true }) {
+                        BadgedBox(badge = {
+                            if (agenda.professionalId != null || agenda.locationId != null || agenda.showCancelled) {
+                                Badge(containerColor = MaterialTheme.colorScheme.primary)
+                            }
+                        }) { Icon(Icons.Outlined.FilterList, Copy.agenda.filters) }
+                    }
+                }
             }
             Text(
                 dayTitle(agenda.date, today, locale), style = MaterialTheme.typography.headlineMedium,
                 modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 10.dp),
             )
             WeekStrip(model, today)
-            Filters(model)
+            ActiveFilters(model) { filtering = true }
             PullToRefreshBox(isRefreshing = agenda.refreshing, onRefresh = { agenda.refresh(); model.refreshCatalog() }, modifier = Modifier.fillMaxSize()) {
                 when {
                     visible == null && agenda.error != null -> Column(Modifier.fillMaxSize()) { ErrorState(agenda.error ?: Copy.agenda.loadFailed, { agenda.loadCurrent() }) }
@@ -171,6 +190,8 @@ fun AgendaScreen(model: AppModel) {
             modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
         )
     }
+
+    if (filtering) AgendaFilterSheet(model) { filtering = false }
 
     if (picking) {
         val state = rememberDatePickerState(initialSelectedDateMillis = BusinessTime.pickerMillis(agenda.date))
@@ -262,46 +283,140 @@ private fun DayCell(day: LocalDate, locale: java.util.Locale, selected: Boolean,
     }
 }
 
+/** What the agenda is narrowed to: tap to change it, the cross clears it. */
 @Composable
-private fun Filters(model: AppModel) {
+private fun ActiveFilters(model: AppModel, onOpen: () -> Unit) {
     val agenda = model.agenda
     val catalog = model.catalog
-    val locations = catalog.locations.filter { it.active }
-    val showPeople = model.isAdmin && catalog.professionals.isNotEmpty()
-    if (!showPeople && locations.size < 2 && !model.isAdmin) {
+    val person = catalog.professionals.firstOrNull { it.id == agenda.professionalId }
+    val location = catalog.location(agenda.locationId)
+    if (person == null && location == null) {
         Spacer(Modifier.height(8.dp))
         return
     }
+    val primary = MaterialTheme.colorScheme.primary
     Row(
-        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically,
+        Modifier.padding(horizontal = 16.dp, vertical = 8.dp).height(36.dp).clip(CircleShape).background(primary.copy(alpha = 0.12f)),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (locations.size > 1) {
-            FilterChip(agenda.locationId == null, { agenda.locationId = null }, { Text(Copy.common.allLocations) })
-            locations.forEach { location ->
-                FilterChip(agenda.locationId == location.id, { agenda.locationId = if (agenda.locationId == location.id) null else location.id }, { Text(location.name) })
+        Row(
+            Modifier.fillMaxHeight().clickable(onClick = onOpen).padding(start = if (person != null) 6.dp else 12.dp, end = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (person != null) {
+                Avatar(person.name, size = 24.dp, color = LocalExtended.current.person(catalog.personIndex(person.id)), photoUrl = model.api?.absolute(person.photoUrl))
+            } else {
+                Icon(Icons.Outlined.FilterList, null, tint = primary, modifier = Modifier.size(18.dp))
             }
-            Box(Modifier.width(1.dp).height(24.dp).background(LocalExtended.current.cardBorder))
-        }
-        if (showPeople) {
-            FilterChip(
-                agenda.professionalId == null, { agenda.professionalId = null }, { Text(Copy.agenda.allProfessionals) },
-                leadingIcon = if (agenda.professionalId == null) ({ Icon(Icons.Filled.Check, null, Modifier.size(16.dp)) }) else null,
+            Text(
+                listOfNotNull(person?.name, location?.name).joinToString(" · "), color = primary,
+                style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(start = 8.dp),
             )
-            catalog.professionals.filter { it.active || it.id == agenda.professionalId }.forEach { professional ->
-                val color = LocalExtended.current.person(catalog.personIndex(professional.id))
-                FilterChip(
-                    agenda.professionalId == professional.id,
-                    { agenda.professionalId = if (agenda.professionalId == professional.id) null else professional.id },
-                    { Text(professional.name) },
-                    leadingIcon = { Avatar(professional.name, size = 20.dp, color = color, photoUrl = model.api?.absolute(professional.photoUrl)) },
-                    colors = FilterChipDefaults.filterChipColors(selectedContainerColor = color.copy(alpha = 0.18f), selectedLabelColor = MaterialTheme.colorScheme.onSurface),
-                )
+        }
+        Box(
+            Modifier.size(36.dp).clickable { agenda.professionalId = null; agenda.locationId = null },
+            contentAlignment = Alignment.Center,
+        ) { Icon(Icons.Filled.Close, Copy.agenda.clearFilters, tint = primary, modifier = Modifier.size(16.dp)) }
+    }
+}
+
+/**
+ * Whose agenda to see (everyone or one person), at which location, and whether
+ * cancelled appointments show. Picking a person closes the sheet; a long team
+ * gets a search field.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AgendaFilterSheet(model: AppModel, onDismiss: () -> Unit) {
+    val agenda = model.agenda
+    val catalog = model.catalog
+    val locations = catalog.locations.filter { it.active }
+    val team = catalog.professionals.filter { it.active || it.id == agenda.professionalId }
+    val searchable = team.size > 8
+    var query by remember { mutableStateOf("") }
+    val shown = query.trim().let { text -> if (text.isEmpty()) team else team.filter { it.name.contains(text, ignoreCase = true) } }
+    val state = rememberModalBottomSheetState(skipPartiallyExpanded = searchable)
+    val scope = rememberCoroutineScope()
+    fun close() { scope.launch { state.hide() }.invokeOnCompletion { onDismiss() } }
+
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = state, containerColor = MaterialTheme.colorScheme.surfaceContainerLow) {
+        LazyColumn(Modifier.fillMaxWidth(), contentPadding = PaddingValues(bottom = 24.dp)) {
+            item {
+                Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(Copy.agenda.filters, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+                    if (agenda.professionalId != null || agenda.locationId != null) {
+                        TextButton({ agenda.professionalId = null; agenda.locationId = null }) { Text(Copy.agenda.clearFilters) }
+                    }
+                }
+            }
+            if (model.isAdmin && team.size > 1) {
+                item { SheetLabel(Copy.agenda.professional) }
+                if (searchable) {
+                    item {
+                        Field(
+                            query, { query = it }, Copy.agenda.searchStaff, Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                            imeAction = ImeAction.Search, leading = { Icon(Icons.Outlined.Search, null) },
+                        )
+                    }
+                }
+                if (query.isBlank()) {
+                    item {
+                        FilterOption(Copy.agenda.allProfessionals, agenda.professionalId == null, leading = {
+                            Box(Modifier.size(36.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
+                                Icon(Icons.Outlined.Groups, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                            }
+                        }) { agenda.professionalId = null; close() }
+                    }
+                }
+                items(shown, key = { it.id }) { professional ->
+                    FilterOption(professional.name, agenda.professionalId == professional.id, leading = {
+                        Avatar(professional.name, size = 36.dp, color = LocalExtended.current.person(catalog.personIndex(professional.id)), photoUrl = model.api?.absolute(professional.photoUrl))
+                    }) { agenda.professionalId = professional.id; close() }
+                }
+            }
+            if (locations.size > 1 && query.isBlank()) {
+                item { SheetLabel(Copy.agenda.location) }
+                item { FilterOption(Copy.common.allLocations, agenda.locationId == null) { agenda.locationId = null } }
+                items(locations, key = { "location-" + it.id }) { location ->
+                    FilterOption(location.name, agenda.locationId == location.id) { agenda.locationId = location.id }
+                }
+            }
+            if (model.isAdmin && query.isBlank()) {
+                item {
+                    Row(
+                        Modifier.fillMaxWidth().clickable { agenda.showCancelled = !agenda.showCancelled }.padding(horizontal = 20.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(Copy.agenda.showCancelledLong, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                        Switch(agenda.showCancelled, { agenda.showCancelled = it })
+                    }
+                }
             }
         }
-        if (model.isAdmin) {
-            FilterChip(agenda.showCancelled, { agenda.showCancelled = !agenda.showCancelled }, { Text(Copy.agenda.showCancelled) })
+    }
+}
+
+@Composable
+private fun SheetLabel(text: String) {
+    Text(
+        text, style = MaterialTheme.typography.labelLarge, color = LocalExtended.current.muted,
+        modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 4.dp),
+    )
+}
+
+@Composable
+private fun FilterOption(title: String, selected: Boolean, leading: (@Composable () -> Unit)? = null, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (leading != null) {
+            leading()
+            Spacer(Modifier.width(14.dp))
         }
+        Text(title, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+        if (selected) Icon(Icons.Filled.Check, null, tint = MaterialTheme.colorScheme.primary)
     }
 }
 

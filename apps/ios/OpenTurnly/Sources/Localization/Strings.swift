@@ -140,6 +140,8 @@ enum L {
         static var title: String { tr("Calendar", "Agenda") }
         static var pickDate: String { tr("Pick a date", "Elegir fecha") }
         static var everyone: String { tr("All staff", "Todos") }
+        static var professional: String { tr("Staff member", "Profesional") }
+        static var searchStaff: String { tr("Search staff", "Buscar profesional") }
         static var allLocations: String { tr("All locations", "Todos los locales") }
         static var location: String { tr("Location", "Local") }
         static var showCancelled: String { tr("Show cancelled", "Mostrar canceladas") }
