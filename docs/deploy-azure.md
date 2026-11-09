@@ -119,7 +119,7 @@ docker run --rm hello-world
 ## 4. Install OpenTurnly
 
 ```bash
-git clone https://github.com/juanpabloortizo/openturnly.git
+git clone https://github.com/sarrazola/openturnly.git
 cd openturnly
 ```
 

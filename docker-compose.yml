@@ -5,7 +5,7 @@ name: openturnly
 
 services:
   openturnly:
-    image: ghcr.io/juanpabloortizo/openturnly:latest
+    image: ghcr.io/sarrazola/openturnly:latest
     build: .
     restart: unless-stopped
     ports:

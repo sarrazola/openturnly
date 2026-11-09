@@ -9,7 +9,7 @@
 Barbershops, hair salons, spas, clinics, therapists, vets, sports courts — give your
 customers a page to book appointments, on your own server, for free.
 
-[![CI](https://github.com/juanpabloortizo/openturnly/actions/workflows/ci.yml/badge.svg)](https://github.com/juanpabloortizo/openturnly/actions/workflows/ci.yml)
+[![CI](https://github.com/sarrazola/openturnly/actions/workflows/ci.yml/badge.svg)](https://github.com/sarrazola/openturnly/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 </div>
@@ -61,7 +61,7 @@ features than they need. OpenTurnly aims to be the free, simple alternative that
 You need [Docker](https://docs.docker.com/get-docker/) with Docker Compose.
 
 ```bash
-git clone https://github.com/juanpabloortizo/openturnly.git
+git clone https://github.com/sarrazola/openturnly.git
 cd openturnly
 docker compose up -d --build
 ```

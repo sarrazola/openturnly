@@ -6,8 +6,8 @@ If anything in this guide is unclear, that is a bug — please open an issue.
 ## Ways to help
 
 - **Try it** and report what breaks or confuses you.
-- **Pick an issue** labeled [`good first issue`](https://github.com/juanpabloortizo/openturnly/labels/good%20first%20issue)
-  or [`help wanted`](https://github.com/juanpabloortizo/openturnly/labels/help%20wanted).
+- **Pick an issue** labeled [`good first issue`](https://github.com/sarrazola/openturnly/labels/good%20first%20issue)
+  or [`help wanted`](https://github.com/sarrazola/openturnly/labels/help%20wanted).
 - **Translate** the interface (see [Translations](#translations)).
 - **Improve the docs**, especially the self-hosting guide.
 

@@ -23,7 +23,7 @@ lose the database on every restart.
 ## Install
 
 ```bash
-git clone https://github.com/juanpabloortizo/openturnly.git
+git clone https://github.com/sarrazola/openturnly.git
 cd openturnly
 cp .env.example .env   # set APP_URL and a strong POSTGRES_PASSWORD
 docker compose up -d --build
@@ -128,7 +128,7 @@ If you installed from a clone and build the image yourself, run `git pull` and
 
 The image is published as `latest` and with version tags (`1`, `1.0`, `1.0.0`). To take
 only fixes and new features that don't change your setup, pin the major version in
-`docker-compose.yml`: `image: ghcr.io/juanpabloortizo/openturnly:1`. Read the
+`docker-compose.yml`: `image: ghcr.io/sarrazola/openturnly:1`. Read the
 [changelog](../CHANGELOG.md) before moving to a new major version.
 
 Major PostgreSQL upgrades (for example 18 to 19) are not automatic: back up with
