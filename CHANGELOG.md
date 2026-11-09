@@ -6,6 +6,15 @@ All notable changes to OpenTurnly are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-09
+
+Workflows now talk to customers and the business gets paid up front: WhatsApp, email and
+text messages from workflows, deposits and full payments online with Mercado Pago, and a
+survey after each visit. The people who run a business get native iPhone and Android apps,
+and anyone can reset a forgotten password. Existing installs update by pulling the new
+image, which now lives at `ghcr.io/sarrazola/openturnly`; migrations 0030 to 0036 run on
+start.
+
 ### Added
 
 - **Phone apps** for iPhone and Android, native on each, for the people who run the business:
@@ -41,6 +50,8 @@ All notable changes to OpenTurnly are documented here. The format follows
 
 ### Changed
 
+- The image is published as `ghcr.io/sarrazola/openturnly`, where the project lives now:
+  change `image:` in your `docker-compose.yml`. The old name stays at 1.3.0.
 - A business's link can't change once the business exists, because its booking page, QR codes,
   embeds and MCP clients all depend on it. A sample business can still change it.
 - The ready-made WhatsApp templates carry the booking code, and their names are now in Spanish:
@@ -276,8 +287,9 @@ The first public release, under the MIT license.
   own pages, and "My account" waits 15 minutes after 5 wrong current passwords. See
   [SECURITY.md](SECURITY.md) for everything that's built in.
 
-[Unreleased]: https://github.com/juanpabloortizo/openturnly/compare/v1.3.0...HEAD
-[1.3.0]: https://github.com/juanpabloortizo/openturnly/compare/v1.2.0...v1.3.0
-[1.2.0]: https://github.com/juanpabloortizo/openturnly/compare/v1.1.0...v1.2.0
-[1.1.0]: https://github.com/juanpabloortizo/openturnly/compare/v1.0.0...v1.1.0
-[1.0.0]: https://github.com/juanpabloortizo/openturnly/releases/tag/v1.0.0
+[Unreleased]: https://github.com/sarrazola/openturnly/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/sarrazola/openturnly/compare/v1.3.0...v1.4.0
+[1.3.0]: https://github.com/sarrazola/openturnly/compare/v1.2.0...v1.3.0
+[1.2.0]: https://github.com/sarrazola/openturnly/compare/v1.1.0...v1.2.0
+[1.1.0]: https://github.com/sarrazola/openturnly/compare/v1.0.0...v1.1.0
+[1.0.0]: https://github.com/sarrazola/openturnly/releases/tag/v1.0.0
