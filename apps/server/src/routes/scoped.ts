@@ -21,6 +21,7 @@ import { reportRoutes } from "./reports.ts";
 import { saleRoutes } from "./sales.ts";
 import { serviceRoutes } from "./services.ts";
 import { stockRoutes } from "./stock.ts";
+import { surveyRoutes } from "./surveys.ts";
 
 /**
  * What a professional may call: their own agenda (the appointment routes narrow it to
@@ -75,6 +76,7 @@ export function businessScopedRoutes(deps: Deps) {
     .route("/sales", saleRoutes(deps))
     .route("/cash", cashRoutes(deps))
     .route("/reports", reportRoutes(deps))
+    .route("/surveys", surveyRoutes(deps))
     .route("/deposits", depositRoutes(deps))
     .route("/payments", paymentRoutes(deps))
     .route("/gift-cards", giftCardRoutes(deps))

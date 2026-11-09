@@ -253,6 +253,13 @@
       "when": 1794236938289,
       "tag": "0035_push_notifications",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1794258918042,
+      "tag": "0036_surveys",
+      "breakpoints": true
     }
   ]
 }

@@ -29,6 +29,7 @@ export const EMAIL_TEMPLATE_NAMES = [
   "appointment_reminder",
   "appointment_rescheduled",
   "appointment_cancelled",
+  "appointment_survey",
 ] as const;
 export type EmailTemplateName = (typeof EMAIL_TEMPLATE_NAMES)[number];
 
@@ -94,6 +95,18 @@ export const EMAIL_TEMPLATES: readonly EmailTemplateDefinition[] = [
     body: {
       es: `Hola {{customer.first_name}}, tu cita en {{business.name}} fue cancelada.\n\n${DETAILS.es}\n\n${QUESTIONS.es}`,
       en: `Hi {{customer.first_name}}, your appointment at {{business.name}} was cancelled.\n\n${DETAILS.en}\n\n${QUESTIONS.en}`,
+    },
+  },
+  {
+    // For a flow that runs when an appointment ends: the link asks for a 1–5 rating.
+    name: "appointment_survey",
+    subject: {
+      es: "¿Cómo te fue en {{business.name}}?",
+      en: "How was your visit to {{business.name}}?",
+    },
+    body: {
+      es: "Hola {{customer.first_name}}, gracias por visitarnos en {{business.name}}.\n\n¿Cómo calificarías tu cita de {{appointment.service}}? Te toma unos segundos:\n{{appointment.survey_link}}\n\nTu opinión nos ayuda a mejorar.",
+      en: "Hi {{customer.first_name}}, thanks for visiting {{business.name}}.\n\nHow would you rate your {{appointment.service}} appointment? It takes a few seconds:\n{{appointment.survey_link}}\n\nYour feedback helps us get better.",
     },
   },
 ];

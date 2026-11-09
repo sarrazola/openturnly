@@ -18,6 +18,7 @@ import {
   Scissors,
   Search,
   Settings,
+  Star,
   Store,
   TriangleAlert,
   Users,
@@ -190,6 +191,7 @@ function SidebarContent({ user, collapsed }: { user: User; collapsed: boolean })
                 count: lowStock,
               },
               leaf("/reports", t("nav.reports"), ChartColumn, "reports"),
+              leaf("/surveys", t("nav.surveys"), Star, "surveys"),
               {
                 group: "sales" as const,
                 label: t("nav.sales"),

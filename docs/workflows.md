@@ -88,7 +88,7 @@ an example of each, or search them all.
 | Group | Data |
 | --- | --- |
 | — | `event` (`appointment.created`, `appointment.reminder`…) |
-| `appointment` | `code`, `status`, `date` (YYYY-MM-DD), `time`, `time_text` (10:00 a. m.), `end_time`, `weekday`, `date_text`, `starts_at` and `ends_at` (ISO, UTC), `service`, `duration_minutes`, `professional`, `price` (a number), `price_text`, `booked_via` (`online`, `admin` or the AI agent's key name), `answers`, `previous_date`, `previous_time` |
+| `appointment` | `code`, `status`, `date` (YYYY-MM-DD), `time`, `time_text` (10:00 a. m.), `end_time`, `weekday`, `date_text`, `starts_at` and `ends_at` (ISO, UTC), `service`, `duration_minutes`, `professional`, `price` (a number), `price_text`, `booked_via` (`online`, `admin` or the AI agent's key name), `answers`, `previous_date`, `previous_time`, `survey_link` (only when an appointment ends, see [surveys.md](surveys.md)) |
 | `customer` | `name`, `first_name`, `last_name`, `phone` (+573001234567), `phone_digits` (573001234567, as WhatsApp APIs expect), `email` |
 | `business` | `name`, `phone`, `address`, `booking_page`, `time_zone` |
 

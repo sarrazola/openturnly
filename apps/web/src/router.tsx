@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 import { createBrowserRouter, Link, Navigate } from "react-router";
 import { buttonClass } from "./components/ui.tsx";
 import { PublicBookingPage } from "./routes/public-page.tsx";
+import { SurveyPage } from "./routes/survey-page.tsx";
 
 function NotFoundPage() {
   const { t } = useTranslation();
@@ -49,6 +50,7 @@ export const router = createBrowserRouter([
           { path: "gift-cards", lazy: page("GiftCardsPage") },
           { path: "inventory", lazy: page("InventoryPage") },
           { path: "reports", lazy: page("ReportsPage") },
+          { path: "surveys", lazy: page("SurveysPage") },
           { path: "customers", lazy: page("CustomersPage") },
           { path: "locations", lazy: page("LocationsPage") },
           { path: "services", lazy: page("ServicesPage") },
@@ -63,6 +65,7 @@ export const router = createBrowserRouter([
     ],
   },
   // Must stay last: any other single segment is a business booking page.
+  { path: "/e/:code", element: <SurveyPage /> },
   { path: "/:slug/login", lazy: page("BusinessLoginPage") },
   { path: "/:slug", element: <PublicBookingPage /> },
   { path: "*", element: <NotFoundPage /> },
