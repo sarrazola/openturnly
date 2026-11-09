@@ -183,9 +183,9 @@ const statusLabel = (source: ChannelSource) => {
 };
 
 /**
- * One channel at a glance: whether it works and which account it sends from. A channel that
- * already works needs nothing, so its button is for changing it. Without `onOpen` it isn't
- * available yet.
+ * One channel at a glance: whether it works, and which account it sends from when it's the
+ * owner's own. A channel that already works needs nothing, so its button is for changing it.
+ * Without `onOpen` it isn't available yet.
  */
 function ChannelCard({
   icon: Icon,
@@ -220,13 +220,16 @@ function ChannelCard({
             </Badge>
           )}
         </div>
-        {source && sender ? (
+        {source === "own" && sender ? (
           <>
             <p className="mt-1 text-sm break-words text-zinc-500">
               {t("channels.sendsFrom")} <span className="font-medium text-zinc-900">{sender}</span>
             </p>
             <p className="text-[13px] text-zinc-500">{t(SOURCE_LABELS[source])}</p>
           </>
+        ) : source ? (
+          // The default account is the install's: it's enough to know it works.
+          <p className="mt-1 text-sm break-words text-zinc-500">{t(SOURCE_LABELS[source])}</p>
         ) : (
           <p className="mt-1 text-sm break-words text-zinc-500">{detail}</p>
         )}
@@ -266,7 +269,7 @@ function smsSender(overview: SmsOverview) {
 function smsSummary(t: TFunction, overview: SmsOverview) {
   const number = smsSender(overview);
   if (overview.active === "own" && number) return t("sms.sendingOwn", { number });
-  if (overview.active === "default" && number) return t("sms.sendingDefault", { number });
+  if (overview.active === "default") return t("sms.sendingDefault");
   return t("sms.notSending");
 }
 
@@ -274,7 +277,7 @@ function smsSummary(t: TFunction, overview: SmsOverview) {
 function whatsappSummary(t: TFunction, overview: WhatsappOverview) {
   const number = whatsappSender(t, overview);
   if (overview.active === "own" && number) return t("whatsapp.sendingOwn", { number });
-  if (overview.active === "default" && number) return t("whatsapp.sendingDefault", { number });
+  if (overview.active === "default") return t("whatsapp.sendingDefault");
   return t("whatsapp.notSending");
 }
 
@@ -282,9 +285,7 @@ function whatsappSummary(t: TFunction, overview: WhatsappOverview) {
 function emailSummary(t: TFunction, overview: EmailOverview) {
   const own = overview.connection?.fromEmail;
   if (overview.active === "own" && own) return t("email.sendingOwn", { address: own });
-  if (overview.active === "default" && overview.default) {
-    return t("email.sendingDefault", { address: overview.default });
-  }
+  if (overview.active === "default") return t("email.sendingDefault");
   return t("email.notSending");
 }
 
@@ -482,8 +483,13 @@ function WebhookCard({ connection }: { connection: WhatsappConnection }) {
 }
 
 /** The number's templates, and a test message with one of them. */
+/**
+ * An own number's templates, with whether WhatsApp approved them, and a test send. The
+ * default number's are managed outside the panel: a flow's step shows the ones it can use.
+ */
 function TemplatesCard({ overview }: { overview: WhatsappOverview }) {
   const { t } = useTranslation();
+  const own = overview.active === "own";
   const templates = useWhatsappTemplates();
   const { prepareTemplates, test } = useWhatsappMutations();
   const [choice, setChoice] = useState("");
@@ -524,10 +530,10 @@ function TemplatesCard({ overview }: { overview: WhatsappOverview }) {
 
   return (
     <SettingsCard
-      title={t("whatsapp.templatesTitle")}
-      description={t("whatsapp.templatesHint")}
+      title={t(own ? "whatsapp.templatesTitle" : "whatsapp.testTitle")}
+      description={t(own ? "whatsapp.templatesHint" : "whatsapp.testHint")}
       action={
-        overview.active === "own" && (
+        own && (
           <Button variant="secondary" disabled={prepareTemplates.isPending} onClick={prepare}>
             {t("whatsapp.prepareTemplates")}
           </Button>
@@ -546,7 +552,7 @@ function TemplatesCard({ overview }: { overview: WhatsappOverview }) {
         </Alert>
       ) : list.length === 0 ? (
         <p className="text-sm text-zinc-500">{t("whatsapp.noTemplates")}</p>
-      ) : (
+      ) : !own ? null : (
         <ul className="divide-y divide-zinc-100 rounded-lg border border-zinc-200">
           {list.map((item) => (
             <li

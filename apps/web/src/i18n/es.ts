@@ -52,7 +52,7 @@ export const es = {
   email: {
     title: "Correo",
     sendingOwn: "Tus correos salen desde tu cuenta: {{address}}.",
-    sendingDefault: "Tus correos ya salen desde {{address}}, la cuenta predeterminada.",
+    sendingDefault: "Tus correos ya salen por la cuenta predeterminada.",
     notSending: "Conecta una cuenta para enviar correos a tus clientes desde tus flujos.",
     useOwn: "Usar mi propio correo",
     ownTitle: "Tu propio correo",
@@ -97,7 +97,7 @@ export const es = {
   sms: {
     title: "SMS",
     sendingOwn: "Tus SMS salen desde tu cuenta de Twilio: {{number}}.",
-    sendingDefault: "Tus SMS ya salen desde {{number}}, la cuenta predeterminada.",
+    sendingDefault: "Tus SMS ya salen por la cuenta predeterminada.",
     notSending: "Conecta una cuenta de Twilio para enviar SMS a tus clientes desde tus flujos.",
     useOwn: "Usar mi propia cuenta de Twilio",
     ownTitle: "Tu propia cuenta de Twilio",
@@ -143,7 +143,7 @@ export const es = {
     active: "Activo",
     inactive: "Sin conectar",
     sendingOwn: "Tus mensajes salen desde tu número: {{number}}.",
-    sendingDefault: "Tus mensajes ya salen desde {{number}}, el número predeterminado.",
+    sendingDefault: "Tus mensajes ya salen por el número predeterminado.",
     notSending: "Conecta un número para enviar mensajes a los clientes de tus negocios.",
     unknownNumber: "número conectado",
     useOwn: "Usar mi propio número",
@@ -182,6 +182,9 @@ export const es = {
     templatesSent_other: "{{count}} plantillas enviadas a revisión",
     noTemplates: "Esta cuenta todavía no tiene plantillas.",
     accountMissing: "Falta el identificador de la cuenta de WhatsApp para ver las plantillas.",
+    testTitle: "Probar WhatsApp",
+    testHint:
+      "Envía una de las plantillas aprobadas, con datos de ejemplo, al celular que escribas.",
     testTemplate: "Plantilla de prueba",
     testPhone: "Enviar a",
     sendTest: "Enviar prueba",
