@@ -2196,9 +2196,10 @@ export const en: Messages<typeof es> = {
     howBody: "The survey goes out in a flow that runs when an appointment ends.",
     howStep1: 'Create a "When an appointment ends" flow, or use the ready-made one.',
     howStep2:
-      'Add an email or text step with the "Satisfaction survey" message, or put the "Survey link" value in your own message.',
+      'Pick the channel: WhatsApp with the "encuesta_cita" template, or email or text message with the "Satisfaction survey" message. You can also put the "Survey link" value in your own message.',
     howStep3: "Leave it on here. Responses show up in the Responses tab.",
-    createFlow: "Create survey flow",
+    createFlow: "Create the survey flow on:",
+    channels: { whatsapp: "WhatsApp", email: "Email", sms: "Text message" },
     seeFlows: "See flows",
     preview: "What your customer will see",
     sampleService: "Classic haircut",

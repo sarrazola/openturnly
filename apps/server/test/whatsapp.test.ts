@@ -288,10 +288,10 @@ describe("WhatsApp", () => {
     await owner.put(`/api/channels/whatsapp`, OWN_NUMBER);
     await owner.post(`/api/channels/whatsapp/connect`);
     const { body } = await owner.post(`/api/channels/whatsapp/templates`);
-    // Four templates in two languages, except the one the account already has.
-    expect(body).toMatchObject({ created: 7, error: null });
+    // Five templates in two languages, except the one the account already has.
+    expect(body).toMatchObject({ created: 9, error: null });
     expect(whatsapp.sent.map((item) => item.url)).toEqual(
-      Array(7).fill(`/${OWN_NUMBER.wabaId}/message_templates`),
+      Array(9).fill(`/${OWN_NUMBER.wabaId}/message_templates`),
     );
     expect(whatsapp.sent[0]?.json).toMatchObject({
       category: "UTILITY",

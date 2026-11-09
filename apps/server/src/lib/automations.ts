@@ -822,13 +822,20 @@ export function createAutomations({
         throw new Error("appointment_not_found");
       }
       const event = AUTOMATION_EVENTS[flow.trigger];
-      const values = row
-        ? automationValues(row.business, row, event, config.appUrl)
-        : sampleValues(business, event, config.appUrl);
       // Waits are skipped: a test shows right away how each system answers.
       const steps = sendingSteps({ ...flow, offsetMin: 0 })
         .map((step) => step.action)
         .filter((action) => !actionId || action.id === actionId);
+      // Tested with one of the business's appointments, a survey step sends that
+      // appointment's own link, open from now: what the customer would get, ready to answer.
+      const surveyLink =
+        row && flow.trigger === "after" && steps.some((action) => usesSurveyLink(action))
+          ? surveyUrl(config.appUrl, await surveyCodeFor(db, row.business.id, row.appointment.id))
+          : null;
+      if (row && surveyLink) await markSurveySent(db, row.business, row.appointment.id, Date.now());
+      const values = row
+        ? automationValues(row.business, row, event, config.appUrl, undefined, surveyLink)
+        : sampleValues(business, event, config.appUrl);
       const secret = flow.secret ?? `whsec_test_${randomBytes(12).toString("base64url")}`;
       return Promise.all(
         steps.map(async (action) => {

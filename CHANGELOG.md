@@ -6,6 +6,18 @@ All notable changes to OpenTurnly are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-11-09
+
+### Added
+
+- Surveys on WhatsApp: a ready-made `encuesta_cita` template carries the survey link, and
+  **Surveys → Settings** starts the survey flow on WhatsApp, email or text message.
+
+### Fixed
+
+- Testing a survey flow with one of the business's appointments sent the message without its
+  link. It now sends that appointment's own link, ready to answer.
+
 ## [1.4.0] - 2026-11-09
 
 Workflows now talk to customers and the business gets paid up front: WhatsApp, email and
@@ -287,7 +299,8 @@ The first public release, under the MIT license.
   own pages, and "My account" waits 15 minutes after 5 wrong current passwords. See
   [SECURITY.md](SECURITY.md) for everything that's built in.
 
-[Unreleased]: https://github.com/sarrazola/openturnly/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/sarrazola/openturnly/compare/v1.4.1...HEAD
+[1.4.1]: https://github.com/sarrazola/openturnly/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/sarrazola/openturnly/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/sarrazola/openturnly/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/sarrazola/openturnly/compare/v1.1.0...v1.2.0
