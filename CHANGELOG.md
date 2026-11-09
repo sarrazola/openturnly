@@ -8,6 +8,10 @@ All notable changes to OpenTurnly are documented here. The format follows
 
 ### Added
 
+- **Phone apps** for iPhone and Android, native on each, for the people who run the business:
+  the agenda with booking, moving and cancelling, deposits and checkout, customers, the day's
+  sales, reports and the business's settings. A professional sees only their own appointments.
+  They sign in to any install with its address. See [docs/mobile.md](docs/mobile.md).
 - WhatsApp messages in workflows: a new step sends the customer an approved template with the
   appointment's details, such as a reminder the day before. See [docs/whatsapp.md](docs/whatsapp.md).
 - Email in workflows: a new step sends the customer a confirmation, a reminder, or a notice that

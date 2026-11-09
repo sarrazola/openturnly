@@ -1,6 +1,9 @@
 **/node_modules
 **/dist
 data
+# The native apps are built on their own, never into the image.
+apps/ios
+apps/android
 # Dot-files and folders (git, CI, local settings, .env) stay out of the image.
 .*
 *.db
