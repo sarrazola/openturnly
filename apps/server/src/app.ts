@@ -8,10 +8,12 @@ import { logger } from "hono/logger";
 import { secureHeaders } from "hono/secure-headers";
 import { createAutomations } from "./lib/automations.ts";
 import { createBookingGuard } from "./lib/booking-guard.ts";
-import { hasProxyHeaders, withClientIp } from "./lib/client-ip.ts";
+import { clientIp, hasProxyHeaders, networkKey, withClientIp } from "./lib/client-ip.ts";
 import { createEmail } from "./lib/email.ts";
 import type { AppEnv, Deps } from "./lib/http.ts";
+import { RESET_REQUESTED } from "./lib/password-reset.ts";
 import { createPayments } from "./lib/payments.ts";
+import { createRateLimiter } from "./lib/rate-limit.ts";
 import { createSms } from "./lib/sms.ts";
 import { createWhatsapp } from "./lib/whatsapp.ts";
 import { businessRoutes } from "./routes/businesses.ts";
@@ -26,6 +28,8 @@ import { businessScopedRoutes } from "./routes/scoped.ts";
 import { setupRoutes } from "./routes/setup.ts";
 import { smsWebhookRoutes } from "./routes/sms.ts";
 import { whatsappWebhookRoutes } from "./routes/whatsapp.ts";
+
+const HOUR = 60 * 60_000;
 
 export function createApp({ db, auth, config }: Pick<Deps, "db" | "auth" | "config">) {
   const guard = createBookingGuard({ db, secret: config.secret, settings: config.bookingGuard });
@@ -64,6 +68,24 @@ export function createApp({ db, auth, config }: Pick<Deps, "db" | "auth" | "conf
   });
 
   app.get("/api/health", (c) => c.json({ ok: true }));
+
+  // Forgotten-password emails: a few per address and per network an hour, so the form can't
+  // flood someone's inbox. Past the address's limit the answer stays the same, so it says
+  // nothing about which addresses have an account.
+  const resetsPerAddress = createRateLimiter({ max: 3, windowMs: HOUR });
+  const resetsPerNetwork = createRateLimiter({ max: 10, windowMs: HOUR });
+  app.post("/api/auth/request-password-reset", async (c, next) => {
+    if (!resetsPerNetwork(networkKey(clientIp(c, config.trustProxy)) ?? "unknown")) {
+      return c.json({ error: { code: "too_many_reset_requests" } }, 429);
+    }
+    const body = (await c.req.raw
+      .clone()
+      .json()
+      .catch(() => null)) as { email?: unknown } | null;
+    const address = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
+    if (address && !resetsPerAddress(address)) return c.json(RESET_REQUESTED);
+    await next();
+  });
 
   // Accounts are only created through /api/setup and invitations.
   app.all("/api/auth/sign-up/*", (c) => c.json({ error: { code: "signup_disabled" } }, 403));

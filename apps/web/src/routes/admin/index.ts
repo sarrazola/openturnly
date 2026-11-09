@@ -1,5 +1,13 @@
 /** Everything behind login, loaded on demand by the router. */
-export { BusinessLoginPage, HomeRedirect, InvitePage, LoginPage, SetupPage } from "../auth.tsx";
+export {
+  BusinessLoginPage,
+  ForgotPasswordPage,
+  HomeRedirect,
+  InvitePage,
+  LoginPage,
+  ResetPasswordPage,
+  SetupPage,
+} from "../auth.tsx";
 export { AccountPage } from "./account.tsx";
 export { AgendaPage } from "./agenda.tsx";
 export { AutomationBuilderPage } from "./automation-builder.tsx";

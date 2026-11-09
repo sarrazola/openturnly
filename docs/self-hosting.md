@@ -134,6 +134,24 @@ only fixes and new features that don't change your setup, pin the major version 
 Major PostgreSQL upgrades (for example 18 to 19) are not automatic: back up with
 `pg_dump`, change the `db` image, start with an empty `postgres-data` volume and restore.
 
+## Forgotten passwords
+
+With an email account set up (in **Channels → Email** or in `.env`, see
+[email.md](email.md)), anyone gets back in on their own: **Forgot your password?** on the
+sign-in page emails a link that sets a new password. The link works once, for an hour, and
+saving the new password signs the account out on every device.
+
+Without email, the sign-in page tells people to ask. An admin can set a new password for anyone
+on their team from **Users**. For the owner, whoever runs the server sets a temporary
+password from the command line, and the owner changes it in **My account**:
+
+```bash
+docker compose exec openturnly node apps/server/src/reset-password.ts owner@example.com
+```
+
+From a clone, `npm run reset-password -w @openturnly/server -- owner@example.com` does the same.
+With the embedded development database, stop the server first: only one process can open it.
+
 ## Troubleshooting
 
 - **Port 3000 already in use**: set `OPENTURNLY_PORT=8080` (or any free port).

@@ -8,6 +8,11 @@ All notable changes to OpenTurnly are documented here. The format follows
 
 ### Added
 
+- **Forgot your password?** on the sign-in pages: with an email account set up, anyone gets a
+  link to set a new password, good once for an hour, and is signed out everywhere when they do.
+  Without email, whoever runs the server sets a temporary password with
+  `reset-password`. See [docs/self-hosting.md](docs/self-hosting.md#forgotten-passwords).
+
 - WhatsApp messages in workflows: a new step sends the customer an approved template with the
   appointment's details, such as a reminder the day before. See [docs/whatsapp.md](docs/whatsapp.md).
 - Email in workflows: a new step sends the customer a confirmation, a reminder, or a notice that

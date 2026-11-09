@@ -5,7 +5,7 @@ import { ApiError, api, type User } from "./api.ts";
 export function useSetupStatus() {
   return useQuery({
     queryKey: ["setup"],
-    queryFn: () => api<{ needsSetup: boolean }>("/api/setup"),
+    queryFn: () => api<{ needsSetup: boolean; passwordReset?: "email" | "operator" }>("/api/setup"),
     staleTime: Number.POSITIVE_INFINITY,
   });
 }
