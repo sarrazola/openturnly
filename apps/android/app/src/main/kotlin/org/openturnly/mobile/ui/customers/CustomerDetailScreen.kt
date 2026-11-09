@@ -15,11 +15,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.Chat
 import androidx.compose.material.icons.outlined.Edit
-import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.EventAvailable
-import androidx.compose.material.icons.outlined.Phone
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -34,7 +31,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -57,6 +53,7 @@ import org.openturnly.mobile.rules.Phones
 import org.openturnly.mobile.ui.AppCard
 import org.openturnly.mobile.ui.agenda.StatusChip
 import org.openturnly.mobile.ui.Avatar
+import org.openturnly.mobile.ui.ContactActions
 import org.openturnly.mobile.ui.CustomerNotesSection
 import org.openturnly.mobile.ui.DetailScaffold
 import org.openturnly.mobile.ui.ErrorState
@@ -64,7 +61,6 @@ import org.openturnly.mobile.ui.Hairline
 import org.openturnly.mobile.ui.InfoRow
 import org.openturnly.mobile.ui.LocalExtended
 import org.openturnly.mobile.ui.PrimaryButton
-import org.openturnly.mobile.ui.QuickAction
 import org.openturnly.mobile.ui.Route
 import org.openturnly.mobile.ui.SectionTitle
 import org.openturnly.mobile.ui.SkeletonCards
@@ -121,7 +117,6 @@ internal object CustomerVisits {
 @Composable
 fun CustomerDetailScreen(model: AppModel, summary: CustomerSummary) {
     val ext = LocalExtended.current
-    val context = LocalContext.current
     val locale = AppLocale.locale
     val zone = model.zone
     val loader = rememberLoader(summary.id) { model.call { customer(it, summary.id) } }
@@ -177,15 +172,7 @@ fun CustomerDetailScreen(model: AppModel, summary: CustomerSummary) {
                     BusinessTime.parse(customer?.createdAt ?: summary.createdAt)?.let {
                         Text(Copy.customers.since(BusinessTime.mediumDate(BusinessTime.localDate(it, zone), locale)), style = MaterialTheme.typography.bodyMedium, color = ext.muted)
                     }
-                    if (phone != null || mail != null) {
-                        Row(Modifier.fillMaxWidth().padding(top = 16.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
-                            if (phone != null) {
-                                QuickAction(Icons.Outlined.Phone, Copy.common.call) { context.dial(Phones.dialUri(phone)) }
-                                QuickAction(Icons.AutoMirrored.Outlined.Chat, Copy.common.whatsapp, tint = ext.whatsapp) { context.openUrl(Phones.whatsappUrl(phone)) }
-                            }
-                            if (mail != null) QuickAction(Icons.Outlined.Email, Copy.common.email) { context.email(mail) }
-                        }
-                    }
+                    if (phone != null || mail != null) ContactActions(phone, mail, Modifier.padding(top = 16.dp))
                 }
 
                 // Booking needs only who it is for, so it is there before the rest loads.

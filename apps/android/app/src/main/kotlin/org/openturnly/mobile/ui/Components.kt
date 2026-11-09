@@ -29,17 +29,20 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.outlined.Info
@@ -96,6 +99,7 @@ import kotlinx.coroutines.withContext
 import org.openturnly.mobile.api.ApiClient
 import org.openturnly.mobile.localization.Copy
 import org.openturnly.mobile.rules.Names
+import org.openturnly.mobile.rules.Phones
 
 /** A white (or raised dark) card with the app's 16dp corners and a hairline border. */
 @Composable
@@ -407,14 +411,32 @@ fun ConfirmDialog(
     )
 }
 
-/** A round tonal button with a label under it: call, WhatsApp, email. */
+/** Call, WhatsApp and email as wide tinted buttons with a caption, the same as on the iPhone. */
 @Composable
-fun QuickAction(icon: ImageVector, label: String, tint: Color = MaterialTheme.colorScheme.primary, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    Column(modifier.widthIn(min = 64.dp).clip(RoundedCornerShape(14.dp)).clickable(onClick = onClick).padding(6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(Modifier.size(46.dp).clip(CircleShape).background(tint.copy(alpha = if (LocalExtended.current.dark) 0.2f else 0.12f)), contentAlignment = Alignment.Center) {
-            Icon(icon, label, tint = tint, modifier = Modifier.size(22.dp))
+fun ContactActions(phone: String?, email: String?, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val ext = LocalExtended.current
+    val mailColor = if (ext.dark) Color(0xFF38BDF8) else Color(0xFF0284C7)
+    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        if (phone != null) {
+            ContactAction(Icons.Filled.Phone, Copy.common.call, MaterialTheme.colorScheme.primary) { context.dial(Phones.dialUri(phone)) }
+            ContactAction(Icons.AutoMirrored.Filled.Chat, Copy.common.whatsapp, ext.whatsapp) { context.openUrl(Phones.whatsappUrl(phone)) }
         }
-        Text(label, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 6.dp), maxLines = 1)
+        if (email != null) ContactAction(Icons.Filled.Email, Copy.common.email, mailColor) { context.email(email) }
+    }
+}
+
+@Composable
+private fun RowScope.ContactAction(icon: ImageVector, label: String, color: Color, onClick: () -> Unit) {
+    Column(
+        Modifier.weight(1f).heightIn(min = 62.dp).clip(RoundedCornerShape(14.dp))
+            .background(color.copy(alpha = if (LocalExtended.current.dark) 0.2f else 0.11f))
+            .clickable(onClickLabel = label, onClick = onClick).padding(vertical = 10.dp, horizontal = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Icon(icon, null, tint = color, modifier = Modifier.size(20.dp))
+        Text(label, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Medium, color = color, maxLines = 1, modifier = Modifier.padding(top = 6.dp))
     }
 }
 

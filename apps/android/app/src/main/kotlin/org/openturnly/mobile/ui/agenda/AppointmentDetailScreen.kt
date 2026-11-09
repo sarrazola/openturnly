@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -21,11 +22,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.Chat
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.AccessTime
+import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.ContentCut
 import androidx.compose.material.icons.outlined.EditCalendar
@@ -33,7 +36,6 @@ import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.EventBusy
 import androidx.compose.material.icons.outlined.HowToReg
 import androidx.compose.material.icons.outlined.Payments
-import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.PersonOff
 import androidx.compose.material.icons.outlined.Phone
 import androidx.compose.material.icons.outlined.Place
@@ -95,13 +97,13 @@ import org.openturnly.mobile.ui.CustomerNotesSection
 import org.openturnly.mobile.ui.DetailScaffold
 import org.openturnly.mobile.ui.Field
 import org.openturnly.mobile.ui.Hairline
+import org.openturnly.mobile.ui.ContactActions
 import org.openturnly.mobile.ui.IconBadge
 import org.openturnly.mobile.ui.InfoRow
 import org.openturnly.mobile.ui.LocalExtended
 import org.openturnly.mobile.ui.NavRow
 import org.openturnly.mobile.ui.NoticeBanner
 import org.openturnly.mobile.ui.PrimaryButton
-import org.openturnly.mobile.ui.QuickAction
 import org.openturnly.mobile.ui.Route
 import org.openturnly.mobile.ui.SectionTitle
 import org.openturnly.mobile.ui.copyText
@@ -326,37 +328,45 @@ private fun HeaderRow(icon: ImageVector, text: String) {
 @Composable
 private fun CustomerCard(model: AppModel, appointment: Appointment, showCustomer: Boolean) {
     val ext = LocalExtended.current
-    val context = LocalContext.current
     val customer = appointment.customer
     val phone = customer.phone?.takeIf { it.isNotBlank() }
     val mail = customer.email?.takeIf { it.isNotBlank() }
     Column {
         SectionTitle(Copy.agenda.customer)
         AppCard(padding = PaddingValues(0.dp)) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (phone == null && mail == null) {
                     Text(Copy.agenda.noContact, style = MaterialTheme.typography.bodyMedium, color = ext.muted)
                 } else {
-                    if (phone != null) ContactLine(Icons.Outlined.Phone, Phones.format(phone))
-                    if (mail != null) ContactLine(Icons.Outlined.Email, mail)
-                }
-            }
-            if (phone != null || mail != null) {
-                Row(Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, bottom = 12.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
-                    if (phone != null) {
-                        QuickAction(Icons.Outlined.Phone, Copy.common.call) { context.dial(Phones.dialUri(phone)) }
-                        QuickAction(Icons.AutoMirrored.Outlined.Chat, Copy.common.whatsapp, tint = ext.whatsapp) { context.openUrl(Phones.whatsappUrl(phone)) }
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        if (phone != null) ContactLine(Icons.Outlined.Phone, Phones.format(phone))
+                        if (mail != null) ContactLine(Icons.Outlined.Email, mail)
                     }
-                    if (mail != null) QuickAction(Icons.Outlined.Email, Copy.common.email) { context.email(mail) }
+                    ContactActions(phone, mail)
                 }
-            }
-            if (showCustomer) {
-                Hairline()
-                NavRow(Copy.agenda.viewCustomer, Icons.Outlined.Person) {
-                    model.nav.push(Route.CustomerDetail(CustomerSummary(id = customer.id, shortId = customer.shortId, firstName = customer.firstName, lastName = customer.lastName, email = customer.email, phone = customer.phone)))
+                if (showCustomer) {
+                    ViewCustomerButton {
+                        model.nav.push(Route.CustomerDetail(CustomerSummary(id = customer.id, shortId = customer.shortId, firstName = customer.firstName, lastName = customer.lastName, email = customer.email, phone = customer.phone)))
+                    }
                 }
             }
         }
+    }
+}
+
+/** «Ver cliente»: a soft brand button inside the customer card, as on the iPhone. */
+@Composable
+private fun ViewCustomerButton(onClick: () -> Unit) {
+    val ext = LocalExtended.current
+    val brand = MaterialTheme.colorScheme.primary
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 44.dp).clip(RoundedCornerShape(12.dp)).background(ext.brand.container)
+            .clickable(onClick = onClick).padding(horizontal = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Outlined.AccountCircle, null, tint = brand, modifier = Modifier.size(20.dp))
+        Text(Copy.agenda.viewCustomer, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, color = brand, modifier = Modifier.padding(start = 10.dp).weight(1f))
+        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = ext.subtle, modifier = Modifier.size(20.dp))
     }
 }
 
