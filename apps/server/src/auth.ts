@@ -6,6 +6,7 @@ import type { Config } from "./config.ts";
 import type { Db } from "./db/client.ts";
 import { accounts, sessions, users, verifications } from "./db/schema.ts";
 import { CLIENT_IP_HEADER } from "./lib/client-ip.ts";
+import { passwordResetSender, RESET_LINK_MINUTES } from "./lib/password-reset.ts";
 
 /**
  * Accounts are created only by OpenTurnly itself (first-run setup and invitations),
@@ -26,6 +27,10 @@ export function createAuth({ db, config }: { db: Db; config: Config }) {
       enabled: true,
       minPasswordLength: PASSWORD_MIN_LENGTH,
       maxPasswordLength: 128,
+      // "Forgot your password?": a link by email, good once for an hour (lib/password-reset.ts).
+      sendResetPassword: passwordResetSender({ db, config }),
+      resetPasswordTokenExpiresIn: RESET_LINK_MINUTES * 60,
+      revokeSessionsOnPasswordReset: true,
     },
     user: {
       additionalFields: {

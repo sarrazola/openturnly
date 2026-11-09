@@ -145,7 +145,7 @@ export async function createTestApp(
     return self;
   };
 
-  return { app, db, client };
+  return { app, db, client, auth };
 }
 
 export type TestApp = Awaited<ReturnType<typeof createTestApp>>;

@@ -1,8 +1,8 @@
-import { loginSchema, setupSchema } from "@openturnly/core";
+import { loginSchema, PASSWORD_MIN_LENGTH, setupSchema } from "@openturnly/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, Navigate, useNavigate, useParams } from "react-router";
+import { Link, Navigate, useLocation, useNavigate, useParams, useSearchParams } from "react-router";
 import { AuthLayout } from "../components/auth-layout.tsx";
 import { BookingBackdrop } from "../components/booking-backdrop.tsx";
 import { LanguageSwitcher } from "../components/brand.tsx";
@@ -14,6 +14,9 @@ import { brandStyle } from "../lib/brand.ts";
 import { businessPath } from "../lib/businesses.ts";
 import { errorMessage, type FieldErrors, fieldMessage, validate } from "../lib/forms.ts";
 import { loginPath, rememberLogin, useMe, useSetupStatus } from "../lib/session.ts";
+
+/** What the sign-in pages hand the "forgot password" page: the email typed, and where to return. */
+type ForgotState = { email?: string; back?: string };
 
 /** "/" sends people where they belong: setup, login or the admin panel. */
 export function HomeRedirect() {
@@ -48,6 +51,7 @@ function CredentialsForm({
   serverError,
   pending,
   onSubmit,
+  forgotBack,
 }: {
   withName: boolean;
   fixedEmail?: string;
@@ -56,6 +60,8 @@ function CredentialsForm({
   serverError?: string;
   pending: boolean;
   onSubmit: (values: Credentials) => void;
+  /** On a sign-in form: where "Forgot your password?" comes back to. */
+  forgotBack?: string;
 }) {
   const { t } = useTranslation();
   const [values, setValues] = useState<Credentials>({
@@ -107,6 +113,17 @@ function CredentialsForm({
           />
         )}
       </Field>
+      {forgotBack && (
+        <div className="-mt-2 text-right">
+          <Link
+            to="/forgot-password"
+            state={{ email: values.email, back: forgotBack } satisfies ForgotState}
+            className="text-sm font-medium text-brand-700 hover:text-brand-800"
+          >
+            {t("forgot.link")}
+          </Link>
+        </div>
+      )}
       <Button type="submit" loading={pending} className="w-full">
         {submitLabel}
       </Button>
@@ -192,6 +209,7 @@ export function LoginPage() {
         serverError={mutation.isError ? errorMessage(t, mutation.error) : undefined}
         pending={mutation.isPending}
         onSubmit={submit}
+        forgotBack="/login"
       />
     </AuthLayout>
   );
@@ -262,6 +280,7 @@ export function BusinessLoginPage() {
             serverError={mutation.isError ? errorMessage(t, mutation.error) : undefined}
             pending={mutation.isPending}
             onSubmit={submit}
+            forgotBack={`/${slug}/login`}
           />
         </div>
         <div className="flex justify-center border-t border-zinc-100 bg-zinc-50/70 py-3">
@@ -269,6 +288,155 @@ export function BusinessLoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * "Forgot your password?": asks for the email and sends the link to set a new one. On an
+ * install that sends no email it says who can help instead.
+ */
+export function ForgotPasswordPage() {
+  const { t, i18n } = useTranslation();
+  const state = (useLocation().state ?? {}) as ForgotState;
+  const back = state.back?.startsWith("/") ? state.back : "/login";
+  const setup = useSetupStatus();
+  const [email, setEmail] = useState(state.email ?? "");
+  const [invalid, setInvalid] = useState(false);
+  const mutation = useMutation({
+    mutationFn: (address: string) =>
+      api("/api/auth/request-password-reset", {
+        method: "POST",
+        body: { email: address },
+        // The email comes in the language this page is in.
+        headers: { "accept-language": i18n.language },
+      }),
+  });
+
+  if (setup.isError) return <ServerUnavailable error={setup.error} />;
+  if (setup.isPending) return <Spinner className="min-h-screen" />;
+
+  const backLink = (
+    <Link to={back} className={buttonClass({ variant: "secondary", className: "w-full" })}>
+      {t("forgot.back")}
+    </Link>
+  );
+
+  if (setup.data.passwordReset === "operator") {
+    return (
+      <AuthLayout title={t("forgot.noEmailTitle")} subtitle={t("forgot.noEmail")}>
+        {backLink}
+      </AuthLayout>
+    );
+  }
+  if (mutation.isSuccess) {
+    return (
+      <AuthLayout
+        title={t("forgot.sentTitle")}
+        subtitle={t("forgot.sent", { email: email.trim() })}
+      >
+        {backLink}
+      </AuthLayout>
+    );
+  }
+
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    const address = email.trim();
+    const looksRight = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address);
+    setInvalid(!looksRight);
+    if (looksRight) mutation.mutate(address);
+  };
+
+  return (
+    <AuthLayout title={t("forgot.title")} subtitle={t("forgot.subtitle")}>
+      <form onSubmit={submit} noValidate className="space-y-4">
+        {mutation.isError && <Alert>{errorMessage(t, mutation.error)}</Alert>}
+        <Field
+          label={t("fields.email")}
+          error={invalid ? fieldMessage(t, "email", "invalid_format") : undefined}
+        >
+          {(props) => (
+            <Input
+              {...props}
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+            />
+          )}
+        </Field>
+        <Button type="submit" loading={mutation.isPending} className="w-full">
+          {t("forgot.submit")}
+        </Button>
+        {backLink}
+      </form>
+    </AuthLayout>
+  );
+}
+
+/** The emailed link lands here: a new password, once, and back to sign in. */
+export function ResetPasswordPage() {
+  const { t } = useTranslation();
+  const [params] = useSearchParams();
+  const token = params.get("token") ?? "";
+  const [password, setPassword] = useState("");
+  const [tooShort, setTooShort] = useState(false);
+  const mutation = useMutation({
+    mutationFn: () =>
+      api("/api/auth/reset-password", { method: "POST", body: { token, newPassword: password } }),
+  });
+
+  const expired =
+    !token || (mutation.error instanceof ApiError && mutation.error.code === "invalid_token");
+  if (expired) {
+    return (
+      <AuthLayout title={t("reset.invalidTitle")} subtitle={t("reset.invalid")}>
+        <Link to="/forgot-password" className={buttonClass({ className: "w-full" })}>
+          {t("reset.askAgain")}
+        </Link>
+      </AuthLayout>
+    );
+  }
+  if (mutation.isSuccess) {
+    return (
+      <AuthLayout title={t("reset.doneTitle")} subtitle={t("reset.done")}>
+        <Link to={loginPath()} className={buttonClass({ className: "w-full" })}>
+          {t("reset.goToLogin")}
+        </Link>
+      </AuthLayout>
+    );
+  }
+
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    const short = password.length < PASSWORD_MIN_LENGTH;
+    setTooShort(short);
+    if (!short) mutation.mutate();
+  };
+
+  return (
+    <AuthLayout title={t("reset.title")} subtitle={t("reset.subtitle")}>
+      <form onSubmit={submit} noValidate className="space-y-4">
+        {mutation.isError && <Alert>{errorMessage(t, mutation.error)}</Alert>}
+        <Field
+          label={t("fields.password")}
+          hint={t("fields.passwordHint")}
+          error={tooShort ? t("errors.password_too_short") : undefined}
+        >
+          {(props) => (
+            <PasswordInput
+              {...props}
+              autoComplete="new-password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+          )}
+        </Field>
+        <Button type="submit" loading={mutation.isPending} className="w-full">
+          {t("reset.submit")}
+        </Button>
+      </form>
+    </AuthLayout>
   );
 }
 

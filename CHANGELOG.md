@@ -12,7 +12,13 @@ All notable changes to OpenTurnly are documented here. The format follows
   the agenda with booking, moving and cancelling, deposits and checkout, customers, the day's
   sales and reports. Setting the business up stays in the web admin. A professional sees only
   their own appointments.
-  They sign in to any install with its address. See [docs/mobile.md](docs/mobile.md).
+  They sign in to any install with its address, and get a notification when an appointment is
+  booked, moved or cancelled. See [docs/mobile.md](docs/mobile.md) and
+  [docs/push-notifications.md](docs/push-notifications.md).
+- **Forgot your password?** on the sign-in pages: with an email account set up, anyone gets a
+  link to set a new password, good once for an hour, and is signed out everywhere when they do.
+  Without email, whoever runs the server sets a temporary password with
+  `reset-password`. See [docs/self-hosting.md](docs/self-hosting.md#forgotten-passwords).
 - WhatsApp messages in workflows: a new step sends the customer an approved template with the
   appointment's details, such as a reminder the day before. See [docs/whatsapp.md](docs/whatsapp.md).
 - Email in workflows: a new step sends the customer a confirmation, a reminder, or a notice that

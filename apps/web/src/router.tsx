@@ -25,6 +25,8 @@ export const router = createBrowserRouter([
   { path: "/", lazy: page("HomeRedirect") },
   { path: "/setup", lazy: page("SetupPage") },
   { path: "/login", lazy: page("LoginPage") },
+  { path: "/forgot-password", lazy: page("ForgotPasswordPage") },
+  { path: "/reset-password", lazy: page("ResetPasswordPage") },
   { path: "/invite/:token", lazy: page("InvitePage") },
   {
     path: "/admin",

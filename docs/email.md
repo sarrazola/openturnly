@@ -19,6 +19,10 @@ the account menu, and every business sends through it. There are two ways:
 
 Emails carry the business's name as the sender, and answers go to the business's email.
 
+The same account sends the link to set a new password when someone uses **Forgot your
+password?** on the sign-in page. Without an email account there is no link, and the sign-in page
+says who can help instead (see [self-hosting.md](self-hosting.md#forgotten-passwords)).
+
 ## Providers
 
 Choosing a provider fills in its server, and those that log in with a fixed user fill that in

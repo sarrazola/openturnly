@@ -6,10 +6,16 @@ describe("first-run setup", () => {
   it("is required until the owner account exists", async () => {
     const app = await createTestApp();
     const visitor = app.client();
-    expect((await visitor.get("/api/setup")).body).toEqual({ needsSetup: true });
+    expect((await visitor.get("/api/setup")).body).toEqual({
+      needsSetup: true,
+      passwordReset: "operator",
+    });
 
     await setUpOwner(app);
-    expect((await visitor.get("/api/setup")).body).toEqual({ needsSetup: false });
+    expect((await visitor.get("/api/setup")).body).toEqual({
+      needsSetup: false,
+      passwordReset: "operator",
+    });
   });
 
   it("creates the owner and signs them in without exposing the session token", async () => {
