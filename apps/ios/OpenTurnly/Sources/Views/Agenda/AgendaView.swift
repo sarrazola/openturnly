@@ -146,12 +146,15 @@ struct AgendaView: View {
                     Image(systemName: "calendar")
                 }
                 .accessibilityLabel(L.Agenda.pickDate)
-                Button {
-                    filtering = true
-                } label: {
-                    Image(systemName: model.isFiltered || model.filter.showCancelled ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                // A professional only has something to filter with several locations.
+                if workspace.isAdmin || workspace.activeLocations.count > 1 {
+                    Button {
+                        filtering = true
+                    } label: {
+                        Image(systemName: model.isFiltered || model.filter.showCancelled ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                    }
+                    .accessibilityLabel(L.Agenda.filters)
                 }
-                .accessibilityLabel(L.Agenda.filters)
             }
         }
         .task(id: model.weekStart) { await model.load(workspace) }
@@ -575,7 +578,7 @@ private struct AgendaFilterSheet: View {
                         }
                     }
                 }
-                if workspace.isAdmin && workspace.activeLocations.count > 1 && query.isEmpty {
+                if workspace.activeLocations.count > 1 && query.isEmpty {
                     Section(L.Agenda.location) {
                         choice(L.Agenda.allLocations, selected: filter.locationId == nil) {
                             EmptyView()
@@ -591,7 +594,7 @@ private struct AgendaFilterSheet: View {
                         }
                     }
                 }
-                if query.isEmpty {
+                if workspace.isAdmin && query.isEmpty {
                     Section {
                         Toggle(L.Agenda.showCancelled, isOn: $filter.showCancelled)
                     }

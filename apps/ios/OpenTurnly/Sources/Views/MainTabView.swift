@@ -79,7 +79,7 @@ extension View {
     func withRoutes() -> some View { modifier(RouteDestinations()) }
 }
 
-/// The open business at the top of a tab, tap to switch.
+/// The open business's logo at the top of the agenda, tap to switch.
 struct BusinessSwitcherButton: View {
     @Environment(AppModel.self) private var model
     @Environment(Workspace.self) private var workspace
@@ -89,12 +89,10 @@ struct BusinessSwitcherButton: View {
         Button {
             showing = true
         } label: {
-            HStack(spacing: 8) {
-                BusinessLogo(business: workspace.business, server: workspace.server, size: 28)
-                Text(workspace.business.name)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Theme.ink)
-                    .lineLimit(1)
+            // Only the logo: the bar already carries the screen's title, and a
+            // name squeezed next to it would push the logo off the button's centre.
+            HStack(spacing: 4) {
+                BusinessLogo(business: workspace.business, server: workspace.server, size: 30)
                 if model.businesses.count > 1 {
                     Image(systemName: "chevron.down").font(.caption2.weight(.bold)).foregroundStyle(Theme.subtle)
                 }

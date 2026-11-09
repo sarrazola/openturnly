@@ -127,28 +127,37 @@ struct AppointmentCard: View {
     }
 }
 
-/// Paid, deposit left, or the price.
+/// Paid, deposit left, or the price. A professional sees only the price: the
+/// payments are for owners and admins.
 struct MoneyBadge: View {
     let appointment: Appointment
     @Environment(Workspace.self) private var workspace
 
     var body: some View {
-        switch AppointmentRules.paymentState(appointment) {
-        case .paid(let number):
-            Chip(text: L.Checkout.paidIn(number), tone: .info, symbol: "checkmark")
-        case .covered:
-            Chip(text: L.Checkout.paid, tone: .info, symbol: "checkmark")
-        case .partly(let owed, _):
-            Chip(text: workspace.money(owed), tone: .warning, symbol: "tray.and.arrow.down.fill")
-        case .none:
-            EmptyView()
-        case .unpaid:
-            if workspace.isAdmin, let price = appointment.priceAmount {
-                Text(workspace.money(max(0, price - appointment.discountAmount)))
-                    .font(.footnote.weight(.semibold))
-                    .monospacedDigit()
-                    .foregroundStyle(Theme.muted)
+        if !workspace.isAdmin {
+            price
+        } else {
+            switch AppointmentRules.paymentState(appointment) {
+            case .paid(let number):
+                Chip(text: L.Checkout.paidIn(number), tone: .info, symbol: "checkmark")
+            case .covered:
+                Chip(text: L.Checkout.paid, tone: .info, symbol: "checkmark")
+            case .partly(let owed, _):
+                Chip(text: workspace.money(owed), tone: .warning, symbol: "tray.and.arrow.down.fill")
+            case .none:
+                EmptyView()
+            case .unpaid:
+                price
             }
+        }
+    }
+
+    @ViewBuilder private var price: some View {
+        if let price = appointment.priceAmount {
+            Text(workspace.money(max(0, price - appointment.discountAmount)))
+                .font(.footnote.weight(.semibold))
+                .monospacedDigit()
+                .foregroundStyle(Theme.muted)
         }
     }
 }
