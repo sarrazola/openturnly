@@ -11,8 +11,10 @@ import { createBookingGuard } from "./lib/booking-guard.ts";
 import { clientIp, hasProxyHeaders, networkKey, withClientIp } from "./lib/client-ip.ts";
 import { createEmail } from "./lib/email.ts";
 import type { AppEnv, Deps } from "./lib/http.ts";
+import { createNotifications } from "./lib/notifications.ts";
 import { RESET_REQUESTED } from "./lib/password-reset.ts";
 import { createPayments } from "./lib/payments.ts";
+import { type PushProvider, pushProviderFromConfig } from "./lib/push.ts";
 import { createRateLimiter } from "./lib/rate-limit.ts";
 import { createSms } from "./lib/sms.ts";
 import { createWhatsapp } from "./lib/whatsapp.ts";
@@ -22,6 +24,7 @@ import { invitationRoutes } from "./routes/invitations.ts";
 import { mcpRoutes } from "./routes/mcp.ts";
 import { meRoutes } from "./routes/me.ts";
 import { metaRoutes } from "./routes/meta.ts";
+import { mobileRoutes } from "./routes/mobile.ts";
 import { paymentWebhookRoutes } from "./routes/payments.ts";
 import { publicRoutes } from "./routes/public.ts";
 import { businessScopedRoutes } from "./routes/scoped.ts";
@@ -31,18 +34,41 @@ import { whatsappWebhookRoutes } from "./routes/whatsapp.ts";
 
 const HOUR = 60 * 60_000;
 
-export function createApp({ db, auth, config }: Pick<Deps, "db" | "auth" | "config">) {
+export function createApp({
+  db,
+  auth,
+  config,
+  push = pushProviderFromConfig(config),
+}: Pick<Deps, "db" | "auth" | "config"> & {
+  /** Delivers notifications to the phone apps; by default, what PUSH_PROVIDER says. */
+  push?: PushProvider | null;
+}) {
   const guard = createBookingGuard({ db, secret: config.secret, settings: config.bookingGuard });
   const whatsapp = createWhatsapp({ db, config });
   const email = createEmail({ db, config });
   const sms = createSms({ db, config });
+  const notifications = createNotifications({ db, push });
   const payments = createPayments({
     db,
     config,
-    onConfirmed: (appointmentId) => automations.emit(appointmentId, "created"),
+    onConfirmed: async (appointmentId) => {
+      await automations.emit(appointmentId, "created");
+      await notifications.appointmentBooked(appointmentId, null);
+    },
   });
   const automations = createAutomations({ db, config, whatsapp, email, sms, payments });
-  const deps: Deps = { db, auth, config, guard, automations, whatsapp, email, sms, payments };
+  const deps: Deps = {
+    db,
+    auth,
+    config,
+    guard,
+    automations,
+    whatsapp,
+    email,
+    sms,
+    payments,
+    notifications,
+  };
   const app = new Hono<AppEnv>();
 
   if (!config.isProduction && process.env.NODE_ENV !== "test") app.use(logger());
@@ -119,6 +145,7 @@ export function createApp({ db, auth, config }: Pick<Deps, "db" | "auth" | "conf
 
   app.route("/api/setup", setupRoutes(deps));
   app.route("/api/me", meRoutes(deps));
+  app.route("/api/mobile", mobileRoutes(deps));
   app.route("/api/meta", metaRoutes());
   app.route("/api/businesses", businessRoutes(deps));
   app.route("/api/businesses/:businessId", businessScopedRoutes(deps));

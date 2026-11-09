@@ -49,7 +49,7 @@ const MAX_ACTIVE_BOOKINGS_PER_CUSTOMER = 3;
 const giftCheckSchema = z.object({ code: z.string().min(1).max(40), serviceId: z.string().min(1) });
 
 /** Endpoints used by the public booking page. No login required. */
-export function publicRoutes({ db, config, guard, automations, payments }: Deps) {
+export function publicRoutes({ db, config, guard, automations, payments, notifications }: Deps) {
   const network = (c: Context) => networkKey(clientIp(c, config.trustProxy));
 
   /**
@@ -577,6 +577,7 @@ export function publicRoutes({ db, config, guard, automations, payments }: Deps)
           );
         }
         await automations.emit(appointment.id, "created");
+        await notifications.appointmentBooked(appointment.id, null);
         return c.json({ appointment: view, payment: null }, 201);
       })
 

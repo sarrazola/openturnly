@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The booking page's QR code, written to the cache so it can be shared as an image. -->
+<paths>
+    <cache-path name="shared" path="shared/" />
+</paths>

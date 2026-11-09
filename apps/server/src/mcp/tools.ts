@@ -676,6 +676,7 @@ export function registerTools(server: McpServer, ctx: ToolContext) {
           bookingRules(business),
         );
         await ctx.automations.emit(moved.id, "rescheduled", appointment.startsAt);
+        await ctx.notifications.appointmentRescheduled(moved.id, appointment, null);
         return { moved: true, ...appointmentView(business, moved) };
       },
     );
@@ -702,6 +703,7 @@ export function registerTools(server: McpServer, ctx: ToolContext) {
           .where(eq(appointments.id, appointment.id))
           .returning();
         await ctx.automations.emit(appointment.id, "cancelled");
+        await ctx.notifications.appointmentCancelled(appointment.id, null);
         return { cancelled: true, ...appointmentView(business, cancelled ?? appointment) };
       },
     );

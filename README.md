@@ -120,6 +120,8 @@ updates, read the [self-hosting guide](docs/self-hosting.md), or follow the
 - **Services, staff and hours**: split shifts, closures, automatic public holidays per
   country and booking rules, all time-zone aware.
 - **Team access** with admin and professional roles, and a branded sign-in page per business.
+- **Phone apps** for iPhone and Android, native on each, for the owner, admins and staff: the
+  agenda, booking, checkout, customers, sales and reports ([docs/mobile.md](docs/mobile.md)).
 - **AI agents** through an MCP server per business ([docs/mcp.md](docs/mcp.md)).
 - **Workflows** that send appointment data to any system that takes webhooks: an
   automation platform, a CRM, a WhatsApp bot or your own API ([docs/workflows.md](docs/workflows.md)).

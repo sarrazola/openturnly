@@ -1,0 +1,58 @@
+// The identity this build is compiled with.
+//
+// Copy this file when publishing your own app and replace every value: the
+// example identifiers below belong to nobody and a store rejects them. Nothing in
+// this repository points at a hosted service; a publisher that runs one fills in
+// the BRAND_HOSTED_* values and the sign-in screen offers it as a choice.
+//
+// Addresses are written without a scheme because "//" starts a comment in an
+// xcconfig file. The app prepends https:// to every one of them.
+
+BRAND_PRODUCT_NAME = OpenTurnly
+BRAND_BUNDLE_IDENTIFIER = com.example.openturnly
+BRAND_URL_SCHEME = openturnly
+MARKETING_VERSION = 1.0.0
+CURRENT_PROJECT_VERSION = 1
+DEVELOPMENT_TEAM =
+
+// Six hex digits, no leading "#". It paints the sign-in screen; the rest of the
+// app uses the AccentColor in the asset catalog, which a publisher replaces too.
+BRAND_PRIMARY_COLOR = 0f766e
+
+// YES when the logo is the example's clock mark: the loading screens then draw it
+// in code and turn its hands. NO (or absent) shows BrandLogoWhite still, with a
+// gentle pulse, which is what a brand with a logo of its own wants.
+BRAND_ANIMATED_MARK = YES
+
+// Pre-fills the server field. Host and optional path, no scheme.
+BRAND_DEFAULT_SERVER =
+
+// A preset for a service the publisher runs. Both values empty means the app
+// only asks for a server address, which is what a self-hosted install wants.
+// The template must contain {workspace}, e.g. {workspace}.example.com
+BRAND_HOSTED_LABEL =
+BRAND_HOSTED_SERVER_TEMPLATE =
+// A directory the service runs so people sign in with an e-mail alone: the
+// app POSTs {email, password} there and receives the accounts that person can
+// open, each with its own server and session. Host and path, no scheme. Empty
+// means the sign-in screen asks for the account name or the server instead.
+BRAND_HOSTED_SIGN_IN =
+
+// Shown on the sign-in screen and in the account screen when present. Host and
+// path, no scheme.
+BRAND_PRIVACY_POLICY_URL_EN =
+BRAND_PRIVACY_POLICY_URL_ES =
+BRAND_SUPPORT_URL_EN =
+BRAND_SUPPORT_URL_ES =
+
+// "Forgot your password?" opens <server>/forgot-password when the app knows the
+// server. Signing in through BRAND_HOSTED_SIGN_IN it doesn't yet, so it opens
+// this page instead. Host and path, no scheme. Empty keeps a note that the
+// administrator sets passwords.
+BRAND_PASSWORD_RECOVERY_URL =
+
+// Push notifications. Empty means this build has none: it never asks for
+// permission and never registers the phone. "development" or "production"
+// adds the aps-environment entitlement with that value, so the App ID needs the
+// Push Notifications capability. The server must be set up to deliver as well.
+BRAND_APS_ENVIRONMENT =

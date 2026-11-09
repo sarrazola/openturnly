@@ -1,6 +1,7 @@
 import { PASSWORD_MIN_LENGTH } from "@openturnly/core";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { bearer } from "better-auth/plugins";
 import type { Config } from "./config.ts";
 import type { Db } from "./db/client.ts";
 import { accounts, sessions, users, verifications } from "./db/schema.ts";
@@ -41,6 +42,9 @@ export function createAuth({ db, config }: { db: Db; config: Config }) {
       ipAddress: { ipAddressHeaders: [CLIENT_IP_HEADER] },
     },
     telemetry: { enabled: false },
+    // The phone apps keep the session's token and send it as "Authorization: Bearer"; it's
+    // the same session a browser keeps in a cookie, and signing out ends it the same way.
+    plugins: [bearer()],
   });
 }
 

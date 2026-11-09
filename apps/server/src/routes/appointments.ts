@@ -50,7 +50,7 @@ const rescheduleSchema = z.object({
 });
 
 /** The business calendar: appointments between two instants, with who booked them. */
-export function appointmentRoutes({ db, automations }: Deps) {
+export function appointmentRoutes({ db, automations, notifications }: Deps) {
   /** An appointment of the business, whatever its status; professionals only reach their own. */
   const findAny = async (businessId: string, appointmentId: string, access: BusinessAccess) => {
     const [appointment] = await db
@@ -349,7 +349,10 @@ export function appointmentRoutes({ db, automations }: Deps) {
             .returning();
           return created;
         });
-        if (appointment) await automations.emit(appointment.id, "created");
+        if (appointment) {
+          await automations.emit(appointment.id, "created");
+          await notifications.appointmentBooked(appointment.id, c.get("user")?.id ?? null);
+        }
         return c.json({ appointment }, 201);
       })
 
@@ -381,6 +384,11 @@ export function appointmentRoutes({ db, automations }: Deps) {
           staffRules(business),
         );
         await automations.emit(appointment.id, "rescheduled", current.startsAt);
+        await notifications.appointmentRescheduled(
+          appointment.id,
+          current,
+          c.get("user")?.id ?? null,
+        );
         return c.json({ appointment });
       })
 
@@ -469,6 +477,7 @@ export function appointmentRoutes({ db, automations }: Deps) {
           .returning({ id: appointments.id, status: appointments.status });
         if (cancelled) {
           await automations.emit(cancelled.id, "cancelled");
+          await notifications.appointmentCancelled(cancelled.id, c.get("user")?.id ?? null);
           return c.json({ appointment: cancelled });
         }
         // Already cancelled: nothing changes and nothing is sent again.
