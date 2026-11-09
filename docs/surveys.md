@@ -18,18 +18,21 @@ The same tab shows what the customer will see.
 
 A survey goes out in a [workflow](workflows.md) that runs **when an appointment ends**, so
 it waits for the visit to be over and never goes out for a cancelled appointment or a no-show.
-**Create survey flow** in Settings makes one: it waits an hour after the appointment ends,
-then emails the ready-made **Satisfaction survey** message. You can change the wait, or
-send it another way:
+**Create the survey flow on** WhatsApp, email or text message, in Settings, makes one: it
+waits an hour after the appointment ends, then sends the survey on that channel. You can
+change the wait, or the message:
 
-- **Email** or **text message**: pick the **Satisfaction survey** message.
-- **WhatsApp**: a template of your own with a variable for the link, filled with
+- **WhatsApp**: the ready-made `encuesta_cita` template, once WhatsApp has approved it
+  (see [whatsapp.md](whatsapp.md)), or a template of your own with a variable filled with
   **Survey link** (`{{appointment.survey_link}}`).
+- **Email** or **text message**: the **Satisfaction survey** message.
 - **Webhook**: add **Survey link** to the data you send, or put
   `{{appointment.survey_link}}` in your message or JSON.
 
 The link only exists in workflows that run when an appointment ends; elsewhere it's empty.
-A test run sends an example link that opens the "closed" page.
+**Test** with one of your appointments sends that appointment's real link, open from that
+moment (and counted for its customer's 30 days); with example data it sends an example link
+that opens nothing.
 
 ## The rules
 

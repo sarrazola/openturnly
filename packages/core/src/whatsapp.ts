@@ -15,6 +15,7 @@ export const WHATSAPP_VARIABLE_DATA: Record<string, string> = {
   booking_code: "{{appointment.code}}",
   business_address: "{{appointment.location_address}}",
   business_phone: "{{business.phone}}",
+  survey_link: "{{appointment.survey_link}}",
 };
 
 /** What WhatsApp's reviewers see in place of each variable. */
@@ -27,6 +28,7 @@ export const WHATSAPP_VARIABLE_EXAMPLES: Record<WhatsappLanguage, Record<string,
     booking_code: "7K2M9P",
     business_address: "Calle 10 # 20-30",
     business_phone: "+573001234567",
+    survey_link: "https://reservas.example.com/e/K7Q4XM2P",
   },
   en: {
     customer_name: "Ana",
@@ -36,6 +38,7 @@ export const WHATSAPP_VARIABLE_EXAMPLES: Record<WhatsappLanguage, Record<string,
     booking_code: "7K2M9P",
     business_address: "10 Main Street",
     business_phone: "+13055550100",
+    survey_link: "https://booking.example.com/e/K7Q4XM2P",
   },
 };
 
@@ -90,6 +93,15 @@ export const WHATSAPP_TEMPLATES: readonly WhatsappTemplateDefinition[] = [
     body: {
       es: `Hola {{customer_name}}, tu cita en {{business_name}} fue cancelada.\n\n${DETAILS.es}\n\n${QUESTIONS.es}`,
       en: `Hi {{customer_name}}, your appointment at {{business_name}} was cancelled.\n\n${DETAILS.en}\n\n${QUESTIONS.en}`,
+    },
+  },
+  {
+    // For a flow that runs when an appointment ends: the link opens the 1–5 rating.
+    name: "encuesta_cita",
+    header: { es: "¿Cómo te fue?", en: "How was your visit?" },
+    body: {
+      es: "Hola {{customer_name}}, gracias por visitarnos en {{business_name}}.\n\n¿Cómo calificarías tu cita? Te toma unos segundos:\n{{survey_link}}\n\nTu opinión nos ayuda a mejorar.",
+      en: "Hi {{customer_name}}, thanks for visiting {{business_name}}.\n\nHow would you rate your appointment? It takes a few seconds:\n{{survey_link}}\n\nYour feedback helps us get better.",
     },
   },
 ];

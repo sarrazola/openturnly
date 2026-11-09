@@ -338,17 +338,18 @@ function Settings() {
             <li>{t("surveys.howStep2")}</li>
             <li>{t("surveys.howStep3")}</li>
           </ol>
+          <p className="text-sm font-medium text-zinc-800">{t("surveys.createFlow")}</p>
           <div className="flex flex-wrap gap-2">
-            <Link
-              to="../automations/new?template=survey"
-              className={buttonClass({ variant: "primary" })}
-            >
-              {t("surveys.createFlow")}
-            </Link>
-            <Link
-              to="../settings?tab=automations"
-              className={buttonClass({ variant: "secondary" })}
-            >
+            {(["whatsapp", "email", "sms"] as const).map((channel) => (
+              <Link
+                key={channel}
+                to={`../automations/new?template=survey&channel=${channel}`}
+                className={buttonClass({ variant: "secondary" })}
+              >
+                {t(`surveys.channels.${channel}`)}
+              </Link>
+            ))}
+            <Link to="../settings?tab=automations" className={buttonClass({ variant: "ghost" })}>
               {t("surveys.seeFlows")}
             </Link>
           </div>

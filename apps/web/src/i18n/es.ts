@@ -2213,9 +2213,10 @@ export const es = {
     howBody: "La encuesta sale en un flujo que se activa cuando termina una cita.",
     howStep1: "Crea un flujo «Cuando termina una cita», o usa el flujo listo.",
     howStep2:
-      "Agrega un paso de correo o SMS con el mensaje «Encuesta de satisfacción», o pon el dato «Enlace de la encuesta» en tu propio mensaje.",
+      "Elige el canal: WhatsApp con la plantilla «encuesta_cita», o correo o SMS con el mensaje «Encuesta de satisfacción». También puedes poner el dato «Enlace de la encuesta» en tu propio mensaje.",
     howStep3: "Déjala encendida aquí. Las respuestas aparecen en la pestaña Respuestas.",
-    createFlow: "Crear flujo de encuesta",
+    createFlow: "Crear el flujo de encuesta por:",
+    channels: { whatsapp: "WhatsApp", email: "Correo", sms: "SMS" },
     seeFlows: "Ver flujos",
     preview: "Así la verá tu cliente",
     sampleService: "Corte clásico",

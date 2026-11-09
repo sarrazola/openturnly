@@ -29,8 +29,10 @@ import {
   WEBHOOK_METHODS,
   type WebhookAction,
   type WebhookAuth,
+  WHATSAPP_TEMPLATES,
   WHATSAPP_VARIABLE_DATA,
   type WhatsappAction,
+  whatsappVariableNames,
   whatsappVariables,
 } from "@openturnly/core";
 import type { TFunction } from "i18next";
@@ -131,11 +133,30 @@ type Draft = {
   active: boolean;
 };
 
+/** The survey flow's message, on the channel the business picked: email unless told otherwise. */
+function surveyStep(channel: string | null, language: "es" | "en"): AutomationAction {
+  if (channel === "whatsapp") {
+    const ready = WHATSAPP_TEMPLATES.find((item) => item.name === "encuesta_cita");
+    return {
+      ...newWhatsapp(),
+      template: "encuesta_cita",
+      language,
+      variables: whatsappVariableNames(ready?.body[language] ?? "").map((name) => ({
+        name,
+        value: WHATSAPP_VARIABLE_DATA[name] ?? "",
+      })),
+    };
+  }
+  if (channel === "sms") return { ...newSms(language), template: "appointment_survey" };
+  return { ...newEmail(language), template: "appointment_survey" };
+}
+
 function toDraft(
   t: TFunction,
   automation: Automation | null,
   template: Template | undefined,
   language: "es" | "en",
+  channel: string | null,
 ): Draft {
   if (template) {
     return {
@@ -145,7 +166,7 @@ function toDraft(
       actions: [
         ...(template.wait ? [newWait(template.wait)] : []),
         template.key === "survey"
-          ? { ...newEmail(language), template: "appointment_survey" as const }
+          ? surveyStep(channel, language)
           : newWebhook(t(`automations.templates.${template.key}.message`)),
       ],
       active: true,
@@ -181,17 +202,33 @@ export function AutomationBuilderPage() {
     return <Navigate to="../settings?tab=automations" replace />;
   }
   const template = TEMPLATES.find((item) => item.key === search.get("template"));
-  return <Builder key={automation?.id ?? "new"} automation={automation} template={template} />;
+  return (
+    <Builder
+      key={automation?.id ?? "new"}
+      automation={automation}
+      template={template}
+      channel={search.get("channel")}
+    />
+  );
 }
 
-function Builder({ automation, template }: { automation: Automation | null; template?: Template }) {
+function Builder({
+  automation,
+  template,
+  channel = null,
+}: {
+  automation: Automation | null;
+  template?: Template;
+  /** For the survey flow: the channel its message goes on. */
+  channel?: string | null;
+}) {
   const { t } = useTranslation();
   const { business } = useBusinessContext();
   const navigate = useNavigate();
   const { save, remove, test } = useAutomationMutations(business.id);
   const confirm = useConfirm();
   const [draft, setDraft] = useState<Draft>(() =>
-    toDraft(t, automation, template, business.locale === "en" ? "en" : "es"),
+    toDraft(t, automation, template, business.locale === "en" ? "en" : "es", channel),
   );
   /** "trigger", a step's id, or null for the flow's overview. */
   const [selected, setSelected] = useState<string | null>(() =>

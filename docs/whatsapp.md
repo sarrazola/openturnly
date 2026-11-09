@@ -56,7 +56,9 @@ placeholders as webhooks (`{{customer.first_name}}`). Named variables and number
 work, as long as they're in the text alone.
 
 **Create appointment templates** in **Channels → WhatsApp** sends a confirmation, a reminder,
-a rescheduling notice and a cancellation notice for review, in Spanish and English. Approval usually takes minutes. On a number from the
+a rescheduling notice, a cancellation notice and a survey (`encuesta_cita`, with the
+[survey](surveys.md) link) for review, in Spanish and English. Templates the account already
+has are left alone, so pressing it again adds only the new ones. Approval usually takes minutes. On a number from the
 environment, templates are managed outside the panel.
 
 Empty values are sent as `-`, because WhatsApp refuses them, and line breaks become spaces.

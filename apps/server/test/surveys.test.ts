@@ -197,6 +197,32 @@ describe("surveys", () => {
     expect((await visitor.get("/api/public/surveys/EJEMPLO1")).status).toBe(404);
   });
 
+  it("send a working link when the flow is tested with a real appointment", async () => {
+    const { app, owner, base, book, hook } = await shop();
+    const visit = await book("10:00");
+    const flow = {
+      name: "Encuesta",
+      trigger: "after",
+      actions: [
+        { id: "link", type: "webhook", url: hook.url, fields: ["appointment.survey_link"] },
+      ],
+    };
+    const tested = await owner.post(`${base}/automations/test`, {
+      automation: flow,
+      appointmentId: visit.id,
+    });
+    expect(tested.status).toBe(200);
+    const sent = hook.received.at(-1) as { appointment: { survey_link: string } };
+    const code = sent.appointment.survey_link.split("/e/")[1] as string;
+    expect(code).toMatch(/^[2-9A-HJ-NP-Z]{8}$/);
+    // The customer would land on the question, open right away.
+    expect((await app.client().get(`/api/public/surveys/${code}`)).body.state).toBe("open");
+    // Example data carries the example link, which opens nothing.
+    await owner.post(`${base}/automations/test`, { automation: flow });
+    const example = hook.received.at(-1) as { appointment: { survey_link: string } };
+    expect(example.appointment.survey_link).toBe("http://localhost:3000/e/EJEMPLO1");
+  });
+
   it("check their settings and the period asked for", async () => {
     const { owner, base } = await shop();
     const odd = await owner.patch(`${base}/surveys/settings`, { validHours: 12 });
