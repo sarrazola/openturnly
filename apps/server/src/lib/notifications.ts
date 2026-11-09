@@ -88,7 +88,12 @@ export function createNotifications({ db, push }: { db: Db; push: PushProvider |
     if (!push) return;
     const list = await activeDevices(userId);
     if (list.length === 0) return;
-    const result = await push.send({ ...message, badge: await unreadCount(userId), devices: list });
+    const result = await push.send({
+      ...message,
+      userId,
+      badge: await unreadCount(userId),
+      devices: list,
+    });
     const invalid = result?.invalidTokens ?? [];
     if (invalid.length > 0) await db.delete(devices).where(inArray(devices.token, invalid));
   };

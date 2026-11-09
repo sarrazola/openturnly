@@ -108,6 +108,8 @@ describe("notifications of new bookings", () => {
     const toJuan = sent.find((m) => m.devices.some((d) => d.token === "juan-token"));
     expect(sent).toHaveLength(2);
     expect(toOwner).toMatchObject({ title: "Nueva reserva", badge: 1 });
+    expect(toOwner?.userId).toBeTruthy();
+    expect(toJuan?.userId).not.toBe(toOwner?.userId);
     expect(toOwner?.body).toMatch(/^Ana Pérez · Corte · .+ · con Juan$/);
     // The professional knows it's theirs: no "with Juan".
     expect(toJuan?.body).toMatch(/^Ana Pérez · Corte · /);

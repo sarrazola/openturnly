@@ -32,6 +32,8 @@ export type PushDevice = {
 
 /** One notification for one person, to every phone they're signed in on. */
 export type PushMessage = {
+  /** The person it's for: their user id on this install. */
+  userId: string;
   title: string;
   body: string;
   /** The person's unread notifications, for the number on the app's icon. */

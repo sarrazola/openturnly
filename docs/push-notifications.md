@@ -60,6 +60,7 @@ The body:
 
 ```json
 {
+  "userId": "…",
   "title": "Nueva reserva",
   "body": "Ana Pérez · Corte · sáb, 14 nov, 9:00 a. m. · con Juan",
   "badge": 3,
@@ -74,7 +75,8 @@ The body:
 }
 ```
 
-`badge` is the person's unread count, for the number on the app's icon. Answer `200`; to have the
+`userId` is the person it's for, as this install knows them. `badge` is their unread count, for
+the number on the app's icon. Answer `200`; to have the
 server forget tokens that will never work again, answer `{ "invalidTokens": ["…"] }`.
 
 What the apps expect to receive:
