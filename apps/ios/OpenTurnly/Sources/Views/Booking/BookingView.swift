@@ -8,8 +8,8 @@ struct PickedCustomer: Equatable {
     let email: String?
 }
 
-/// Booking an appointment from the phone: customer, service, professional,
-/// date, a free time from the server, then "Agendar cita".
+/// Booking an appointment from the phone, in four numbered steps: customer,
+/// service (and location), professional, day and a free time from the server.
 struct BookingView: View {
     @Environment(Workspace.self) private var workspace
     @Environment(ToastCenter.self) private var toasts
@@ -41,6 +41,7 @@ struct BookingView: View {
     @State private var failure: Error?
 
     enum Mode: Hashable { case existing, new }
+    enum Step: Hashable { case customer, service, professional, time }
 
     init(date: LocalDate, preset: PickedCustomer? = nil, onBooked: ((LocalDate) -> Void)? = nil) {
         self.preset = preset
@@ -66,14 +67,33 @@ struct BookingView: View {
         BookingRules.times(slots.slots, resourceId: workspace.isAdmin ? resourceId : nil)
     }
 
-    private var newCustomerValid: Bool {
-        !firstName.trimmingCharacters(in: .whitespaces).isEmpty && !lastName.trimmingCharacters(in: .whitespaces).isEmpty
-            && (!phoneNational.filter(\.isNumber).isEmpty || TextRules.isEmail(email.trimmingCharacters(in: .whitespaces)))
+    private var needsLocation: Bool { BookingRules.needsLocation(workspace.locations) && location == nil }
+
+    /// The customer step's first problem, if any.
+    private var customerProblem: String? {
+        if customer != nil { return nil }
+        if mode == .existing { return L.Booking.pickCustomer }
+        if firstName.trimmingCharacters(in: .whitespaces).isEmpty { return L.Booking.firstNameRequired }
+        if lastName.trimmingCharacters(in: .whitespaces).isEmpty { return L.Booking.lastNameRequired }
+        let mail = email.trimmingCharacters(in: .whitespaces)
+        if !mail.isEmpty && !TextRules.isEmail(mail) { return L.Booking.emailInvalid }
+        if phoneNational.filter(\.isNumber).isEmpty && mail.isEmpty { return L.Booking.contactHint }
+        return nil
     }
 
-    private var customerReady: Bool { mode == .existing ? customer != nil : newCustomerValid }
-    private var needsLocation: Bool { BookingRules.needsLocation(workspace.locations) && location == nil }
-    private var canSubmit: Bool { customerReady && serviceId != nil && time != nil && !needsLocation && !busy }
+    /// The first thing missing and the step it belongs to.
+    private var missing: (step: Step, message: String)? {
+        if let problem = customerProblem { return (.customer, problem) }
+        if needsLocation { return (.service, ErrorText.text("location_required") ?? L.Booking.pickServiceError) }
+        if serviceId == nil { return (.service, L.Booking.pickServiceError) }
+        if time == nil { return (.time, L.Booking.pickTime) }
+        return nil
+    }
+
+    private var summary: String? {
+        guard let service = workspace.service(serviceId) else { return nil }
+        return [service.name, Fmt.dayMedium(date), time].compactMap { $0 }.joined(separator: " · ")
+    }
 
     private var slotKey: SlotLoader.Key {
         SlotLoader.Key(serviceId: serviceId, date: date, locationId: location?.id, appointmentId: nil)
@@ -83,24 +103,29 @@ struct BookingView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    Text(L.Booking.hint).font(.subheadline).foregroundStyle(Theme.muted)
-                    customerBlock
-                    if places.count > 1 { locationBlock }
-                    serviceBlock
-                    dateBlock
-                    timesBlock
-                    if let failure, !(failure is CancellationError) {
-                        NoticeBanner(text: ErrorText.message(failure), symbol: "exclamationmark.triangle.fill", tone: .danger)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 22) {
+                        StepBlock(number: 1, title: L.Booking.customer, done: customerProblem == nil) { customerBlock }
+                            .id(Step.customer)
+                        StepBlock(number: 2, title: L.Booking.service, done: serviceId != nil && !needsLocation) { serviceBlock }
+                            .id(Step.service)
+                        StepBlock(number: 3, title: L.Booking.professional, done: serviceId != nil) { professionalBlock }
+                            .id(Step.professional)
+                        StepBlock(number: 4, title: L.Booking.date, trailing: Fmt.dayLong(date), done: time != nil) { timeBlock }
+                            .id(Step.time)
+                    }
+                    .padding(16)
+                    .padding(.bottom, 24)
+                }
+                .scrollDismissesKeyboard(.interactively)
+                .background(Theme.canvas)
+                .bottomBar {
+                    BookingBar(message: barMessage, summary: summary, title: L.Booking.create, symbol: "checkmark", busy: busy) {
+                        Task { await submit(proxy) }
                     }
                 }
-                .padding(16)
-                .padding(.bottom, 90)
             }
-            .scrollDismissesKeyboard(.interactively)
-            .background(Theme.canvas)
-            .bottomBar { submitBar }
             .navigationTitle(L.Booking.title)
             .keyboardDoneButton()
             .navigationBarTitleDisplayMode(.inline)
@@ -121,39 +146,40 @@ struct BookingView: View {
         .interactiveDismissDisabled(busy)
     }
 
+    private var barMessage: String? {
+        if let failure, !(failure is CancellationError) { return ErrorText.message(failure) }
+        return attempted ? missing?.message : nil
+    }
+
     // MARK: Customer
 
+    @ViewBuilder
     private var customerBlock: some View {
-        FormBlock(title: L.Booking.customer) {
-            if let customer {
-                HStack(spacing: 12) {
-                    Avatar(name: customer.name, size: 44)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(customer.name).font(.body.weight(.semibold)).foregroundStyle(Theme.ink)
-                        Text(Phone.format(customer.phone).isEmpty ? (customer.email ?? "") : Phone.format(customer.phone))
-                            .font(.footnote).foregroundStyle(Theme.muted)
-                            .lineLimit(1).truncationMode(.middle)
-                    }
-                    Spacer(minLength: 8)
-                    if preset == nil {
-                        Button(L.Booking.change) {
-                            withAnimation { self.customer = nil }
-                        }
-                        .font(.footnote.weight(.semibold))
-                    }
+        if let customer {
+            HStack(spacing: 12) {
+                Avatar(name: customer.name, size: 44)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(customer.name).font(.body.weight(.semibold)).foregroundStyle(Theme.ink)
+                    Text(Phone.format(customer.phone).isEmpty ? (customer.email ?? "") : Phone.format(customer.phone))
+                        .font(.footnote).foregroundStyle(Theme.muted)
+                        .lineLimit(1).truncationMode(.middle)
                 }
-            } else {
-                Picker("", selection: $mode.animation()) {
-                    Text(L.Booking.existing).tag(Mode.existing)
-                    Text(L.Booking.newCustomer).tag(Mode.new)
-                }
-                .pickerStyle(.segmented)
-                .padding(.bottom, 12)
-                if mode == .existing { searchBox } else { newCustomerFields }
-                if attempted && !customerReady {
-                    FieldError(text: mode == .existing ? L.Booking.pickCustomer : L.Booking.contactHint).padding(.top, 8)
+                Spacer(minLength: 8)
+                if preset == nil {
+                    Button(L.Booking.change) {
+                        withAnimation { self.customer = nil }
+                    }
+                    .font(.footnote.weight(.semibold))
                 }
             }
+        } else {
+            Picker("", selection: $mode.animation()) {
+                Text(L.Booking.existing).tag(Mode.existing)
+                Text(L.Booking.newCustomer).tag(Mode.new)
+            }
+            .pickerStyle(.segmented)
+            .padding(.bottom, 12)
+            if mode == .existing { searchBox } else { newCustomerFields }
         }
     }
 
@@ -220,7 +246,7 @@ struct BookingView: View {
                 .frame(minHeight: 44)
             FieldError(text: failure.flatMap { ErrorText.field($0, "phone") })
             Divider()
-            TextField(L.Common.email, text: $email)
+            TextField(L.Booking.emailOptional, text: $email)
                 .keyboardType(.emailAddress)
                 .textContentType(.emailAddress)
                 .textInputAutocapitalization(.never)
@@ -231,73 +257,43 @@ struct BookingView: View {
         }
     }
 
-    // MARK: What and when
+    // MARK: What, who and when
 
-    private var locationBlock: some View {
-        FormBlock(title: L.Booking.location) {
+    @ViewBuilder
+    private var serviceBlock: some View {
+        if places.count > 1 {
             MenuRow(label: L.Booking.location, symbol: "mappin.and.ellipse",
                     options: places.map { (value: Optional($0.id), title: $0.name, subtitle: $0.address) },
                     selection: Binding(get: { location?.id }, set: { locationId = $0 }),
                     placeholder: L.Booking.location)
-            FieldError(text: attempted && needsLocation ? ErrorText.text("location_required") : nil)
-        }
-    }
-
-    private var serviceBlock: some View {
-        FormBlock(title: L.Booking.service) {
-            MenuRow(label: L.Booking.service, symbol: "scissors",
-                    options: services.map { (value: Optional($0.id), title: $0.name, subtitle: $0.summary(workspace.business)) },
-                    selection: $serviceId, placeholder: L.Booking.pickService)
             Divider().padding(.vertical, 8)
-            if workspace.isAdmin {
-                MenuRow(label: L.Booking.professional, symbol: "person",
-                        options: [(value: String?.none, title: L.Booking.anyFree, subtitle: nil)]
-                            + team.map { (value: Optional($0.id), title: $0.name, subtitle: nil) },
-                        selection: $resourceId)
-            } else {
-                HStack(spacing: 12) {
-                    Image(systemName: "person.fill.checkmark").foregroundStyle(Theme.brand).frame(width: 22)
-                    Text(L.Booking.bookedForYou(workspace.me?.name ?? workspace.session.user.name))
-                        .font(.subheadline).foregroundStyle(Theme.muted)
-                }
-                .padding(.vertical, 4)
+        }
+        ServiceField(services: services, selection: $serviceId)
+    }
+
+    @ViewBuilder
+    private var professionalBlock: some View {
+        if workspace.isAdmin {
+            MenuRow(label: L.Booking.professional, symbol: "person",
+                    options: [(value: String?.none, title: L.Booking.anyFree, subtitle: nil)]
+                        + team.map { (value: Optional($0.id), title: $0.name, subtitle: nil) },
+                    selection: $resourceId)
+        } else {
+            HStack(spacing: 12) {
+                Image(systemName: "person.fill.checkmark").foregroundStyle(Theme.brand).frame(width: 22)
+                Text(L.Booking.bookedForYou(workspace.me?.name ?? workspace.session.user.name))
+                    .font(.subheadline).foregroundStyle(Theme.muted)
             }
+            .padding(.vertical, 4)
         }
     }
 
-    private var dateBlock: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            SectionTitle(text: L.Booking.date, trailing: Fmt.dayLong(date))
+    private var timeBlock: some View {
+        VStack(alignment: .leading, spacing: 14) {
             DayScroller(selected: $date, today: workspace.clock.today(), clock: workspace.clock)
-        }
-    }
-
-    private var timesBlock: some View {
-        FormBlock(title: L.Booking.freeTimes, trailing: serviceId == nil ? nil : "\(times.count)") {
-            if serviceId == nil {
-                Text(L.Booking.pickService).font(.subheadline).foregroundStyle(Theme.subtle)
-            } else if let error = slots.error, times.isEmpty {
-                Text(ErrorText.message(error)).font(.subheadline).foregroundStyle(Theme.danger)
-            } else {
-                SlotGrid(slots: times, selected: $time, loading: slots.loading)
-            }
-            if attempted && time == nil && serviceId != nil && !times.isEmpty {
-                FieldError(text: L.Booking.pickTime).padding(.top, 8)
-            }
-        }
-    }
-
-    private var submitBar: some View {
-        VStack(spacing: 0) {
             Divider()
-            PrimaryButton(title: L.Booking.create, symbol: "checkmark", busy: busy, disabled: false) {
-                Task { await submit() }
-            }
-            .opacity(canSubmit || busy ? 1 : 0.55)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
+            GroupedSlots(serviceChosen: serviceId != nil, slots: times, selected: $time, loading: slots.loading, error: slots.error)
         }
-        .background(.bar)
     }
 
     // MARK: Work
@@ -305,8 +301,11 @@ struct BookingView: View {
     private func prepare() async {
         await workspace.loadCatalog()
         phoneISO = Phone.defaultCountry(business: workspace.business.country)
-        if locationId == nil, places.count == 1 { locationId = places.first?.id }
-        if serviceId == nil { serviceId = services.first?.id }
+        if locationId == nil {
+            // The agenda's location filter first, else the first active place.
+            let filtered = places.first { $0.id == workspace.agendaLocation }
+            locationId = (filtered ?? places.first)?.id
+        }
     }
 
     private func search() async {
@@ -328,26 +327,24 @@ struct BookingView: View {
     }
 
     private func startNew(from text: String) {
-        let words = text.split(separator: " ").map(String.init)
-        if text.contains("@") {
-            email = text
-        } else if text.filter(\.isNumber).count >= 6 {
-            phoneNational = text.filter(\.isNumber)
-        } else {
-            firstName = words.first ?? ""
-            lastName = words.dropFirst().joined(separator: " ")
-        }
+        let draft = BookingRules.draft(from: text)
+        firstName = draft.firstName
+        lastName = draft.lastName
+        if !draft.phone.isEmpty { phoneNational = draft.phone }
+        email = draft.email
         withAnimation { mode = .new }
     }
 
-    private func submit() async {
+    private func submit(_ proxy: ScrollViewProxy) async {
         attempted = true
-        guard canSubmit, let serviceId, let time else {
+        failure = nil
+        if let missing {
             Haptics.warning()
+            withAnimation { proxy.scrollTo(missing.step, anchor: .top) }
             return
         }
+        guard let serviceId, let time else { return }
         busy = true
-        failure = nil
         defer { busy = false }
         var body: [String: JSON] = [
             "serviceId": .string(serviceId),
@@ -356,7 +353,7 @@ struct BookingView: View {
             "time": .string(time),
         ]
         if let location { body["locationId"] = .string(location.id) }
-        if mode == .existing, let customer {
+        if let customer {
             body["customerId"] = .string(customer.id)
         } else {
             var details: [String: JSON] = [
@@ -371,6 +368,7 @@ struct BookingView: View {
             _ = try await workspace.api.createAppointment(workspace.id, body)
             toasts.show(L.Booking.created)
             workspace.changed()
+            workspace.agendaDay = date
             onBooked?(date)
             dismiss()
         } catch {

@@ -7,11 +7,13 @@ final class AppointmentRulesTests: XCTestCase {
 
     func testDisplayStatusSplitsConfirmedByTime() {
         let start = Fixtures.date("2026-11-10T14:00:00.000Z")
-        XCTAssertEqual(AppointmentRules.displayStatus(.confirmed, startsAt: start, now: before), .upcoming)
-        XCTAssertEqual(AppointmentRules.displayStatus(.confirmed, startsAt: start, now: after), .confirmed)
-        XCTAssertEqual(AppointmentRules.displayStatus(.cancelled, startsAt: start, now: before), .cancelled)
-        XCTAssertEqual(AppointmentRules.displayStatus(.noShow, startsAt: start, now: after), .noShow)
-        XCTAssertEqual(AppointmentRules.displayStatus(.pendingPayment, startsAt: start, now: before), .pendingPayment)
+        let end = Fixtures.date("2026-11-10T14:45:00.000Z")
+        XCTAssertEqual(AppointmentRules.displayStatus(.confirmed, startsAt: start, endsAt: end, now: before), .upcoming)
+        XCTAssertEqual(AppointmentRules.displayStatus(.confirmed, startsAt: start, endsAt: end, now: after), .ongoing)
+        XCTAssertEqual(AppointmentRules.displayStatus(.confirmed, startsAt: start, endsAt: end, now: end), .confirmed)
+        XCTAssertEqual(AppointmentRules.displayStatus(.cancelled, startsAt: start, endsAt: end, now: before), .cancelled)
+        XCTAssertEqual(AppointmentRules.displayStatus(.noShow, startsAt: start, endsAt: end, now: after), .noShow)
+        XCTAssertEqual(AppointmentRules.displayStatus(.pendingPayment, startsAt: start, endsAt: end, now: before), .pendingPayment)
     }
 
     func testAdminActionsOnAnUpcomingUnpaidAppointment() {

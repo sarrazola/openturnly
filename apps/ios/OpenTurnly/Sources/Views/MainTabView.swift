@@ -90,27 +90,27 @@ extension View {
     func withRoutes() -> some View { modifier(RouteDestinations()) }
 }
 
-/// The open business's logo at the top of the agenda, tap to switch.
+/// The open business's logo and name at the top of the agenda; tap to switch
+/// when the person has more than one.
 struct BusinessSwitcherButton: View {
     @Environment(AppModel.self) private var model
     @Environment(Workspace.self) private var workspace
     @State private var showing = false
 
     var body: some View {
-        Button {
-            showing = true
-        } label: {
-            // Only the logo: the bar already carries the screen's title, and a
-            // name squeezed next to it would push the logo off the button's centre.
-            HStack(spacing: 4) {
-                BusinessLogo(business: workspace.business, server: workspace.server, size: 30)
-                if model.businesses.count > 1 {
-                    Image(systemName: "chevron.down").font(.caption2.weight(.bold)).foregroundStyle(Theme.subtle)
-                }
+        // Only the business's logo (or initials) sits in the bar: the day title
+        // below says where you are, and "More" carries the name.
+        Group {
+            if model.businesses.count > 1 {
+                Button { showing = true } label: { mark(chevron: true) }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("\(workspace.business.name), \(L.Business.switchBusiness)")
+            } else {
+                mark(chevron: false)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(workspace.business.name)
             }
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel("\(workspace.business.name), \(L.Business.switchBusiness)")
         .sheet(isPresented: $showing) {
             NavigationStack {
                 BusinessPickerList(businesses: model.businesses, current: workspace.business.id) { business in
@@ -123,6 +123,15 @@ struct BusinessSwitcherButton: View {
                 .refreshable { await model.loadBusinesses() }
             }
             .presentationDetents([.medium, .large])
+        }
+    }
+
+    private func mark(chevron: Bool) -> some View {
+        HStack(spacing: 4) {
+            BusinessLogo(business: workspace.business, server: workspace.server, size: 32)
+            if chevron {
+                Image(systemName: "chevron.down").font(.caption2.weight(.bold)).foregroundStyle(Theme.subtle)
+            }
         }
     }
 }

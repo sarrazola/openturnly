@@ -11,6 +11,8 @@ struct CustomerDetailView: View {
     @State private var editing = false
     @State private var editingNotes = false
     @State private var booking = false
+    @State private var opening: String?
+    @State private var openedAppointment: Appointment?
 
     var body: some View {
         Group {
@@ -35,6 +37,9 @@ struct CustomerDetailView: View {
                     Button(L.Common.edit) { editing = true }
                 }
             }
+        }
+        .navigationDestination(item: $openedAppointment) { appointment in
+            AppointmentDetailView(initial: appointment)
         }
         .task { await load() }
         .task(id: workspace.revision) { if workspace.revision > 0 { await load() } }
@@ -67,56 +72,49 @@ struct CustomerDetailView: View {
     private func content(_ detail: CustomerDetail) -> some View {
         let customer = detail.customer
         let now = Date()
-        let upcoming = detail.appointments.filter { $0.startsAt >= now && $0.status != .cancelled }.sorted { $0.startsAt < $1.startsAt }
-        let past = detail.appointments.filter { !upcoming.contains($0) }
-        let visits = detail.appointments.filter { $0.status == .confirmed && $0.startsAt < now }
-        let spent = visits.reduce(0) { $0 + ($1.priceAmount ?? 0) }
+        let clock = workspace.clock
+        let upcoming = CustomerRules.upcoming(detail.appointments, now: now)
+        let past = CustomerRules.history(detail.appointments, now: now)
+        let stats = CustomerRules.stats(detail.appointments, now: now)
         return ScrollView {
             VStack(spacing: 16) {
                 VStack(spacing: 12) {
                     Avatar(name: customer.fullName, size: 76)
                     Text(customer.fullName).font(.title2.weight(.bold)).foregroundStyle(Theme.ink).multilineTextAlignment(.center)
                     if let since = customer.createdAt {
-                        Text(L.Customers.since(Fmt.dayWithYear(workspace.clock.localDate(of: since))))
+                        Text(L.Customers.since(Fmt.dayWithYear(clock.localDate(of: since))))
                             .font(.footnote).foregroundStyle(Theme.muted)
                     }
-                    ContactActions(phone: customer.phone, email: customer.email)
-                        .padding(.top, 4)
+                    if customer.phone != nil || customer.email != nil {
+                        ContactActions(phone: customer.phone, email: customer.email)
+                            .padding(.top, 4)
+                    }
                 }
                 .frame(maxWidth: .infinity)
                 .card()
 
-                HStack(spacing: 12) {
-                    StatTile(label: L.Customers.visitsDone, value: "\(visits.count)", symbol: "checkmark.circle")
-                    StatTile(label: L.Customers.spent, value: workspace.money(spent), symbol: "banknote", tint: Color(hex: "#0284c7"))
-                }
-
                 PrimaryButton(title: L.Agenda.newAppointment, symbol: "calendar.badge.plus") { booking = true }
 
-                VStack(alignment: .leading, spacing: 8) {
-                    SectionTitle(text: L.Customers.contact)
-                    VStack(spacing: 0) {
-                        if let phone = customer.phone {
-                            InfoRow(label: L.Common.phone, value: Phone.format(phone), symbol: "phone")
+                HStack(spacing: 10) {
+                    StatTile(label: L.Customers.visits, value: "\(stats.visits)", symbol: "checkmark.circle")
+                    StatTile(label: L.Customers.lastVisit, value: stats.lastVisit.map { Fmt.dayShort(clock.localDate(of: $0)) } ?? L.Customers.never,
+                             symbol: "clock.arrow.circlepath", tint: Color(hex: "#0284c7"))
+                    StatTile(label: L.Customers.nextVisit, value: stats.nextVisit.map { Fmt.dayShort(clock.localDate(of: $0)) } ?? L.Customers.never,
+                             symbol: "calendar", valueColor: stats.nextVisit == nil ? Theme.ink : Theme.brand)
+                }
+
+                if customer.phone != nil || customer.email != nil || customer.birthDate != nil
+                    || TextRules.clean(customer.document) != nil || customer.gender != nil {
+                    VStack(alignment: .leading, spacing: 8) {
+                        SectionTitle(text: L.Customers.details)
+                        VStack(spacing: 0) {
+                            ForEach(Array(detailRows(customer).enumerated()), id: \.offset) { index, row in
+                                if index > 0 { Divider() }
+                                InfoRow(label: row.label, value: row.value, symbol: row.symbol)
+                            }
                         }
-                        if let email = customer.email {
-                            if customer.phone != nil { Divider() }
-                            InfoRow(label: L.Common.email, value: email, symbol: "envelope")
-                        }
-                        if let birth = customer.birthDate.flatMap(LocalDate.init) {
-                            Divider()
-                            InfoRow(label: L.Customers.birthDate, value: Fmt.dayWithYear(birth), symbol: "gift")
-                        }
-                        if let document = customer.document, !document.isEmpty {
-                            Divider()
-                            InfoRow(label: L.Customers.document, value: document, symbol: "person.text.rectangle")
-                        }
-                        if customer.gender != nil {
-                            Divider()
-                            InfoRow(label: L.Customers.gender, value: L.Customers.genderName(customer.gender), symbol: "person")
-                        }
+                        .card(padding: 14)
                     }
-                    .card(padding: 14)
                 }
 
                 VStack(alignment: .leading, spacing: 8) {
@@ -136,14 +134,18 @@ struct CustomerDetailView: View {
                         .card(padding: 14)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel(L.Appointment.editNotes)
                 }
 
                 if !upcoming.isEmpty {
                     history(L.Customers.upcoming, upcoming)
                 }
-                if past.isEmpty && upcoming.isEmpty {
-                    EmptyState(symbol: "calendar", title: L.Customers.noHistory).card()
-                } else if !past.isEmpty {
+                if past.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        SectionTitle(text: L.Customers.history, trailing: "0")
+                        Text(L.Customers.noHistory).font(.subheadline).foregroundStyle(Theme.muted).card(padding: 14)
+                    }
+                } else {
                     history(L.Customers.history, past)
                 }
             }
@@ -154,16 +156,51 @@ struct CustomerDetailView: View {
         .refreshable { await load() }
     }
 
+    /// Celular, Email, Fecha de nacimiento, Documento, Género: only those with data.
+    private func detailRows(_ customer: Customer) -> [(label: String, value: String, symbol: String)] {
+        var rows: [(label: String, value: String, symbol: String)] = []
+        if let phone = customer.phone { rows.append((L.Common.phone, Phone.format(phone), "phone")) }
+        if let email = customer.email { rows.append((L.Common.email, email, "envelope")) }
+        if let birth = customer.birthDate.flatMap(LocalDate.init) { rows.append((L.Customers.birthDate, Fmt.dayWithYear(birth), "gift")) }
+        if let document = TextRules.clean(customer.document) { rows.append((L.Customers.document, document, "person.text.rectangle")) }
+        if customer.gender != nil { rows.append((L.Customers.gender, L.Customers.genderName(customer.gender), "person")) }
+        return rows
+    }
+
     private func history(_ title: String, _ items: [CustomerAppointment]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             SectionTitle(text: title, trailing: "\(items.count)")
             VStack(spacing: 0) {
                 ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                     if index > 0 { Divider() }
-                    HistoryRow(item: item)
+                    Button {
+                        open(item)
+                    } label: {
+                        HistoryRow(item: item, busy: opening == item.id)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(opening != nil)
                 }
             }
             .card(padding: 14)
+        }
+    }
+
+    /// Finds the appointment on its day, like a tapped notification, and opens it.
+    private func open(_ item: CustomerAppointment) {
+        Haptics.selection()
+        opening = item.id
+        Task {
+            defer { opening = nil }
+            do {
+                if let found = try await workspace.reloadAppointment(item.id, near: item.startsAt) {
+                    openedAppointment = found
+                } else {
+                    toasts.show(L.Appointment.notFound, error: true)
+                }
+            } catch {
+                toasts.error(error)
+            }
         }
     }
 
@@ -180,36 +217,34 @@ struct CustomerDetailView: View {
 
 private struct HistoryRow: View {
     let item: CustomerAppointment
+    var busy = false
     @Environment(Workspace.self) private var workspace
 
     var body: some View {
         let clock = workspace.clock
-        let status = AppointmentRules.displayStatus(item.status, startsAt: item.startsAt)
+        let status = AppointmentRules.displayStatus(item.status, startsAt: item.startsAt, endsAt: item.endsAt)
         HStack(spacing: 12) {
-            VStack(spacing: 0) {
-                Text("\(clock.localDate(of: item.startsAt).day)").font(.headline).fontDesign(.rounded)
-                Text(Fmt.monthShort(clock.localDate(of: item.startsAt)).prefix(3).uppercased())
-                    .font(.caption2.weight(.semibold)).foregroundStyle(Theme.muted)
-            }
-            .frame(width: 44, height: 44)
-            .background(Theme.fill, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
-                Text(item.serviceName).font(.subheadline.weight(.semibold)).foregroundStyle(Theme.ink)
-                Text([clock.time(of: item.startsAt), item.resourceName,
-                      clock.localDate(of: item.startsAt).year == clock.today().year ? nil : "\(clock.localDate(of: item.startsAt).year)"]
-                    .compactMap { $0 }.joined(separator: " · "))
+                Text("\(Fmt.dayWithYear(clock.localDate(of: item.startsAt))) · \(clock.time(of: item.startsAt))")
+                    .font(.subheadline.weight(.semibold)).foregroundStyle(Theme.ink)
+                Text([item.serviceName, item.resourceName].compactMap { $0 }.joined(separator: " · "))
                     .font(.caption).foregroundStyle(Theme.muted)
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 3) {
-                Chip(text: status == .confirmed ? L.Customers.attended : L.Status.label(status),
-                     tone: status == .confirmed ? .success : Tone.of(status))
+                StatusChip(status: status)
                 if let price = item.priceAmount {
                     Text(workspace.money(price)).font(.caption).monospacedDigit().foregroundStyle(Theme.subtle)
                 }
             }
+            if busy {
+                ProgressView().controlSize(.small)
+            } else {
+                Image(systemName: "chevron.right").font(.caption.weight(.bold)).foregroundStyle(Theme.subtle)
+            }
         }
         .padding(.vertical, 8)
+        .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
     }
 }

@@ -37,6 +37,11 @@ enum Brand {
         return "\(short) (\(build))"
     }()
 
+    /// "1.2.0": the version people see in "Más".
+    static let marketingVersion: String = {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
+    }()
+
     /// The sign-in screen's colour.
     static let primaryColor: Color = {
         let raw = value("PrimaryColor").replacingOccurrences(of: "#", with: "")
@@ -98,7 +103,15 @@ enum Brand {
     }
 
     static var privacyPolicyURL: URL? { localized("PrivacyPolicyURL") }
+    /// Where someone signing in through the account directory recovers a
+    /// password, before the app knows which server they belong to.
+    static var passwordRecoveryURL: URL? { httpsURL(value("PasswordRecoveryURL")) }
     static var supportURL: URL? { localized("SupportURL") }
+
+    /// Whether the logo is the clock the app draws itself (BRAND_ANIMATED_MARK).
+    /// The loader then turns its hands; without it the loader shows the brand's
+    /// white logo and pulses it. A brand file without the key is a logo of its own.
+    static let animatedMark: Bool = ["yes", "true", "1"].contains(value("AnimatedMark").lowercased())
 
     /// The push gateway this build is entitled to: `development`, `production`,
     /// or empty when the build has no push notifications at all.

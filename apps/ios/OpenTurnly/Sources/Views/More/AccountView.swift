@@ -11,6 +11,7 @@ struct AccountView: View {
     @State private var currentForEmail = ""
     @State private var currentPassword = ""
     @State private var newPassword = ""
+    @State private var repeatPassword = ""
     @State private var savingDetails = false
     @State private var savingPassword = false
     @State private var detailsError: String?
@@ -20,6 +21,8 @@ struct AccountView: View {
     private var user: User? { model.session?.user }
     private var emailChanged: Bool { email.trimmingCharacters(in: .whitespaces).lowercased() != (user?.email ?? "").lowercased() }
     private var detailsDirty: Bool { name.trimmingCharacters(in: .whitespaces) != (user?.name ?? "") || emailChanged }
+
+    private var mismatch: Bool { !repeatPassword.isEmpty && repeatPassword != newPassword }
 
     var body: some View {
         Form {
@@ -32,8 +35,6 @@ struct AccountView: View {
                     }
                 }
                 .padding(.vertical, 4)
-                LabeledContent(L.Account.role, value: user?.isInstallOwner == true ? L.Account.installOwner : L.Business.role(workspace.business.access))
-                LabeledContent(L.Account.server, value: ServerAddress.displayHost(workspace.server))
             }
 
             Section {
@@ -67,6 +68,7 @@ struct AccountView: View {
             Section {
                 SecureField(L.Account.currentPassword, text: $currentPassword).textContentType(.password)
                 SecureField(L.Account.newPassword, text: $newPassword).textContentType(.newPassword)
+                SecureField(L.Account.repeatPassword, text: $repeatPassword).textContentType(.newPassword)
                 Button {
                     Task { await changePassword() }
                 } label: {
@@ -75,12 +77,14 @@ struct AccountView: View {
                         if savingPassword { Spacer(); ProgressView() }
                     }
                 }
-                .disabled(currentPassword.isEmpty || newPassword.count < 10 || savingPassword)
+                .disabled(currentPassword.isEmpty || newPassword.count < 10 || repeatPassword != newPassword || savingPassword)
             } header: {
                 Text(L.Account.password)
             } footer: {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("\(L.Account.newPasswordHint) \(L.Account.passwordHint)")
+                    Text(L.Account.passwordHint)
+                    Text(L.Account.newPasswordHint)
+                    if mismatch { FieldError(text: L.Account.mismatch) }
                     FieldError(text: passwordError)
                 }
             }
@@ -90,13 +94,12 @@ struct AccountView: View {
             }
 
             Section {
-                Text(L.Account.appearance).font(.footnote).foregroundStyle(Theme.muted)
-                if let url = Brand.privacyPolicyURL {
-                    Button(L.SignIn.privacy) { openURL(url) }
-                }
-                if let url = Brand.supportURL {
-                    Button(L.SignIn.support) { openURL(url) }
-                }
+                LabeledContent(L.Account.server, value: ServerAddress.displayHost(workspace.server))
+                LabeledContent(L.Account.role, value: user?.isInstallOwner == true ? L.Account.installOwner : L.Business.role(workspace.business.access))
+            } header: {
+                Text(L.Account.session)
+            } footer: {
+                Text(L.Account.appearance)
             }
         }
         .navigationTitle(L.Account.title)
@@ -161,6 +164,7 @@ struct AccountView: View {
             try await workspace.api.changePassword(current: currentPassword, new: newPassword)
             currentPassword = ""
             newPassword = ""
+            repeatPassword = ""
             toasts.show(L.Account.passwordChanged)
         } catch {
             passwordError = ErrorText.field(error, "currentPassword") ?? ErrorText.field(error, "newPassword") ?? ErrorText.message(error)

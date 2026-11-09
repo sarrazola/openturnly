@@ -102,8 +102,12 @@
 		<string>$(BRAND_SUPPORT_URL_EN)</string>
 		<key>SupportURL_es</key>
 		<string>$(BRAND_SUPPORT_URL_ES)</string>
+		<key>PasswordRecoveryURL</key>
+		<string>$(BRAND_PASSWORD_RECOVERY_URL)</string>
 		<key>ApsEnvironment</key>
 		<string>$(BRAND_APS_ENVIRONMENT)</string>
+		<key>AnimatedMark</key>
+		<string>$(BRAND_ANIMATED_MARK)</string>
 	</dict>
 </dict>
 </plist>

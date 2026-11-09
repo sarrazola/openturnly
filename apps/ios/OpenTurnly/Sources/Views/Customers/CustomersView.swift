@@ -1,18 +1,18 @@
 import SwiftUI
 
-/// Everyone who books with the business, searchable as you type.
+/// Everyone who books with the business, A to Z, searchable as you type.
 ///
 /// The server sends the whole list at once (no paging), so it is filtered on
-/// the phone and drawn a page at a time as the person scrolls.
+/// the phone; the list draws rows lazily as the person scrolls.
 struct CustomersView: View {
     @Environment(Workspace.self) private var workspace
     @State private var customers: [CustomerSummary] = []
     @State private var loaded = false
     @State private var error: Error?
     @State private var query = ""
-    @State private var shown = 60
     @State private var creating = false
     @State private var booking: PickedCustomer?
+    @State private var opened: Customer?
 
     private var filtered: [CustomerSummary] {
         let needle = query.trimmingCharacters(in: .whitespaces)
@@ -34,42 +34,29 @@ struct CustomersView: View {
             } else if list.isEmpty {
                 EmptyState(symbol: "magnifyingglass", title: L.Customers.noResults).listRowSeparator(.hidden)
             } else {
-                Section {
-                    ForEach(list.prefix(shown)) { customer in
-                        NavigationLink(value: Route.customer(id: customer.id, name: customer.fullName)) {
-                            CustomerRow(customer: customer)
+                Text(L.Customers.count(list.count))
+                    .font(.footnote.weight(.medium))
+                    .foregroundStyle(Theme.muted)
+                    .listRowSeparator(.hidden)
+                ForEach(CustomerRules.sections(list, name: \.fullName), id: \.key) { section in
+                    Section {
+                        ForEach(section.items) { customer in
+                            row(customer)
                         }
-                        .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                            Button {
-                                booking = PickedCustomer(id: customer.id, name: customer.fullName, phone: customer.phone, email: customer.email)
-                            } label: {
-                                Label(L.Customers.bookFor, systemImage: "calendar.badge.plus")
-                            }
-                            .tint(Theme.brand)
-                        }
-                        .swipeActions(edge: .trailing) {
-                            if let url = Phone.whatsAppURL(customer.phone) {
-                                Link(destination: url) { Label(L.Common.whatsapp, systemImage: "message.fill") }
-                                    .tint(Color(hex: "#16a34a"))
-                            }
-                            if let url = Phone.callURL(customer.phone) {
-                                Link(destination: url) { Label(L.Common.call, systemImage: "phone.fill") }
-                                    .tint(Color(hex: "#0284c7"))
-                            }
-                        }
-                        .onAppear {
-                            if customer.id == list.prefix(shown).last?.id, shown < list.count { shown += 60 }
-                        }
+                    } header: {
+                        Text(section.key)
                     }
-                } header: {
-                    Text(L.Customers.count(list.count))
+                    .modifier(SectionIndex(label: section.key))
                 }
             }
         }
         .listStyle(.plain)
+        .modifier(SectionIndexVisible())
         .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: L.Customers.search)
-        .onChange(of: query) { _, _ in shown = 60 }
         .navigationTitle(L.Customers.title)
+        .navigationDestination(item: $opened) { customer in
+            CustomerDetailView(customerId: customer.id, name: customer.fullName)
+        }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
@@ -83,10 +70,47 @@ struct CustomersView: View {
         .task { if !loaded { await load() } }
         .task(id: workspace.revision) { if workspace.revision > 0 { await load() } }
         .sheet(isPresented: $creating) {
-            CustomerFormView(customer: nil) { _ in Task { await load() } }
+            CustomerFormView(customer: nil) { saved in
+                Task { await load() }
+                opened = saved
+            }
         }
         .sheet(item: Binding(get: { booking.map(IdentifiedCustomer.init) }, set: { booking = $0?.customer })) { item in
             BookingView(date: workspace.clock.today(), preset: item.customer)
+        }
+    }
+
+    private func row(_ customer: CustomerSummary) -> some View {
+        let picked = PickedCustomer(id: customer.id, name: customer.fullName, phone: customer.phone, email: customer.email)
+        return NavigationLink(value: Route.customer(id: customer.id, name: customer.fullName)) {
+            CustomerRow(customer: customer)
+        }
+        .contextMenu {
+            Button { booking = picked } label: { Label(L.Agenda.newAppointment, systemImage: "calendar.badge.plus") }
+            if let url = Phone.callURL(customer.phone) {
+                Link(destination: url) { Label(L.Common.call, systemImage: "phone") }
+            }
+            if let url = Phone.whatsAppURL(customer.phone) {
+                Link(destination: url) { Label(L.Common.whatsapp, systemImage: "message") }
+            }
+        }
+        .swipeActions(edge: .leading, allowsFullSwipe: true) {
+            Button {
+                booking = picked
+            } label: {
+                Label(L.Agenda.newAppointment, systemImage: "calendar.badge.plus")
+            }
+            .tint(Theme.brand)
+        }
+        .swipeActions(edge: .trailing) {
+            if let url = Phone.whatsAppURL(customer.phone) {
+                Link(destination: url) { Label(L.Common.whatsapp, systemImage: "message.fill") }
+                    .tint(Color(hex: "#16a34a"))
+            }
+            if let url = Phone.callURL(customer.phone) {
+                Link(destination: url) { Label(L.Common.call, systemImage: "phone.fill") }
+                    .tint(Color(hex: "#0284c7"))
+            }
         }
     }
 
@@ -99,6 +123,29 @@ struct CustomersView: View {
             self.error = error
         }
         loaded = true
+    }
+}
+
+/// The letter a section shows in the list's side index, where the system has one.
+private struct SectionIndex: ViewModifier {
+    let label: String
+
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content.sectionIndexLabel(Text(label))
+        } else {
+            content
+        }
+    }
+}
+
+private struct SectionIndexVisible: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content.listSectionIndexVisibility(.visible)
+        } else {
+            content
+        }
     }
 }
 
@@ -122,10 +169,11 @@ struct CustomerRow: View {
             Spacer(minLength: 8)
             VStack(alignment: .trailing, spacing: 3) {
                 if let next = customer.nextVisit {
-                    Chip(text: Fmt.dayShort(workspace.clock.localDate(of: next)), tone: .brand, symbol: "calendar")
+                    Text(L.Customers.next(Fmt.dayShort(workspace.clock.localDate(of: next))))
+                        .font(.caption.weight(.semibold)).foregroundStyle(Theme.brand)
                 }
                 if let visits = customer.visits, visits > 0 {
-                    Text(L.Agenda.count(visits)).font(.caption).foregroundStyle(Theme.subtle)
+                    Text(L.Customers.visitCount(visits)).font(.caption).foregroundStyle(Theme.subtle)
                 }
             }
         }
@@ -136,6 +184,6 @@ struct CustomerRow: View {
     private var contactLine: String {
         let phone = Phone.format(customer.phone)
         if !phone.isEmpty { return phone }
-        return customer.email ?? "—"
+        return customer.email ?? L.Customers.noContact
     }
 }

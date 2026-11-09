@@ -103,61 +103,58 @@ struct AppointmentCard: View {
             .lineLimit(typeSize.isAccessibilitySize ? 3 : 1)
     }
 
-    @ViewBuilder
     private var statusChip: some View {
-        if ongoing {
-            Chip(text: L.Agenda.now, tone: .success, symbol: "circle.fill")
-        } else {
-            let status = AppointmentRules.displayStatus(appointment.status, startsAt: appointment.startsAt, now: now)
-            Chip(text: L.Status.label(status), tone: Tone.of(status))
-        }
+        StatusChip(status: AppointmentRules.displayStatus(appointment, now: now))
     }
 
     private var footer: some View {
         HStack(spacing: 8) {
-            if let name = appointment.resourceName {
-                HStack(spacing: 5) {
-                    Circle().fill(workspace.color(for: appointment.resourceId)).frame(width: 7, height: 7)
-                    Text(name).font(.footnote).foregroundStyle(Theme.muted).lineLimit(1)
+            HStack(spacing: 5) {
+                if appointment.resourceName != nil {
+                    Circle().fill(dimmed ? Theme.subtle : workspace.color(for: appointment.resourceId)).frame(width: 7, height: 7)
                 }
+                Text(whoAndWhere).font(.footnote).foregroundStyle(Theme.muted).lineLimit(typeSize.isAccessibilitySize ? 3 : 1)
             }
             Spacer(minLength: 4)
-            MoneyBadge(appointment: appointment)
+            MoneyBadge(appointment: appointment, now: now)
         }
+    }
+
+    /// «Camila · Centro»: the professional, and the location when there are several.
+    private var whoAndWhere: String {
+        var parts: [String] = []
+        if let name = appointment.resourceName { parts.append(name) }
+        if workspace.activeLocations.count > 1, let location = appointment.locationName { parts.append(location) }
+        return parts.joined(separator: " · ")
     }
 }
 
-/// Paid, deposit left, or the price. A professional sees only the price: the
-/// payments are for owners and admins.
+/// The money at the bottom right of a card (§2.3): the price before the start,
+/// then what is left to do about it. A professional sees only the price.
 struct MoneyBadge: View {
     let appointment: Appointment
+    var now = Date()
     @Environment(Workspace.self) private var workspace
 
     var body: some View {
-        if !workspace.isAdmin {
-            price
-        } else {
-            switch AppointmentRules.paymentState(appointment) {
-            case .paid(let number):
-                Chip(text: L.Checkout.paidIn(number), tone: .info, symbol: "checkmark")
-            case .covered:
-                Chip(text: L.Checkout.paid, tone: .info, symbol: "checkmark")
-            case .partly(let owed, _):
-                Chip(text: workspace.money(owed), tone: .warning, symbol: "tray.and.arrow.down.fill")
-            case .none:
-                EmptyView()
-            case .unpaid:
-                price
-            }
-        }
-    }
-
-    @ViewBuilder private var price: some View {
-        if let price = appointment.priceAmount {
-            Text(workspace.money(max(0, price - appointment.discountAmount)))
+        switch AppointmentRules.badge(appointment, isAdmin: workspace.isAdmin, now: now) {
+        case .price(let amount):
+            Text(workspace.money(amount))
                 .font(.footnote.weight(.semibold))
                 .monospacedDigit()
                 .foregroundStyle(Theme.muted)
+        case .notCharged:
+            Chip(text: L.Checkout.unpaid, tone: .warning)
+        case .deposited(let amount):
+            Chip(text: L.Checkout.deposited(workspace.money(amount)), tone: .neutral)
+        case .left(let amount):
+            Chip(text: L.Checkout.left(workspace.money(amount)), tone: .warning)
+        case .toClose:
+            Chip(text: L.Checkout.toClose, tone: .warning)
+        case .paid:
+            Chip(text: L.Checkout.paid, tone: .info, symbol: "checkmark")
+        case .none:
+            EmptyView()
         }
     }
 }

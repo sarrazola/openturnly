@@ -19,6 +19,11 @@ DEVELOPMENT_TEAM =
 // app uses the AccentColor in the asset catalog, which a publisher replaces too.
 BRAND_PRIMARY_COLOR = 0f766e
 
+// YES when the logo is the example's clock mark: the loading screens then draw it
+// in code and turn its hands. NO (or absent) shows BrandLogoWhite still, with a
+// gentle pulse, which is what a brand with a logo of its own wants.
+BRAND_ANIMATED_MARK = YES
+
 // Pre-fills the server field. Host and optional path, no scheme.
 BRAND_DEFAULT_SERVER =
 
@@ -39,6 +44,12 @@ BRAND_PRIVACY_POLICY_URL_EN =
 BRAND_PRIVACY_POLICY_URL_ES =
 BRAND_SUPPORT_URL_EN =
 BRAND_SUPPORT_URL_ES =
+
+// "Forgot your password?" opens <server>/forgot-password when the app knows the
+// server. Signing in through BRAND_HOSTED_SIGN_IN it doesn't yet, so it opens
+// this page instead. Host and path, no scheme. Empty keeps a note that the
+// administrator sets passwords.
+BRAND_PASSWORD_RECOVERY_URL =
 
 // Push notifications. Empty means this build has none: it never asks for
 // permission and never registers the phone. "development" or "production"

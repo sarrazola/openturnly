@@ -79,4 +79,63 @@ enum CheckoutRules {
 
     /// Lines with amount zero are dropped, as the server would.
     static func payable(_ payments: [Payment]) -> [Payment] { payments.filter { $0.amount > 0 } }
+
+    /// At most this many ways to pay one sale ("Dividir el pago").
+    static let maxPayments = 4
+
+    /// The summary card, top to bottom: Subtotal, Descuento, Total (the sale's
+    /// total, as its detail shows it), Propinas, Abonos, and what is left to
+    /// collect now (total plus tips minus deposits). A gift card is a payment, not
+    /// a line here.
+    struct Summary: Equatable {
+        let subtotal: Int
+        let discount: Int
+        let total: Int
+        let tips: Int
+        let deposits: Int
+        let toCollect: Int
+    }
+
+    static func summary(lines: [Line], discount: Int, tips: Int, deposits: Int) -> Summary {
+        let subtotal = subtotal(lines)
+        let applied = min(max(0, discount), subtotal)
+        let total = total(subtotal: subtotal, discount: applied)
+        return Summary(subtotal: subtotal, discount: applied, total: total, tips: tips, deposits: deposits,
+                       toCollect: remaining(due: due(total: total, tips: tips), deposits: deposits))
+    }
+
+    /// The line over the charge button.
+    enum Balance: Equatable {
+        /// «El pago cuadra con el total.»
+        case balanced
+        /// «Faltan $ X»
+        case missing(Int)
+        /// «Sobran $ X»
+        case over(Int)
+    }
+
+    static func balance(_ difference: Int) -> Balance {
+        if difference == 0 { return .balanced }
+        return difference < 0 ? .missing(-difference) : .over(difference)
+    }
+
+    /// The charge button: «Cerrar venta» for an appointment with nothing left to
+    /// collect, else «Cobrar $ X» with what is left.
+    enum Submit: Equatable {
+        case closeSale
+        case charge(Int)
+    }
+
+    static func submit(toCollect: Int, forAppointment: Bool) -> Submit {
+        forAppointment && toCollect == 0 ? .closeSale : .charge(toCollect)
+    }
+
+    /// A gift card with balance pays this much: what it holds, up to what is still due.
+    static func giftCardAmount(balance: Int, due: Int) -> Int { max(0, min(balance, due)) }
+
+    /// «Dividir el pago» adds a card row with what is missing.
+    static func split(_ payments: [Payment], difference: Int) -> [Payment] {
+        guard payments.count < maxPayments else { return payments }
+        return payments + [Payment(method: "card", amount: max(0, -difference))]
+    }
 }

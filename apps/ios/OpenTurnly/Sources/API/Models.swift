@@ -497,6 +497,30 @@ struct ReportCommission: Decodable, Identifiable, Hashable {
 
 struct CommissionsResponse: Decodable { let professionals: [ReportCommission] }
 
+/// One tip in the period, newest first.
+struct ReportTip: Decodable, Identifiable, Hashable {
+    let id: String
+    let amount: Int
+    let resourceId: String?
+    let resourceName: String?
+    let sale: SaleReference?
+    let createdAt: Date
+    let locationName: String?
+    let customer: String?
+}
+
+/// Tips per professional, biggest first.
+struct ReportTipTotal: Decodable, Hashable {
+    let name: String
+    let amount: Int
+    let count: Int
+}
+
+struct TipsReport: Decodable {
+    let tips: [ReportTip]
+    let totals: [ReportTipTotal]
+}
+
 // MARK: Team
 
 struct Invitation: Decodable, Identifiable, Hashable {

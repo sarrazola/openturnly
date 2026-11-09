@@ -2,42 +2,29 @@ import Charts
 import SwiftUI
 
 /// How the business is doing: bookings, occupancy, new customers and sales for a
-/// period, compared with the one before; and what each professional earned.
+/// period, compared with the one before; the tips; and what each professional earned.
 struct ReportsView: View {
     @Environment(Workspace.self) private var workspace
-    @State private var period: Period = .month
+    @State private var period: ReportRules.Preset = .month
     @State private var tab: Tab = .summary
+    @State private var measure: Measure = .bookings
     @State private var summary: ReportSummary?
+    @State private var tips: TipsReport?
     @State private var commissions: [ReportCommission] = []
     @State private var error: Error?
     @State private var loading = false
 
-    enum Tab: Hashable { case summary, commissions }
+    enum Tab: Hashable { case summary, tips, commissions }
+    enum Measure: Hashable { case bookings, sales }
 
-    enum Period: String, CaseIterable, Identifiable {
-        case today, week, month, lastMonth, last30
-        var id: String { rawValue }
-
-        var title: String {
-            switch self {
-            case .today: return L.Common.today
-            case .week: return L.Common.thisWeek
-            case .month: return L.Common.thisMonth
-            case .lastMonth: return L.Common.lastMonth
-            case .last30: return L.Common.last30
-            }
-        }
-
-        func range(today: LocalDate) -> (LocalDate, LocalDate) {
-            switch self {
-            case .today: return (today, today)
-            case .week: return (today.startOfWeek(firstWeekday: 1), today.startOfWeek(firstWeekday: 1).adding(days: 6))
-            case .month: return (today.firstOfMonth, today.lastOfMonth)
-            case .lastMonth:
-                let previous = today.firstOfMonth.adding(days: -1)
-                return (previous.firstOfMonth, previous.lastOfMonth)
-            case .last30: return (today.adding(days: -29), today)
-            }
+    private func title(_ preset: ReportRules.Preset) -> String {
+        switch preset {
+        case .today: return L.Common.today
+        case .week: return L.Common.thisWeek
+        case .month: return L.Common.thisMonth
+        case .lastMonth: return L.Common.lastMonth
+        case .last30: return L.Common.last30
+        case .year: return L.Common.thisYear
         }
     }
 
@@ -46,12 +33,12 @@ struct ReportsView: View {
             VStack(alignment: .leading, spacing: 16) {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
-                        ForEach(Period.allCases) { option in
+                        ForEach(ReportRules.Preset.allCases) { option in
                             Button {
                                 Haptics.selection()
                                 period = option
                             } label: {
-                                Text(option.title)
+                                Text(title(option))
                                     .font(.subheadline.weight(.medium))
                                     .padding(.horizontal, 14)
                                     .frame(minHeight: 34)
@@ -64,20 +51,22 @@ struct ReportsView: View {
                 }
                 Picker("", selection: $tab) {
                     Text(L.Reports.summary).tag(Tab.summary)
+                    Text(L.Reports.tips).tag(Tab.tips)
                     Text(L.Reports.commissions).tag(Tab.commissions)
                 }
                 .pickerStyle(.segmented)
 
                 if let error {
                     ErrorState(message: ErrorText.message(error)) { Task { await load() } }.card()
-                } else if tab == .summary {
-                    if let summary {
-                        summaryContent(summary)
-                    } else {
-                        CardsSkeleton(count: 3)
-                    }
                 } else {
-                    commissionsContent
+                    switch tab {
+                    case .summary:
+                        if let summary { summaryContent(summary) } else { CardsSkeleton(count: 3) }
+                    case .tips:
+                        if let tips { tipsContent(tips) } else { CardsSkeleton(count: 2) }
+                    case .commissions:
+                        commissionsContent
+                    }
                 }
             }
             .padding(16)
@@ -97,35 +86,23 @@ struct ReportsView: View {
         let current = summary.current
         let before = summary.before
         LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
-            StatTile(label: L.Reports.bookings, value: "\(current.bookings)", detail: before.map { L.Reports.vs("\($0.bookings)") },
-                     symbol: "calendar")
-            StatTile(label: L.Reports.occupancy, value: current.occupancy.map { Fmt.percent($0) } ?? "—",
-                     detail: before?.occupancy.map { L.Reports.vs(Fmt.percent($0)) }, symbol: "chart.pie", tint: Color(hex: "#7c3aed"))
-            StatTile(label: L.Reports.newCustomers, value: "\(current.newCustomers)", detail: before.map { L.Reports.vs("\($0.newCustomers)") },
-                     symbol: "person.badge.plus", tint: Color(hex: "#db2777"))
-            StatTile(label: L.Reports.billed, value: workspace.money(current.billed), detail: before.map { L.Reports.vs(workspace.money($0.billed)) },
-                     symbol: "banknote", tint: Color(hex: "#0284c7"))
+            KpiTile(label: L.Reports.bookings, value: "\(current.bookings)",
+                    change: before.flatMap { ReportRules.change(Double(current.bookings), Double($0.bookings)) }.map(Fmt.change),
+                    up: before.map { current.bookings >= $0.bookings }, before: before.map { "\($0.bookings)" })
+            KpiTile(label: L.Reports.occupancy, value: current.occupancy.map { Fmt.percent($0) } ?? "—",
+                    change: ReportRules.points(current.occupancy, before?.occupancy).map(points),
+                    up: ReportRules.points(current.occupancy, before?.occupancy).map { $0 >= 0 },
+                    before: before?.occupancy.map { Fmt.percent($0) })
+            KpiTile(label: L.Reports.newCustomers, value: "\(current.newCustomers)",
+                    change: before.flatMap { ReportRules.change(Double(current.newCustomers), Double($0.newCustomers)) }.map(Fmt.change),
+                    up: before.map { current.newCustomers >= $0.newCustomers }, before: before.map { "\($0.newCustomers)" })
+            KpiTile(label: L.Reports.billed, value: workspace.money(current.billed),
+                    change: before.flatMap { ReportRules.change(Double(current.billed), Double($0.billed)) }.map(Fmt.change),
+                    up: before.map { current.billed >= $0.billed }, before: before.map { workspace.money($0.billed) })
         }
 
-        if let series = summary.series, series.points.count > 1 {
-            VStack(alignment: .leading, spacing: 10) {
-                SectionTitle(text: L.Reports.chart(series.unit))
-                Chart(series.points, id: \.start) { point in
-                    BarMark(x: .value(L.Common.date, LocalDate(point.start)?.noonUTC ?? Date(), unit: series.unit == "month" ? .month : series.unit == "week" ? .weekOfYear : .day),
-                            y: .value(L.Reports.bookings, point.bookings))
-                        .foregroundStyle(Theme.brand.gradient)
-                        .cornerRadius(4)
-                }
-                .chartXAxis {
-                    AxisMarks(values: .automatic(desiredCount: 5)) { _ in
-                        AxisGridLine()
-                        AxisValueLabel(format: .dateTime.day().month(.abbreviated), centered: false)
-                    }
-                }
-                .environment(\.timeZone, TimeZone(identifier: "UTC")!)
-                .frame(height: 180)
-                .card(padding: 14)
-            }
+        if let series = summary.series {
+            chartCard(series)
         }
 
         if let origin = summary.origin, origin.values.reduce(0, +) > 0 {
@@ -149,13 +126,14 @@ struct ReportsView: View {
             }
         }
 
-        if let top = summary.topServices, !top.isEmpty {
-            VStack(alignment: .leading, spacing: 8) {
-                SectionTitle(text: L.Reports.topSold)
+        VStack(alignment: .leading, spacing: 8) {
+            SectionTitle(text: L.Reports.topSold)
+            if let top = summary.topServices, !top.isEmpty {
                 VStack(spacing: 0) {
                     ForEach(Array(top.enumerated()), id: \.offset) { index, item in
                         if index > 0 { Divider() }
-                        HStack {
+                        HStack(spacing: 10) {
+                            Text("\(index + 1)").font(.subheadline.weight(.bold)).monospacedDigit().foregroundStyle(Theme.brand).frame(width: 22)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(item.name).font(.subheadline.weight(.medium))
                                 Text(L.Reports.soldCount(item.quantity)).font(.caption).foregroundStyle(Theme.muted)
@@ -167,6 +145,8 @@ struct ReportsView: View {
                     }
                 }
                 .card(padding: 14)
+            } else {
+                Text(L.Reports.nothing).font(.subheadline).foregroundStyle(Theme.muted).card(padding: 14)
             }
         }
 
@@ -217,6 +197,97 @@ struct ReportsView: View {
         }
     }
 
+    private func points(_ value: Int) -> String {
+        let sign = value > 0 ? "+" : value < 0 ? "\u{2212}" : ""
+        return "\(sign)\(abs(value)) \(L.Reports.points)"
+    }
+
+    /// Bookings or sales per day, week or month, with the period's total and its first and last dates.
+    private func chartCard(_ series: ReportSeries) -> some View {
+        let points = series.points
+        let total = points.reduce(0) { $0 + (measure == .bookings ? $1.bookings : $1.billed) }
+        return VStack(alignment: .leading, spacing: 12) {
+            Picker("", selection: $measure) {
+                Text(L.Reports.bookings).tag(Measure.bookings)
+                Text(L.Reports.billed).tag(Measure.sales)
+            }
+            .pickerStyle(.segmented)
+            .fixedSize()
+            Text(measure == .bookings ? "\(total)" : workspace.money(total))
+                .font(.title2.weight(.bold)).fontDesign(.rounded).monospacedDigit().foregroundStyle(Theme.ink)
+            if points.isEmpty {
+                Text(L.Reports.nothing).font(.subheadline).foregroundStyle(Theme.muted)
+            } else {
+                Chart(points, id: \.start) { point in
+                    BarMark(x: .value(L.Common.date, point.start),
+                            y: .value(L.Reports.bookings, measure == .bookings ? point.bookings : point.billed))
+                        .foregroundStyle(Theme.brand.gradient)
+                        .cornerRadius(3)
+                }
+                .chartXAxis(.hidden)
+                .chartYAxis {
+                    AxisMarks(position: .leading) { value in
+                        AxisGridLine()
+                        AxisValueLabel {
+                            if let number = value.as(Int.self) {
+                                Text(measure == .bookings ? "\(number)" : workspace.money(number)).font(.caption2)
+                            }
+                        }
+                    }
+                }
+                .frame(height: 170)
+                HStack {
+                    Text(LocalDate(points.first?.start ?? "").map(Fmt.dayShort) ?? "")
+                    Spacer()
+                    Text(LocalDate(points.last?.start ?? "").map(Fmt.dayShort) ?? "")
+                }
+                .font(.caption2)
+                .foregroundStyle(Theme.muted)
+            }
+        }
+        .card(padding: 14)
+    }
+
+    // MARK: Tips
+
+    @ViewBuilder
+    private func tipsContent(_ report: TipsReport) -> some View {
+        if report.totals.isEmpty {
+            EmptyState(symbol: "heart", title: L.Reports.noTips).card()
+        } else {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(L.Reports.tips).font(.subheadline.weight(.medium)).foregroundStyle(Theme.muted)
+                Text(workspace.money(report.totals.reduce(0) { $0 + $1.amount }))
+                    .font(.system(.title, design: .rounded).weight(.bold)).monospacedDigit().foregroundStyle(Theme.brand)
+            }
+            .card(padding: 14)
+            VStack(spacing: 0) {
+                ForEach(Array(report.totals.enumerated()), id: \.offset) { index, total in
+                    if index > 0 { Divider() }
+                    InfoRow(label: "\(total.name.isEmpty ? L.Reports.noProfessional : total.name) · \(total.count)", value: workspace.money(total.amount))
+                }
+            }
+            .card(padding: 14)
+            VStack(spacing: 0) {
+                ForEach(Array(report.tips.enumerated()), id: \.element.id) { index, tip in
+                    if index > 0 { Divider() }
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(tip.resourceName ?? "—").font(.subheadline.weight(.medium)).foregroundStyle(Theme.ink)
+                            Text([Fmt.dayMedium(workspace.clock.localDate(of: tip.createdAt)), tip.sale.map { L.Checkout.paidIn($0.number) }, tip.customer]
+                                .compactMap { $0 }.joined(separator: " · "))
+                                .font(.caption).foregroundStyle(Theme.muted)
+                        }
+                        Spacer()
+                        Text(workspace.money(tip.amount)).font(.subheadline.weight(.semibold)).monospacedDigit()
+                    }
+                    .padding(.vertical, 8)
+                }
+            }
+            .card(padding: 14)
+        }
+    }
+
     private func originName(_ key: String) -> String {
         switch key {
         case "online": return L.Reports.originOnline
@@ -233,7 +304,7 @@ struct ReportsView: View {
         if loading && commissions.isEmpty {
             CardsSkeleton(count: 2)
         } else if commissions.isEmpty {
-            EmptyState(symbol: "person.2", title: L.Reports.nothing).card()
+            EmptyState(symbol: "person.2", title: L.Reports.noProfessionals).card()
         } else {
             let total = commissions.reduce(0) { $0 + $1.total }
             StatTile(label: L.Reports.toPay, value: workspace.money(total), symbol: "banknote")
@@ -246,9 +317,9 @@ struct ReportsView: View {
                         Text(workspace.money(person.total)).font(.headline).monospacedDigit()
                     }
                     Divider()
-                    commissionRow("\(L.Professionals.serviceCommission) (\(person.servicesCount))", person.serviceCommission,
+                    commissionRow(L.Reports.servicesCount(person.servicesCount), person.serviceCommission,
                                   rate: person.serviceRate, base: person.services)
-                    commissionRow("\(L.Professionals.productCommission) (\(person.productsCount))", person.productCommission,
+                    commissionRow(L.Reports.productsCount(person.productsCount), person.productCommission,
                                   rate: person.productRate, base: person.products)
                     InfoRow(label: L.Reports.tips, value: workspace.money(person.tips))
                 }
@@ -261,10 +332,8 @@ struct ReportsView: View {
         HStack(alignment: .firstTextBaseline) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(label).font(.subheadline).foregroundStyle(Theme.muted)
-                if let rate {
-                    Text(L.Reports.rateOf(rate.formatted(.number.precision(.fractionLength(0...1))), workspace.money(base)))
-                        .font(.caption).foregroundStyle(Theme.subtle)
-                }
+                Text(L.Reports.rateOf((rate ?? 0).formatted(.number.precision(.fractionLength(0...1))), workspace.money(base)))
+                    .font(.caption).foregroundStyle(Theme.subtle)
             }
             Spacer()
             Text(workspace.money(amount)).font(.subheadline.weight(.medium)).monospacedDigit()
@@ -280,15 +349,52 @@ struct ReportsView: View {
         defer { loading = false }
         do {
             async let s = workspace.api.reportSummary(workspace.id, from: from, to: to)
+            async let t = workspace.api.reportTips(workspace.id, from: from, to: to)
             async let c = workspace.api.reportCommissions(workspace.id, from: from, to: to)
-            let (foundSummary, foundCommissions) = try await (s, c)
+            let (foundSummary, foundTips, foundCommissions) = try await (s, t, c)
             summary = foundSummary
+            tips = foundTips
             commissions = foundCommissions
             error = nil
         } catch is CancellationError {
         } catch {
             self.error = error
         }
+    }
+}
+
+/// A key number with its change against the period before.
+private struct KpiTile: View {
+    let label: String
+    let value: String
+    /// "+12 %", "−5 %", "+3 pts"; nil when there is nothing to compare.
+    let change: String?
+    let up: Bool?
+    let before: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(label).font(.caption.weight(.medium)).foregroundStyle(Theme.muted).lineLimit(1)
+            Text(value)
+                .font(.title3.weight(.bold))
+                .fontDesign(.rounded)
+                .foregroundStyle(Theme.ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+            if let change, let before {
+                HStack(spacing: 4) {
+                    Image(systemName: up == false ? "arrow.down.right" : "arrow.up.right").font(.caption2.weight(.bold))
+                    Text(change).font(.caption.weight(.semibold)).monospacedDigit()
+                }
+                .foregroundStyle(up == false ? Theme.danger : Theme.success)
+                Text(L.Reports.vs(before)).font(.caption).foregroundStyle(Theme.subtle).lineLimit(1).minimumScaleFactor(0.8)
+            } else {
+                Text(L.Reports.noComparison).font(.caption).foregroundStyle(Theme.subtle).lineLimit(1)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .card(padding: 14)
+        .accessibilityElement(children: .combine)
     }
 }
 

@@ -50,22 +50,27 @@ final class AgendaModel {
 
     /// Days of the loaded week with something booked (after the filters).
     func busyDays(clock: BusinessClock) -> Set<LocalDate> {
-        let list = AgendaRules.apply(filter, to: weeks[weekStart] ?? []).filter { $0.status != .cancelled }
-        return Set(list.map { clock.localDate(of: $0.startsAt) })
+        AgendaRules.busyDays(weeks[weekStart] ?? [], filter: filter, clock: clock)
     }
 
-    var isFiltered: Bool { !filter.professionalIds.isEmpty || filter.locationId != nil }
+    func clearFilters() {
+        filter.professionalIds = []
+        filter.locationId = nil
+        filter.showCancelled = false
+    }
 }
 
 struct AgendaView: View {
     @Environment(AppModel.self) private var app
     @Environment(Workspace.self) private var workspace
     @Environment(ToastCenter.self) private var toasts
+    @Environment(\.scenePhase) private var scenePhase
     @State private var model: AgendaModel?
     @State private var picking = false
     @State private var filtering = false
     @State private var booking = false
     @State private var cancelling: Appointment?
+    @State private var markingNoShow: Appointment?
     @State private var charging: Appointment?
     @State private var rescheduling: Appointment?
     @State private var now = Date()
@@ -92,21 +97,25 @@ struct AgendaView: View {
         let today = clock.today(now: now)
         let day = model.selected
         let items = model.visible(on: day, clock: clock)
+        let segments = AgendaRules.segments(items, clock: clock)
+        let line = day == today ? AgendaRules.nowLine(segments, now: now) : nil
         List {
-            DayHeader(day: day, today: today, items: items, showMoney: workspace.isAdmin)
+            DayHeader(day: day, today: today, items: items, now: now, showMoney: workspace.isAdmin)
                 .plainRow(top: 4, bottom: 4)
             if model.isLoading {
                 CardsSkeleton(count: 3).plainRow()
             } else if let error = model.error, model.all(on: day, clock: clock).isEmpty {
-                ErrorState(message: ErrorText.message(error)) { Task { await model.load(workspace, force: true) } }
+                ErrorState(message: ErrorText.message(error, fallback: L.Agenda.loadFailed)) { Task { await model.load(workspace, force: true) } }
                     .plainRow()
             } else if items.isEmpty {
                 emptyState(model, today: today)
                     .plainRow()
             } else {
-                ForEach(AgendaRules.segments(items, clock: clock), id: \.segment) { group in
+                if line == .top { NowLine(time: clock.time(of: now)).plainRow(top: 6, bottom: 0) }
+                ForEach(segments, id: \.segment) { group in
                     // Plain rows rather than sticky section headers, which would float over the cards.
-                    SegmentHeader(segment: group.segment, count: group.items.count)
+                    // Counted like the day's summary: no-shows and cancelled ones are listed, not counted.
+                    SegmentHeader(segment: group.segment, count: AgendaRules.count(group.items))
                         .plainRow(top: 10, bottom: 2)
                     ForEach(group.items) { appointment in
                         AppointmentCard(appointment: appointment, now: now)
@@ -118,6 +127,9 @@ struct AgendaView: View {
                             .swipeActions(edge: .leading, allowsFullSwipe: true) { leadingActions(appointment) }
                             .swipeActions(edge: .trailing, allowsFullSwipe: false) { trailingActions(appointment) }
                             .contextMenu { menu(appointment) }
+                        if line == .after(appointment.id) {
+                            NowLine(time: clock.time(of: now)).plainRow(top: 2, bottom: 2)
+                        }
                     }
                 }
             }
@@ -126,15 +138,18 @@ struct AgendaView: View {
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .safeAreaInset(edge: .top, spacing: 0) { header(model, today: today) }
-        .overlay(alignment: .bottomTrailing) { fab }
+        .overlay(alignment: .bottomTrailing) { fab(model, today: today) }
         .refreshable {
             await workspace.loadCatalog(force: true)
             await model.load(workspace, force: true)
             await workspace.refreshNotifications()
         }
+        // The tab says "Agenda"; the bar carries the business instead. The title
+        // stays for the back button of the screens pushed from here.
         .navigationTitle(L.Agenda.title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .principal) { Color.clear.frame(width: 1, height: 1).accessibilityHidden(true) }
             ToolbarItem(placement: .topBarLeading) { BusinessSwitcherButton() }
             ToolbarItemGroup(placement: .topBarTrailing) {
                 if model.selected != today {
@@ -155,7 +170,7 @@ struct AgendaView: View {
                     Button {
                         filtering = true
                     } label: {
-                        Image(systemName: model.isFiltered || model.filter.showCancelled ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                        Image(systemName: model.filter.active ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
                     }
                     .accessibilityLabel(L.Agenda.filters)
                 }
@@ -181,6 +196,17 @@ struct AgendaView: View {
                 now = Date()
             }
         }
+        .onChange(of: model.filter.locationId) { _, id in workspace.agendaLocation = id }
+        .onChange(of: workspace.agendaDay) { _, day in
+            guard let day else { return }
+            withAnimation(.snappy) { model.selected = day }
+            workspace.agendaDay = nil
+        }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            now = Date()
+            Task { await model.load(workspace, force: true) }
+        }
         .sheet(isPresented: $picking) { DatePickerSheet(selected: Binding(get: { model.selected }, set: { model.selected = $0 }), clock: workspace.clock) }
         .sheet(isPresented: $filtering) { AgendaFilterSheet(filter: Binding(get: { model.filter }, set: { model.filter = $0 })) }
         .sheet(isPresented: $booking) {
@@ -189,12 +215,22 @@ struct AgendaView: View {
             }
         }
         .sheet(item: $charging) { CheckoutView(appointment: $0) }
-        .sheet(item: $rescheduling) { RescheduleView(appointment: $0) }
-        .confirmationDialog(L.Appointment.cancelTitle, isPresented: Binding(get: { cancelling != nil }, set: { if !$0 { cancelling = nil } }), titleVisibility: .visible, presenting: cancelling) { appointment in
+        .sheet(item: $rescheduling) { appointment in
+            RescheduleView(appointment: appointment) { startsAt in
+                withAnimation(.snappy) { model.selected = workspace.clock.localDate(of: startsAt) }
+            }
+        }
+        .alert(L.Appointment.cancelTitle, isPresented: Binding(get: { cancelling != nil }, set: { if !$0 { cancelling = nil } }), presenting: cancelling) { appointment in
             Button(L.Appointment.cancel, role: .destructive) { Task { await cancel(appointment) } }
             Button(L.Appointment.keep, role: .cancel) {}
         } message: { _ in
             Text(L.Appointment.cancelBody)
+        }
+        .alert(L.Appointment.noShowTitle, isPresented: Binding(get: { markingNoShow != nil }, set: { if !$0 { markingNoShow = nil } }), presenting: markingNoShow) { appointment in
+            Button(L.Appointment.markNoShow, role: .destructive) { Task { await markNoShow(appointment) } }
+            Button(L.Common.goBack, role: .cancel) {}
+        } message: { _ in
+            Text(L.Appointment.noShowBody)
         }
     }
 
@@ -204,14 +240,11 @@ struct AgendaView: View {
         VStack(spacing: 10) {
             WeekStrip(selected: Binding(get: { model.selected }, set: { model.selected = $0 }),
                       today: today, busy: model.busyDays(clock: workspace.clock))
-            if model.isFiltered {
+            if model.filter.active {
                 ActiveFilters(filter: model.filter) {
                     filtering = true
                 } clear: {
-                    withAnimation(.snappy) {
-                        model.filter.professionalIds = []
-                        model.filter.locationId = nil
-                    }
+                    withAnimation(.snappy) { model.clearFilters() }
                 }
                 .transition(.opacity)
             }
@@ -226,14 +259,13 @@ struct AgendaView: View {
 
     private func emptyState(_ model: AgendaModel, today: LocalDate) -> some View {
         Group {
-            if model.isFiltered && !model.all(on: model.selected, clock: workspace.clock).isEmpty {
+            if AgendaRules.hiddenByFilters(model.filter, all: model.all(on: model.selected, clock: workspace.clock)) {
                 EmptyState(symbol: "line.3.horizontal.decrease.circle", title: L.Agenda.emptyFiltered,
                            actionTitle: L.Agenda.clearFilters) {
-                    model.filter.professionalIds = []
-                    model.filter.locationId = nil
+                    withAnimation(.snappy) { model.clearFilters() }
                 }
             } else {
-                EmptyState(symbol: "sun.max", title: L.Agenda.emptyTitle, message: L.Agenda.emptyBody,
+                EmptyState(symbol: "sun.max", title: L.Agenda.emptyTitle,
                            actionTitle: model.selected >= today ? L.Agenda.newAppointment : nil) { booking = true }
             }
         }
@@ -241,7 +273,7 @@ struct AgendaView: View {
         .padding(.top, 8)
     }
 
-    private var fab: some View {
+    private func fab(_ model: AgendaModel, today: LocalDate) -> some View {
         Button {
             Haptics.tap()
             booking = true
@@ -261,6 +293,11 @@ struct AgendaView: View {
 
     // MARK: Row actions
 
+    private func chargeLabel(_ appointment: Appointment) -> String {
+        AppointmentRules.chargeAmount(appointment).map { L.Checkout.chargeAmount(workspace.money($0)) } ?? L.Checkout.charge
+    }
+
+    /// Swipe accelerators: the same actions as the long-press menu.
     @ViewBuilder
     private func leadingActions(_ appointment: Appointment) -> some View {
         let actions = AppointmentRules.actions(for: appointment, isAdmin: workspace.isAdmin)
@@ -295,16 +332,26 @@ struct AgendaView: View {
         }
     }
 
+    /// «Cobrar $ X» / «Cerrar venta» / «Ver venta», «Editar cita», «Llamar»,
+    /// «WhatsApp», «Marcar «No asistió»», «Cancelar cita».
     @ViewBuilder
     private func menu(_ appointment: Appointment) -> some View {
-        let actions = AppointmentRules.actions(for: appointment, isAdmin: workspace.isAdmin)
-        if actions.contains(.charge) || actions.contains(.closeSale) {
-            Button { charging = appointment } label: {
-                Label(actions.contains(.closeSale) ? L.Checkout.closeSale : L.Checkout.charge, systemImage: "banknote")
+        let parts = AppointmentRules.menu(AppointmentRules.actions(for: appointment, isAdmin: workspace.isAdmin))
+        ForEach(parts.before, id: \.self) { action in
+            switch action {
+            case .charge:
+                Button { charging = appointment } label: { Label(chargeLabel(appointment), systemImage: "banknote") }
+            case .closeSale:
+                Button { charging = appointment } label: { Label(L.Checkout.closeSale, systemImage: "banknote") }
+            case .viewSale:
+                Button {
+                    if let sale = appointment.sale { workspace.agendaPath.append(.saleId(sale.id)) }
+                } label: { Label(L.Checkout.viewSale, systemImage: "doc.text") }
+            case .reschedule:
+                Button { rescheduling = appointment } label: { Label(L.Appointment.reschedule, systemImage: "calendar.badge.clock") }
+            default:
+                EmptyView()
             }
-        }
-        if actions.contains(.reschedule) {
-            Button { rescheduling = appointment } label: { Label(L.Appointment.reschedule, systemImage: "calendar.badge.clock") }
         }
         if let url = Phone.callURL(appointment.customer.phone) {
             Link(destination: url) { Label(L.Common.call, systemImage: "phone") }
@@ -312,8 +359,12 @@ struct AgendaView: View {
         if let url = Phone.whatsAppURL(appointment.customer.phone) {
             Link(destination: url) { Label(L.Common.whatsapp, systemImage: "message") }
         }
-        if actions.contains(.cancel) {
-            Button(role: .destructive) { cancelling = appointment } label: { Label(L.Appointment.cancel, systemImage: "xmark.circle") }
+        ForEach(parts.after, id: \.self) { action in
+            if action == .markNoShow {
+                Button { markingNoShow = appointment } label: { Label(L.Appointment.markNoShow, systemImage: "person.fill.xmark") }
+            } else {
+                Button(role: .destructive) { cancelling = appointment } label: { Label(L.Appointment.cancel, systemImage: "xmark.circle") }
+            }
         }
     }
 
@@ -321,6 +372,16 @@ struct AgendaView: View {
         do {
             _ = try await workspace.api.cancel(workspace.id, appointment.id)
             toasts.show(L.Appointment.cancelled)
+            workspace.changed()
+        } catch {
+            toasts.error(error)
+        }
+    }
+
+    private func markNoShow(_ appointment: Appointment) async {
+        do {
+            _ = try await workspace.api.markNoShow(workspace.id, appointment.id)
+            toasts.show(L.Appointment.noShowMarked)
             workspace.changed()
         } catch {
             toasts.error(error)
@@ -339,28 +400,34 @@ extension View {
     }
 }
 
-/// The picked day in words, with its count and expected takings.
+/// The picked day in words, with its count, expected takings and what is left to charge.
 private struct DayHeader: View {
     let day: LocalDate
     let today: LocalDate
     let items: [Appointment]
+    let now: Date
     let showMoney: Bool
     @Environment(Workspace.self) private var workspace
 
     var body: some View {
-        let active = items.filter { $0.status != .cancelled }
-        VStack(alignment: .leading, spacing: 4) {
+        let expected = AgendaRules.expected(items)
+        let toCharge = AgendaRules.toCharge(items, now: now)
+        VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
-                Text(Fmt.dayLong(day))
+                Text(Fmt.dayLong(day, thisYear: today.year))
                     .font(.title2.weight(.bold))
                     .foregroundStyle(Theme.ink)
-                if day == today { Chip(text: L.Common.today, tone: .brand) }
+                if let relative = Fmt.relativeName(day, today: today) { Chip(text: relative, tone: .brand) }
             }
             HStack(spacing: 6) {
-                Text(L.Agenda.count(active.count))
-                if showMoney, AgendaRules.expected(active) > 0 {
+                Text(L.Agenda.count(AgendaRules.count(items)))
+                if showMoney, expected > 0 {
                     Text("·")
-                    Text("\(workspace.money(AgendaRules.expected(active))) \(L.Agenda.expected)")
+                    Text(L.Agenda.expected(workspace.money(expected)))
+                }
+                if showMoney, toCharge > 0 {
+                    Chip(text: L.Agenda.toCharge(toCharge), tone: .warning)
+                        .padding(.leading, 2)
                 }
             }
             .font(.subheadline)
@@ -379,21 +446,13 @@ private struct SegmentHeader: View {
     var body: some View {
         HStack(spacing: 6) {
             Image(systemName: symbol).font(.caption.weight(.bold)).foregroundStyle(Theme.brand)
-            Text(title).font(.footnote.weight(.semibold)).foregroundStyle(Theme.muted).textCase(.uppercase).tracking(0.4)
-            Text("\(count)").font(.footnote.weight(.semibold)).foregroundStyle(Theme.subtle)
+            Text(count > 0 ? "\(L.Agenda.segment(segment)) · \(count)" : L.Agenda.segment(segment))
+                .font(.footnote.weight(.semibold)).foregroundStyle(Theme.muted).textCase(.uppercase).tracking(0.4)
             Spacer()
         }
         .padding(.horizontal, 4)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isHeader)
-    }
-
-    private var title: String {
-        switch segment {
-        case .morning: return L.Agenda.morning
-        case .afternoon: return L.Agenda.afternoon
-        case .evening: return L.Agenda.evening
-        }
     }
 
     private var symbol: String {
@@ -402,6 +461,27 @@ private struct SegmentHeader: View {
         case .afternoon: return "sun.max.fill"
         case .evening: return "moon.stars.fill"
         }
+    }
+}
+
+/// The red line at the current time, with the time in a pill.
+private struct NowLine: View {
+    let time: String
+
+    var body: some View {
+        HStack(spacing: 0) {
+            Text(time)
+                .font(.caption2.weight(.bold))
+                .monospacedDigit()
+                .foregroundStyle(.white)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 3)
+                .background(Theme.danger, in: Capsule())
+            Rectangle().fill(Theme.danger).frame(height: 1.5)
+        }
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(L.Agenda.now), \(time)")
     }
 }
 
@@ -421,9 +501,9 @@ struct WeekStrip: View {
                 Spacer()
                 HStack(spacing: 18) {
                     Button { move(-7) } label: { Image(systemName: "chevron.left") }
-                        .accessibilityLabel(L.Common.previous)
+                        .accessibilityLabel(L.Agenda.previousWeek)
                     Button { move(7) } label: { Image(systemName: "chevron.right") }
-                        .accessibilityLabel(L.Common.next)
+                        .accessibilityLabel(L.Agenda.nextWeek)
                 }
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(Theme.brand)
@@ -462,7 +542,7 @@ private struct DayPill: View {
 
     var body: some View {
         VStack(spacing: 4) {
-            Text(Fmt.weekdayShort(day).prefix(3).uppercased())
+            Text(Fmt.weekdayShort(day))
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(selected ? Theme.onBrand.opacity(0.85) : Theme.muted)
             Text("\(day.day)")
@@ -539,6 +619,7 @@ private struct ActiveFilters: View {
             parts.append(people.count == 1 ? first.name : "\(first.name) +\(people.count - 1)")
         }
         if let location = workspace.location(filter.locationId) { parts.append(location.name) }
+        if filter.showCancelled { parts.append(L.Agenda.withCancelled) }
         return parts.joined(separator: " · ")
     }
 }

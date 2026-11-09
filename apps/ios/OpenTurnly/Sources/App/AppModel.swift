@@ -215,6 +215,10 @@ final class Workspace {
     /// The tab showing, and the agenda's screens, so a notification can lead somewhere.
     var tab: MainTabView.Tab = .agenda
     var agendaPath: [Route] = []
+    /// A day the agenda should show next (after booking or moving an appointment).
+    var agendaDay: LocalDate?
+    /// The agenda's location filter, the first choice of a new booking.
+    var agendaLocation: String?
     /// Unread notifications in this business, for the bell.
     var unread = 0
     /// False against a server without notifications: the bell hides.
@@ -226,6 +230,7 @@ final class Workspace {
         self.toasts = toasts
         self.push = push
         api = OpenTurnlyAPI(server: session.server, token: session.token)
+        ErrorText.timeZone = business.clock.timeZone
     }
 
     var id: String { business.id }
@@ -320,7 +325,7 @@ final class Workspace {
     func openAppointment(_ id: String, near startsAt: Date?, onTop: Bool) async {
         do {
             guard let startsAt, let found = try await reloadAppointment(id, near: startsAt) else {
-                toasts.show(L.Appointment.gone, error: true)
+                toasts.show(L.Appointment.notFound, error: true)
                 return
             }
             tab = .agenda

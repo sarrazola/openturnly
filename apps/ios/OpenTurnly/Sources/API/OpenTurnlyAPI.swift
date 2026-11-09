@@ -224,6 +224,10 @@ struct OpenTurnlyAPI: Sendable {
         try await get(b(business) + "/reports/summary", [("from", from.string), ("to", to.string)])
     }
 
+    func reportTips(_ business: String, from: LocalDate, to: LocalDate) async throws -> TipsReport {
+        try await get(b(business) + "/reports/tips", [("from", from.string), ("to", to.string)])
+    }
+
     func reportCommissions(_ business: String, from: LocalDate, to: LocalDate) async throws -> [ReportCommission] {
         try await (get(b(business) + "/reports/commissions", [("from", from.string), ("to", to.string)]) as CommissionsResponse).professionals
     }

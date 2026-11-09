@@ -6,14 +6,24 @@ import Foundation
 /// a code per field (`customer.phone: invalid_phone`). Like the web, a message is
 /// looked up as "<field>_<code>" first, then "<code>", then a generic one.
 enum ErrorText {
+    /// The open business's time zone, for the day and time an error mentions.
+    nonisolated(unsafe) static var timeZone: TimeZone = .current
+
     static func message(_ error: Error) -> String {
         guard let error = error as? APIError else { return L.Errors.generic }
         return message(code: error.code, fields: error.fields)
     }
 
+    /// The server's words, or `fallback` when there are none more specific than "something went wrong".
+    static func message(_ error: Error, fallback: String) -> String {
+        let text = message(error)
+        return text == L.Errors.generic ? fallback : text
+    }
+
     static func message(code: String, fields: [String: String]) -> String {
         if code == "already_booked", let date = fields["startsAt"].flatMap(APIClient.parseInstant) {
-            return L.Booking.alreadyBooked(Fmt.dayShort(LocalDate(noonUTC: date)), fields["code"] ?? "")
+            let clock = BusinessClock(timeZone: timeZone)
+            return L.Booking.alreadyBooked(Fmt.dayMedium(clock.localDate(of: date)), clock.time(of: date), fields["code"] ?? "")
         }
         if code == "network" { return L.Errors.network }
         // Field errors carry the specific reason.
@@ -42,11 +52,11 @@ enum ErrorText {
         switch key {
         case "unauthorized": return L.SignIn.sessionEnded
         case "invalid_credentials", "invalid_email_or_password": return L.SignIn.invalidCredentials
-        case "too_many_attempts": return tr("Too many tries with a wrong password. Wait 15 minutes.", "Demasiados intentos con una contraseña equivocada. Espera 15 minutos.")
+        case "too_many_attempts": return tr("Too many attempts with a wrong password. Wait 15 minutes.", "Demasiados intentos con una contraseña equivocada. Espera 15 minutos.")
         case "forbidden": return tr("You don't have permission to do this.", "No tienes permiso para hacer esto.")
         case "forbidden_origin": return tr("This can only be done from the web panel.", "Esto solo se puede hacer desde el panel web.")
         case "no_profile": return tr("Your user has no staff profile. Ask the admin to link one.", "Tu usuario no tiene un perfil de profesional. Pídele al administrador que lo vincule.")
-        case "not_found": return tr("We couldn't find that.", "No encontramos eso.")
+        case "not_found": return tr("We couldn't find that.", "No encontramos lo que buscabas.")
         case "business_not_found": return tr("We couldn't find this business.", "No encontramos este negocio.")
         case "appointment_not_found": return tr("We couldn't find this appointment.", "No encontramos esta cita.")
         case "customer_not_found": return tr("That customer no longer exists.", "Ese cliente ya no existe.")
@@ -63,11 +73,12 @@ enum ErrorText {
         case "appointment_no_show": return tr("This appointment was marked as a no-show.", "Esta cita quedó como «No asistió».")
         case "appointment_unpaid": return tr("This appointment is waiting for the customer's payment.", "Esta cita está esperando el pago del cliente.")
         case "appointment_paid": return tr("This appointment was already charged.", "Esta cita ya se cobró.")
-        case "appointment_not_started": return tr("The appointment hasn't started yet: mark it once the time comes.", "La cita todavía no empieza: márcala cuando pase la hora.")
-        case "customer_exists", "phone_customer_exists": return tr("You already have a customer with that phone.", "Ya tienes un cliente con ese celular.")
+        case "appointment_not_started": return tr("The appointment hasn't started yet: mark it once its time has passed.", "La cita todavía no empieza: márcala cuando pase la hora.")
+        case "customer_exists": return tr("You already have a customer with that mobile or email.", "Ya tienes un cliente con ese celular o email.")
+        case "phone_customer_exists": return tr("You already have a customer with that mobile.", "Ya tienes un cliente con ese celular.")
         case "email_customer_exists": return tr("You already have a customer with that email.", "Ya tienes un cliente con ese email.")
         case "payments_mismatch": return L.Checkout.paymentsMismatch
-        case "payments_deposit_amount": return tr("A deposit has to be used in full.", "Un abono se usa completo.")
+        case "payments_deposit_amount", "deposit_amount": return tr("A deposit is used whole: it can't be split.", "Un abono se usa completo: no se puede partir.")
         case "deposit_unavailable": return tr("That deposit isn't available any more.", "Ese abono ya no está disponible.")
         case "deposit_used": return tr("That deposit was used in a sale. Void the sale first.", "Ese abono ya se usó en una venta. Anula la venta primero.")
         case "gift_card_unusable": return tr("That code can't be used right now.", "Ese código no se puede usar ahora.")
@@ -85,7 +96,7 @@ enum ErrorText {
         case "hours_end_before_start": return L.Hours.endBeforeStart
         case "not_at_location": return tr("That staff member doesn't work at that location.", "Ese profesional no atiende en ese local.")
         case "cash_unchanged": return tr("The counted cash matches the drawer: nothing to adjust.", "El efectivo contado es igual al que hay en caja: no hay nada que rectificar.")
-        case "invalid_phone", "phone_invalid_phone", "phone_invalid_format": return tr("Enter a valid phone number, with its country code.", "Escribe un número de celular válido, con su código de país.")
+        case "invalid_phone", "phone_invalid_phone", "phone_invalid_format": return tr("Write a valid mobile number.", "Escribe un número de celular válido.")
         case "contact_required", "phone_contact_required", "email_contact_required": return L.Booking.contactHint
         case "email_invalid_format": return tr("Enter a valid email.", "Escribe un email válido.")
         case "password_too_small", "newPassword_too_small": return tr("Use at least 10 characters.", "Usa al menos 10 caracteres.")
@@ -101,7 +112,18 @@ enum ErrorText {
         case "invalid_format": return tr("The format is not valid.", "El formato no es válido.")
         case "invalid_type": return tr("This field is required.", "Este campo es obligatorio.")
         case "invalid_value": return tr("Choose a valid option.", "Elige una opción válida.")
-        case "internal_error": return tr("Something went wrong on the server. Please try again.", "Algo salió mal en el servidor. Inténtalo de nuevo.")
+        case "internal_error": return tr("Something went wrong on the server. Try again.", "Algo salió mal en el servidor. Inténtalo de nuevo.")
+        case "invalid_server": return tr("That address isn't valid.", "Esa dirección no es válida.")
+        case "product_not_found": return tr("We couldn't find that product.", "No encontramos ese producto.")
+        case "stock_unchanged": return tr("The count equals the current stock: nothing to adjust.", "El conteo es igual al stock actual: no hay nada que ajustar.")
+        case "validation_failed": return tr("Check the highlighted details.", "Revisa los datos marcados.")
+        case "invalid_json": return L.Errors.generic
+        case "invitation_invalid": return tr("The invitation expired or was already used.", "La invitación venció o ya se usó.")
+        case "closure_exists": return tr("Those dates already have a closure.", "Esas fechas ya tienen un cierre.")
+        case "slug_locked": return tr("A business's link can't be changed.", "El enlace de un negocio no se puede cambiar.")
+        case "image_invalid": return tr("The file isn't a valid image. Use JPG, PNG or WebP.", "El archivo no es una imagen válida. Usa JPG, PNG o WebP.")
+        case "image_too_large": return tr("The image is too large.", "La imagen es demasiado grande.")
+        case "commissionValue_too_big": return tr("It can't be more than 100 %.", "No puede pasar de 100 %.")
         case "unknown_error": return L.Errors.generic
         case "network": return L.Errors.network
         default: return nil

@@ -48,18 +48,19 @@ final class APITests: XCTestCase {
 
     func testErrorMessagesPreferTheField() {
         let phone = APIError(status: 400, code: "validation_failed", fields: ["customer.phone": "invalid_phone"])
-        XCTAssertEqual(ErrorText.message(phone), "Escribe un número de celular válido, con su código de país.")
-        XCTAssertEqual(ErrorText.field(phone, "phone"), "Escribe un número de celular válido, con su código de país.")
+        XCTAssertEqual(ErrorText.message(phone), "Escribe un número de celular válido.")
+        XCTAssertEqual(ErrorText.field(phone, "phone"), "Escribe un número de celular válido.")
         XCTAssertEqual(ErrorText.message(APIError(status: 409, code: "slot_taken")),
-                       "Ese horario se acaba de ocupar. Elige otro horario u otra persona que esté libre.")
+                       "Alguien acaba de tomar ese horario. Elige otro.")
         XCTAssertEqual(ErrorText.message(APIError(status: 400, code: "payments_mismatch")), "Lo pagado no cuadra con el total.")
         XCTAssertEqual(ErrorText.message(APIError(status: 418, code: "brand_new_code")), "Algo salió mal. Inténtalo de nuevo.")
-        XCTAssertEqual(ErrorText.message(APIError.network), "No hay conexión con el servidor. Revisa tu conexión.")
+        XCTAssertEqual(ErrorText.message(APIError.network), "No hay conexión con el servidor. Revisa tu internet.")
     }
 
     func testAlreadyBookedNamesTheOtherAppointment() {
         let error = APIError(status: 409, code: "already_booked", fields: ["code": "K7Q4XM", "startsAt": "2026-11-10T14:00:00.000Z"])
-        XCTAssertTrue(ErrorText.message(error).contains("K7Q4XM"))
+        ErrorText.timeZone = TimeZone(identifier: "America/Bogota")!
+        XCTAssertEqual(ErrorText.message(error), "Ese cliente ya tiene una cita el Mar 10 nov a las 09:00 (código K7Q4XM).")
     }
 
     func testEnglishCopy() {

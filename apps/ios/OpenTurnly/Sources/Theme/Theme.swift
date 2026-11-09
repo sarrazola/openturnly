@@ -67,7 +67,7 @@ enum Tone {
     static func of(_ status: AppointmentRules.DisplayStatus) -> Tone {
         switch status {
         case .upcoming: return .brand
-        case .confirmed: return .success
+        case .ongoing, .confirmed: return .success
         case .cancelled: return .danger
         case .noShow: return .orange
         case .pendingPayment: return .warning

@@ -99,10 +99,19 @@ final class NotificationTests: XCTestCase {
         let clock = BusinessClock(timeZone: TimeZone(identifier: "America/Bogota")!)
         let now = Fixtures.date("2026-11-14T15:00:00.000Z")
         XCTAssertEqual(Fmt.ago(now.addingTimeInterval(-20), now: now, clock: clock), "Ahora")
-        XCTAssertEqual(Fmt.ago(now.addingTimeInterval(-300), now: now, clock: clock), "hace 5 min")
-        XCTAssertTrue(Fmt.ago(now.addingTimeInterval(-7200), now: now, clock: clock).hasPrefix("hace 2"))
-        XCTAssertEqual(Fmt.ago(now.addingTimeInterval(-10 * 86_400), now: now, clock: clock),
-                       Fmt.dayShort(LocalDate(year: 2026, month: 11, day: 4)))
+        XCTAssertEqual(Fmt.ago(now.addingTimeInterval(-300), now: now, clock: clock), "Hace 5 min")
+        XCTAssertEqual(Fmt.ago(now.addingTimeInterval(-7200), now: now, clock: clock), "Hace 2 h")
+        XCTAssertEqual(Fmt.ago(now.addingTimeInterval(-86_400), now: now, clock: clock), "Ayer")
+        XCTAssertEqual(Fmt.ago(now.addingTimeInterval(-3 * 86_400), now: now, clock: clock), "Hace 3 días")
+        XCTAssertEqual(Fmt.ago(now.addingTimeInterval(-10 * 86_400), now: now, clock: clock), "4 nov")
+        AppLocale.override = "en"
+        XCTAssertEqual(Fmt.ago(now.addingTimeInterval(-20), now: now, clock: clock), "Now")
+        XCTAssertEqual(Fmt.ago(now.addingTimeInterval(-300), now: now, clock: clock), "5 min ago")
+        XCTAssertEqual(Fmt.ago(now.addingTimeInterval(-7200), now: now, clock: clock), "2 h ago")
+        XCTAssertEqual(Fmt.ago(now.addingTimeInterval(-86_400), now: now, clock: clock), "Yesterday")
+        XCTAssertEqual(Fmt.ago(now.addingTimeInterval(-3 * 86_400), now: now, clock: clock), "3 days ago")
+        XCTAssertEqual(Fmt.ago(now.addingTimeInterval(-10 * 86_400), now: now, clock: clock), "Nov 4")
+        AppLocale.override = "es"
     }
 
     // MARK: Registration

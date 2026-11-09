@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// The booking link, the numbers, the account; everything else is in the web panel.
+/// The business, the booking link, the numbers, the account; everything else is
+/// in the web panel.
 struct MoreView: View {
     @Environment(AppModel.self) private var model
     @Environment(Workspace.self) private var workspace
@@ -11,27 +12,27 @@ struct MoreView: View {
     var body: some View {
         List {
             Section {
-                Button {
-                    switching = true
-                } label: {
-                    HStack(spacing: 14) {
-                        BusinessLogo(business: workspace.business, server: workspace.server, size: 52)
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(workspace.business.name).font(.headline).foregroundStyle(Theme.ink)
-                            Text("\(L.Business.role(workspace.business.access)) · \(model.session?.user.name ?? "")")
-                                .font(.subheadline).foregroundStyle(Theme.muted)
-                        }
-                        Spacer()
-                        if model.businesses.count > 1 {
-                            Image(systemName: "arrow.left.arrow.right.circle.fill")
-                                .font(.title2)
-                                .foregroundStyle(Theme.brand)
-                                .accessibilityLabel(L.Business.switchBusiness)
+                HStack(spacing: 14) {
+                    BusinessLogo(business: workspace.business, server: workspace.server, size: 52)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(workspace.business.name).font(.headline).foregroundStyle(Theme.ink)
+                        BusinessChips(business: workspace.business)
+                    }
+                }
+                .padding(.vertical, 6)
+                .accessibilityElement(children: .combine)
+                if model.businesses.count > 1 {
+                    Button {
+                        switching = true
+                    } label: {
+                        HStack(spacing: 14) {
+                            IconTile(symbol: "arrow.left.arrow.right", color: Theme.brand)
+                            Text(L.Business.switchBusiness).foregroundStyle(Theme.ink)
+                            Spacer()
+                            Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(Theme.subtle)
                         }
                     }
-                    .padding(.vertical, 6)
                 }
-                .disabled(model.businesses.count < 2)
             }
 
             Section {
@@ -59,7 +60,16 @@ struct MoreView: View {
             }
 
             Section {
-                row(.account, L.More.account, "person.crop.circle.fill", "#52525b")
+                NavigationLink(value: Route.account) {
+                    HStack(spacing: 14) {
+                        IconTile(symbol: "person.crop.circle.fill", color: Color(hex: "#52525b"))
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(L.More.account).foregroundStyle(Theme.ink)
+                            Text([model.session?.user.name, model.session?.user.email].compactMap { $0 }.joined(separator: " · "))
+                                .font(.footnote).foregroundStyle(Theme.muted).lineLimit(1)
+                        }
+                    }
+                }
                 Button(role: .destructive) {
                     confirmingSignOut = true
                 } label: {
@@ -70,17 +80,25 @@ struct MoreView: View {
                         if model.signingOut { ProgressView() }
                     }
                 }
-                .confirmationDialog(L.More.signOutTitle, isPresented: $confirmingSignOut, titleVisibility: .visible) {
-                    Button(L.More.signOut, role: .destructive) { Task { await model.signOut() } }
-                    Button(L.Common.cancel, role: .cancel) {}
-                }
+            } header: {
+                Text(L.More.you)
             } footer: {
-                Text("\(Brand.name) · \(L.More.version(Brand.version))")
-                    .padding(.top, 8)
+                VStack(spacing: 6) {
+                    Text("\(Brand.name) · \(L.More.version(Brand.marketingVersion))")
+                    BrandLinks()
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.top, 12)
             }
         }
         .listStyle(.insetGrouped)
         .navigationTitle(L.More.title)
+        .alert(L.More.signOutTitle, isPresented: $confirmingSignOut) {
+            Button(L.More.signOut, role: .destructive) { Task { await model.signOut() } }
+            Button(L.Common.cancel, role: .cancel) {}
+        } message: {
+            Text(L.More.signOutBody)
+        }
         .sheet(isPresented: $switching) {
             NavigationStack {
                 BusinessPickerList(businesses: model.businesses, current: workspace.business.id) { business in
@@ -90,6 +108,7 @@ struct MoreView: View {
                 .navigationTitle(L.Business.switchBusiness)
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar { ToolbarItem(placement: .cancellationAction) { Button(L.Common.close) { switching = false } } }
+                .refreshable { await model.loadBusinesses() }
             }
             .presentationDetents([.medium, .large])
         }

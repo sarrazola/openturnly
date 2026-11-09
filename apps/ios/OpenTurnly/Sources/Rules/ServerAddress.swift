@@ -45,6 +45,13 @@ enum ServerAddress {
     }
 
     /// The host a person recognises, for "Connected to …".
+    /// The server's own page to recover a password.
+    static func forgotPasswordURL(_ server: String) -> URL? {
+        let base = server.hasSuffix("/") ? String(server.dropLast()) : server
+        guard let url = URL(string: base + "/forgot-password"), let scheme = url.scheme, ["http", "https"].contains(scheme) else { return nil }
+        return url
+    }
+
     static func displayHost(_ server: String) -> String {
         guard let url = URL(string: server), let host = url.host() else { return server }
         if let port = url.port { return "\(host):\(port)" }

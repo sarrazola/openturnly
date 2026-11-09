@@ -44,8 +44,8 @@ one account signs in straight away, several let the person choose. Each
 BRAND_HOSTED_SIGN_IN = yourdomain.com/api/directory/sign-in
 ```
 
-Privacy policy and support links appear on the sign-in and account screens when
-set, in the phone's language with English as the fallback:
+Privacy policy and support links appear on the sign-in screens and at the
+bottom of "More" when set, in the phone's language with English as the fallback:
 
 ```
 BRAND_PRIVACY_POLICY_URL_EN = yourdomain.com/privacy
@@ -53,6 +53,34 @@ BRAND_PRIVACY_POLICY_URL_ES = yourdomain.com/es/privacidad
 BRAND_SUPPORT_URL_EN = yourdomain.com/support
 BRAND_SUPPORT_URL_ES = yourdomain.com/es/ayuda
 ```
+
+"Forgot your password?" on the sign-in screen opens the server's own
+`/forgot-password` page in an in-app browser whenever the app knows the server:
+an address typed by the person, or the server an account name resolves to. A
+build that signs in through `BRAND_HOSTED_SIGN_IN` does not know the server yet,
+so it opens this page instead:
+
+```
+BRAND_PASSWORD_RECOVERY_URL = yourdomain.com/forgot-password
+```
+
+Without either, the button explains that the business's administrator sets
+passwords from the web panel.
+
+## Loading mark
+
+While the app restores the session or opens a business, and in the sign-in
+header while signing in, it shows the brand mark on a tile of the brand colour
+with the app's name under it. The example brand's logo is a clock, and the app
+draws that clock itself and turns its hands:
+
+```
+BRAND_ANIMATED_MARK = YES
+```
+
+A brand with a logo of its own sets `NO` (or leaves the key out): the loader
+then shows `BrandLogoWhite` still, with a gentle pulse. With Reduce Motion on,
+the loader holds still either way.
 
 ## Push notifications
 
@@ -91,8 +119,13 @@ In `OpenTurnly/Assets.xcassets`, replace:
 
 - `AppIcon.appiconset/AppIcon.png`: 1024 x 1024, no transparency.
 - `BrandLogo.imageset`: the mark in colour, with a dark-appearance variant.
-- `BrandLogoWhite.imageset`: the mark in white, shown on the brand colour at sign-in.
+- `BrandLogoWhite.imageset`: the mark in white, shown on the brand colour tile
+  (sign-in header and loader) when `BRAND_ANIMATED_MARK` is `NO`.
 - `LaunchIcon.imageset` and the `LaunchBackground` colour: the launch screen.
+  The image is the loader's tile as the app draws it: 88 pt with 18 pt continuous
+  corners and its shadow, centred on a 136 pt transparent square (136, 272 and
+  408 pixels). The colour is the app's background (`#f4f5f5`, dark `#0a0a0b`),
+  so the launch screen hands over to the loader without a jump.
 - `AccentColor.colorset`: the brand colour for light and dark.
 
 ## Keeping the source untouched

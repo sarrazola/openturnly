@@ -43,8 +43,9 @@ struct RootView: View {
             NoBusinessesView()
         case .pickBusiness:
             NavigationStack {
-                BusinessPickerList(businesses: model.businesses, current: nil) { model.open($0) }
+                BusinessPickerList(businesses: model.businesses, current: nil, subtitle: model.session?.user.email) { model.open($0) }
                     .navigationTitle(L.Business.choose)
+                    .refreshable { await model.loadBusinesses() }
                     .toolbar {
                         ToolbarItem(placement: .topBarTrailing) {
                             Button(L.More.signOut) { Task { await model.signOut() } }
@@ -63,17 +64,15 @@ struct RootView: View {
     }
 }
 
-/// While the saved session is checked: the mark on the brand colour, like the launch screen.
+/// While the saved session is checked and while a business loads: the brand
+/// mark turning on the launch screen's background, centred where the launch
+/// screen drew it.
 struct LaunchView: View {
     var body: some View {
         ZStack {
             Color("LaunchBackground").ignoresSafeArea()
-            VStack(spacing: 28) {
-                Image("LaunchIcon").resizable().scaledToFit().frame(width: 96, height: 96)
-                ProgressView().tint(.white)
-            }
+            ClockLoader()
         }
-        .accessibilityLabel(L.Common.loading)
     }
 }
 
@@ -119,31 +118,50 @@ struct NoBusinessesView: View {
 struct BusinessPickerList: View {
     let businesses: [Business]
     let current: String?
+    /// Under the title when picking after sign-in: who is signed in.
+    var subtitle: String?
     let pick: (Business) -> Void
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        List(businesses) { business in
-            Button {
-                Haptics.selection()
-                pick(business)
-            } label: {
-                HStack(spacing: 14) {
-                    BusinessLogo(business: business, server: model.session?.server ?? "", size: 44)
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(business.name).font(.body.weight(.semibold)).foregroundStyle(Theme.ink)
-                        Text("\(L.Business.role(business.access)) · \(business.timezone.replacingOccurrences(of: "_", with: " "))")
-                            .font(.footnote).foregroundStyle(Theme.muted)
-                    }
-                    Spacer()
-                    if business.id == current {
-                        Image(systemName: "checkmark.circle.fill").font(.title3).foregroundStyle(Theme.brand)
+        List {
+            Section {
+                ForEach(businesses) { business in
+                    Button {
+                        Haptics.selection()
+                        pick(business)
+                    } label: {
+                        HStack(spacing: 14) {
+                            BusinessLogo(business: business, server: model.session?.server ?? "", size: 44)
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text(business.name).font(.body.weight(.semibold)).foregroundStyle(Theme.ink)
+                                BusinessChips(business: business)
+                            }
+                            Spacer()
+                            if business.id == current {
+                                Image(systemName: "checkmark.circle.fill").font(.title3).foregroundStyle(Theme.brand)
+                            }
+                        }
+                        .padding(.vertical, 4)
                     }
                 }
-                .padding(.vertical, 4)
+            } header: {
+                if let subtitle { Text(subtitle).textCase(nil) }
             }
         }
         .listStyle(.insetGrouped)
+    }
+}
+
+/// The role in a business, and «Ejemplo» for a sample one.
+struct BusinessChips: View {
+    let business: Business
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Chip(text: L.Business.role(business.access), tone: .brand)
+            if business.sample == true { Chip(text: L.Business.sample, tone: .neutral) }
+        }
     }
 }
 

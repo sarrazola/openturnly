@@ -53,59 +53,54 @@ struct RescheduleView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: 22) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(appointment.customer.fullName).font(.title3.weight(.bold)).foregroundStyle(Theme.ink)
                         Text(L.Booking.rescheduleHint(appointment.code)).font(.subheadline).foregroundStyle(Theme.muted)
                     }
-                    if places.count > 1 {
-                        FormBlock(title: L.Booking.location) {
+                    currentCard
+                    StepBlock(number: 1, title: L.Booking.service, done: serviceId != nil) {
+                        if places.count > 1 {
                             MenuRow(label: L.Booking.location, symbol: "mappin.and.ellipse",
                                     options: places.map { (value: Optional($0.id), title: $0.name, subtitle: $0.address) },
                                     selection: $locationId)
-                        }
-                    }
-                    FormBlock(title: L.Booking.service) {
-                        MenuRow(label: L.Booking.service, symbol: "scissors",
-                                options: services.map { (value: Optional($0.id), title: $0.name, subtitle: $0.summary(workspace.business)) },
-                                selection: $serviceId, placeholder: L.Booking.pickService)
-                        if workspace.isAdmin && !workspace.professionals.isEmpty {
                             Divider().padding(.vertical, 8)
+                        }
+                        ServiceField(services: services, selection: $serviceId)
+                    }
+                    StepBlock(number: 2, title: L.Booking.professional, done: serviceId != nil) {
+                        if workspace.isAdmin {
                             MenuRow(label: L.Booking.professional, symbol: "person",
                                     options: [(value: String?.none, title: L.Booking.anyFree, subtitle: nil)]
                                         + team.map { (value: Optional($0.id), title: $0.name, subtitle: nil) },
                                     selection: $resourceId)
-                        }
-                    }
-                    VStack(alignment: .leading, spacing: 8) {
-                        SectionTitle(text: L.Booking.date, trailing: Fmt.dayLong(date))
-                        DayScroller(selected: $date, today: clock.today(), clock: clock)
-                    }
-                    FormBlock(title: L.Booking.freeTimes, trailing: "\(times.count)") {
-                        if let error = slots.error, times.isEmpty {
-                            Text(ErrorText.message(error)).font(.subheadline).foregroundStyle(Theme.danger)
                         } else {
-                            SlotGrid(slots: times, selected: $time, current: date == originalDate ? originalTime : nil, loading: slots.loading)
+                            HStack(spacing: 12) {
+                                Image(systemName: "person.fill.checkmark").foregroundStyle(Theme.brand).frame(width: 22)
+                                Text(L.Booking.bookedForYou(workspace.me?.name ?? workspace.session.user.name))
+                                    .font(.subheadline).foregroundStyle(Theme.muted)
+                            }
+                            .padding(.vertical, 4)
                         }
                     }
-                    if let failure {
-                        NoticeBanner(text: ErrorText.message(failure), symbol: "exclamationmark.triangle.fill", tone: .danger)
+                    StepBlock(number: 3, title: L.Booking.date, trailing: Fmt.dayLong(date), done: time != nil) {
+                        VStack(alignment: .leading, spacing: 14) {
+                            DayScroller(selected: $date, today: clock.today(), clock: clock)
+                            Divider()
+                            GroupedSlots(serviceChosen: serviceId != nil, slots: times, selected: $time,
+                                         current: date == originalDate ? originalTime : nil, loading: slots.loading, error: slots.error)
+                        }
                     }
                 }
                 .padding(16)
-                .padding(.bottom, 90)
+                .padding(.bottom, 24)
             }
             .background(Theme.canvas)
-            .safeAreaInset(edge: .bottom) {
-                VStack(spacing: 0) {
-                    Divider()
-                    PrimaryButton(title: L.Common.saveChanges, busy: busy, disabled: serviceId == nil || time == nil) {
-                        Task { await save() }
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                BookingBar(message: failure.map { ErrorText.message($0) }, summary: nil, title: L.Common.saveChanges,
+                           busy: busy, disabled: serviceId == nil || time == nil) {
+                    Task { await save() }
                 }
-                .background(.bar)
             }
             .navigationTitle(L.Appointment.reschedule)
             .navigationBarTitleDisplayMode(.inline)
@@ -120,6 +115,18 @@ struct RescheduleView: View {
             }
         }
         .interactiveDismissDisabled(busy)
+    }
+
+    /// Where the appointment is now: «Lunes, 9 de noviembre · 16:00», «service · professional».
+    private var currentCard: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(L.Booking.currentTime).font(.caption.weight(.semibold)).foregroundStyle(Theme.muted).textCase(.uppercase)
+            Text("\(Fmt.dayLong(originalDate, thisYear: clock.today().year)) · \(originalTime)")
+                .font(.subheadline.weight(.semibold)).foregroundStyle(Theme.ink)
+            Text([appointment.serviceName, appointment.resourceName].compactMap { $0 }.joined(separator: " · "))
+                .font(.footnote).foregroundStyle(Theme.muted)
+        }
+        .card(padding: 14)
     }
 
     private func prepare() async {
@@ -156,6 +163,7 @@ struct RescheduleView: View {
             let row = try await workspace.api.reschedule(workspace.id, appointment.id, body)
             toasts.show(L.Appointment.rescheduled)
             workspace.changed()
+            workspace.agendaDay = clock.localDate(of: row.startsAt)
             onSaved?(row.startsAt)
             dismiss()
         } catch {

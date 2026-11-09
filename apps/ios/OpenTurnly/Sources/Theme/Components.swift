@@ -290,17 +290,18 @@ struct StatTile: View {
     var detail: String?
     var symbol: String?
     var tint: Color = Theme.brand
+    var valueColor: Color = Theme.ink
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
                 if let symbol { Image(systemName: symbol).font(.caption.weight(.bold)).foregroundStyle(tint) }
-                Text(label).font(.caption.weight(.medium)).foregroundStyle(Theme.muted).lineLimit(1)
+                Text(label).font(.caption.weight(.medium)).foregroundStyle(Theme.muted).lineLimit(1).minimumScaleFactor(0.8)
             }
             Text(value)
                 .font(.title3.weight(.bold))
                 .fontDesign(.rounded)
-                .foregroundStyle(Theme.ink)
+                .foregroundStyle(valueColor)
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
             if let detail {

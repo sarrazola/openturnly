@@ -34,7 +34,7 @@ enum L {
         static var active: String { tr("Active", "Activo") }
         static var inactive: String { tr("Inactive", "Inactivo") }
         static var name: String { tr("Name", "Nombre") }
-        static var phone: String { tr("Phone", "Celular") }
+        static var phone: String { tr("Mobile", "Celular") }
         static var address: String { tr("Address", "Dirección") }
         static var description: String { tr("Description", "Descripción") }
         static var notes: String { tr("Notes", "Notas") }
@@ -47,21 +47,23 @@ enum L {
         static var period: String { tr("Period", "Periodo") }
         static var thisWeek: String { tr("This week", "Esta semana") }
         static var thisMonth: String { tr("This month", "Este mes") }
+        static var thisYear: String { tr("This year", "Este año") }
         static var lastMonth: String { tr("Last month", "Mes pasado") }
         static var last30: String { tr("Last 30 days", "Últimos 30 días") }
         static var previous: String { tr("Previous", "Anterior") }
         static var next: String { tr("Next", "Siguiente") }
         static var more: String { tr("More", "Más") }
+        static var goBack: String { tr("Go back", "Volver") }
         static var readOnly: String { tr("Only an administrator can change this.", "Solo un administrador puede cambiar esto.") }
     }
 
     enum SignIn {
-        static var title: String { tr("Welcome back", "Hola de nuevo") }
-        static var subtitle: String { tr("Sign in to manage your business.", "Ingresa para gestionar tu negocio.") }
+        static var title: String { tr("Sign in", "Inicia sesión") }
+        static var subtitle: String { tr("Your calendar, customers and sales, on your phone.", "Tu agenda, tus clientes y tus ventas, en tu celular.") }
         static var serverTitle: String { tr("Connect to your server", "Conéctate a tu servidor") }
         static func serverHint(_ name: String) -> String {
-            tr("The address where your business's \(name) runs: the same one you open in the browser.",
-               "La dirección donde funciona el \(name) de tu negocio: la misma que abres en el navegador.")
+            tr("The address where \(name) runs for your business: the same one you open in the browser.",
+               "La dirección donde funciona \(name) en tu negocio: la misma que abres en el navegador.")
         }
         static var serverLabel: String { tr("Server address", "Dirección del servidor") }
         static var serverPlaceholder: String { tr("bookings.yourbusiness.com", "turnos.tunegocio.com") }
@@ -89,7 +91,7 @@ enum L {
         static var passwordLabel: String { tr("Password", "Contraseña") }
         static var submit: String { tr("Sign in", "Ingresar") }
         static func connectedTo(_ host: String) -> String { tr("Connected to \(host)", "Conectado a \(host)") }
-        static var changeServer: String { tr("Change server", "Cambiar servidor") }
+        static var changeServer: String { tr("Change", "Cambiar") }
         static var invalidCredentials: String { tr("The email or password isn't right.", "El email o la contraseña no son correctos.") }
         static var forgot: String { tr("Forgot your password?", "¿Olvidaste tu contraseña?") }
         static var forgotTitle: String { tr("Your administrator manages access", "El administrador gestiona tu acceso") }
@@ -110,14 +112,15 @@ enum L {
     }
 
     enum Business {
-        static var choose: String { tr("Choose a business", "Selecciona un negocio") }
+        static var choose: String { tr("Choose a business", "Elige un negocio") }
         static var switchBusiness: String { tr("Switch business", "Cambiar de negocio") }
         static var noneTitle: String { tr("No businesses yet", "Aún no tienes negocios") }
         static var noneBody: String {
             tr("Ask an administrator to give you access, or create a business from the web panel.",
                "Pídele a un administrador que te dé acceso, o crea un negocio desde el panel web.")
         }
-        static var admin: String { tr("Admin", "Administrador") }
+        static var admin: String { tr("Administrator", "Administrador") }
+        static var sample: String { tr("Sample", "Ejemplo") }
         static var professional: String { tr("Staff member", "Profesional") }
         static var reconnectTitle: String { tr("Couldn't connect", "No se pudo conectar") }
         static var reconnectBody: String {
@@ -138,32 +141,43 @@ enum L {
 
     enum Agenda {
         static var title: String { tr("Calendar", "Agenda") }
-        static var pickDate: String { tr("Pick a date", "Elegir fecha") }
-        static var everyone: String { tr("All staff", "Todos") }
+        static var pickDate: String { tr("Go to a date", "Ir a una fecha") }
+        static var everyone: String { tr("Everyone", "Todos") }
         static var professional: String { tr("Staff member", "Profesional") }
         static var searchStaff: String { tr("Search staff", "Buscar profesional") }
         static var allLocations: String { tr("All locations", "Todos los locales") }
         static var location: String { tr("Location", "Local") }
         static var showCancelled: String { tr("Show cancelled", "Mostrar canceladas") }
         static var filters: String { tr("Filters", "Filtros") }
-        static var emptyTitle: String { tr("A free day", "Día libre") }
-        static var emptyBody: String { tr("Nothing booked for this day yet.", "No hay citas este día todavía.") }
+        static var emptyTitle: String { tr("No appointments this day", "No hay citas este día") }
         static var emptyFiltered: String { tr("No appointments match these filters.", "Ninguna cita coincide con estos filtros.") }
         static var clearFilters: String { tr("Clear filters", "Quitar filtros") }
-        static var morning: String { tr("Morning", "Mañana") }
-        static var afternoon: String { tr("Afternoon", "Tarde") }
-        static var evening: String { tr("Evening", "Noche") }
+        static var morning: String { tr("Morning", "Por la mañana") }
+        static var afternoon: String { tr("Afternoon", "Por la tarde") }
+        static var evening: String { tr("Evening", "Por la noche") }
+        static func segment(_ segment: AgendaRules.Segment) -> String {
+            switch segment {
+            case .morning: return morning
+            case .afternoon: return afternoon
+            case .evening: return evening
+            }
+        }
         static func count(_ n: Int) -> String { n == 1 ? tr("1 appointment", "1 cita") : tr("\(n) appointments", "\(n) citas") }
         static var now: String { tr("Now", "Ahora") }
         static var newAppointment: String { tr("New appointment", "Nueva cita") }
         static var noProfessional: String { tr("No staff member", "Sin profesional") }
-        static var expected: String { tr("expected", "esperado") }
+        static func expected(_ amount: String) -> String { tr("\(amount) expected", "\(amount) esperado") }
+        static func toCharge(_ n: Int) -> String { tr("\(n) to charge", "\(n) por cobrar") }
+        static var withCancelled: String { tr("With cancelled", "Con canceladas") }
+        static var previousWeek: String { tr("Previous week", "Semana anterior") }
+        static var nextWeek: String { tr("Next week", "Semana siguiente") }
         static var yourAgenda: String { tr("Your appointments", "Tus citas") }
         static var loadFailed: String { tr("Couldn't load the calendar", "No se pudo cargar la agenda") }
     }
 
     enum Status {
         static var upcoming: String { tr("Upcoming", "Próxima") }
+        static var ongoing: String { tr("Now", "Ahora") }
         static var confirmed: String { tr("Confirmed", "Confirmada") }
         static var cancelled: String { tr("Cancelled", "Cancelada") }
         static var noShow: String { tr("No-show", "No asistió") }
@@ -175,6 +189,7 @@ enum L {
         static func label(_ status: AppointmentRules.DisplayStatus) -> String {
             switch status {
             case .upcoming: return upcoming
+            case .ongoing: return ongoing
             case .confirmed: return confirmed
             case .cancelled: return cancelled
             case .noShow: return noShow
@@ -190,12 +205,22 @@ enum L {
         static var professional: String { tr("Staff member", "Profesional") }
         static var when: String { tr("When", "Cuándo") }
         static var price: String { tr("Price", "Precio") }
-        static var priceOnRequest: String { tr("On request", "Consultar") }
-        static func discountCode(_ code: String) -> String { tr("Code \(code)", "Código \(code)") }
+        static var priceOnRequest: String { tr("Price on request", "Precio a consultar") }
+        static func discountCode(_ code: String?) -> String {
+            guard let code, !code.isEmpty else { return tr("Discount", "Descuento") }
+            return tr("Discount · \(code)", "Descuento · \(code)")
+        }
+        static var deposits: String { tr("Deposits", "Abonos") }
         static var bookedVia: String { tr("Booked via", "Agendada por") }
         static var sourceOnline: String { tr("Booking page", "Página de reservas") }
-        static var sourceAdmin: String { tr("Admin panel", "Panel") }
-        static var sourceAgent: String { tr("AI agent", "Agente IA") }
+        static var sourceAdmin: String { tr("Your team", "Tu equipo") }
+        static var sourceAgent: String { tr("AI assistant", "Asistente de IA") }
+        static var bookedOn: String { tr("Booked on", "Reservada el") }
+        static var details: String { tr("Details", "Detalles") }
+        static var customer: String { tr("Customer", "Cliente") }
+        static var noContact: String { tr("No contact details", "Sin datos de contacto") }
+        static var actions: String { tr("Actions", "Acciones") }
+        static var noProfessional: String { tr("No staff member", "Sin profesional") }
         static var answers: String { tr("Booking answers", "Respuestas de la reserva") }
         static var customerNotes: String { tr("Customer notes", "Notas del cliente") }
         static var customerNotesHint: String {
@@ -215,29 +240,42 @@ enum L {
         }
         static var keep: String { tr("Keep it", "No, mantenerla") }
         static var cancelled: String { tr("Appointment cancelled", "Cita cancelada") }
-        static var markNoShow: String { tr("Didn't come", "No asistió") }
-        static var noShowMarked: String { tr("Marked as a no-show", "Marcada como «No asistió»") }
+        static var markNoShow: String { tr("Mark as no-show", "Marcar «No asistió»") }
+        static var noShowTitle: String { tr("Mark as no-show?", "¿Marcar como «No asistió»?") }
+        static var noShowBody: String {
+            tr("The time is freed. You can undo it with \"They came\".", "El horario queda libre. Puedes deshacerlo con «Sí vino».")
+        }
+        static var noShowMarked: String { tr("Marked as no-show", "Marcada como «No asistió»") }
         static var undoNoShow: String { tr("They came", "Sí vino") }
         static var noShowUndone: String { tr("The appointment is confirmed again", "La cita vuelve a estar confirmada") }
         static var viewCustomer: String { tr("View customer", "Ver cliente") }
         static var rescheduled: String { tr("Appointment updated", "Cita actualizada") }
         static var location: String { tr("Location", "Local") }
         static var gone: String { tr("This appointment is no longer in the calendar.", "Esta cita ya no está en la agenda.") }
+        static var notFound: String {
+            tr("We couldn't find that appointment. It may have been moved or cancelled.",
+               "No encontramos esa cita. Puede que la hayan movido o cancelado.")
+        }
     }
 
     enum Checkout {
         static var charge: String { tr("Charge", "Cobrar") }
         static func chargeAmount(_ amount: String) -> String { tr("Charge \(amount)", "Cobrar \(amount)") }
         static var closeSale: String { tr("Close sale", "Cerrar venta") }
-        static var deposit: String { tr("Deposit", "Abono") }
+        static var deposit: String { tr("Record deposit", "Registrar abono") }
         static var viewSale: String { tr("View sale", "Ver venta") }
         static var paid: String { tr("Paid", "Pagada") }
         static func paidIn(_ number: Int) -> String { tr("Sale #\(number)", "Venta #\(number)") }
         static var unpaid: String { tr("Not charged", "Sin cobrar") }
         static func dueLeft(_ amount: String) -> String { tr("\(amount) left to charge", "Faltan \(amount) por cobrar") }
-        static func depositLeft(_ amount: String) -> String { tr("Left a \(amount) deposit", "Abonó \(amount)") }
+        static func deposited(_ amount: String) -> String { tr("Deposit \(amount)", "Abonó \(amount)") }
+        static func left(_ amount: String) -> String { tr("\(amount) left", "Faltan \(amount)") }
+        static var toClose: String { tr("To close", "Por cerrar") }
+        static var coveredHint: String {
+            tr("Deposits cover the price: just close the sale.", "Los abonos cubren el precio: solo falta cerrar la venta.")
+        }
         static var newSale: String { tr("New sale", "Nueva venta") }
-        static func titleAppointment(_ name: String) -> String { tr("Charge \(name)", "Cobrar a \(name)") }
+        static var titleAppointment: String { tr("Charge", "Cobrar") }
         static var customer: String { tr("Customer", "Cliente") }
         static var noCustomer: String { tr("No customer", "Sin cliente") }
         static var pickCustomer: String { tr("Pick a customer", "Elegir cliente") }
@@ -245,7 +283,10 @@ enum L {
         static var addService: String { tr("Add service", "Agregar servicio") }
         static var addProduct: String { tr("Add product", "Agregar producto") }
         static var noLines: String { tr("Add at least one service or product.", "Agrega al menos un servicio o producto.") }
-        static var nobody: String { tr("No staff", "Sin profesional") }
+        static var nobody: String { tr("No staff member", "Sin profesional") }
+        static var location: String { tr("Location", "Local") }
+        static var chooseService: String { tr("Choose a service", "Elige un servicio") }
+        static var chooseProduct: String { tr("Choose a product", "Elige un producto") }
         static var quantity: String { tr("Quantity", "Cantidad") }
         static var unitPrice: String { tr("Price", "Precio") }
         static var tips: String { tr("Tips", "Propinas") }
@@ -263,7 +304,7 @@ enum L {
         static var subtotal: String { "Subtotal" }
         static var discount: String { tr("Discount", "Descuento") }
         static var payments: String { tr("How they paid", "Cómo pagó") }
-        static var addPayment: String { tr("Add payment method", "Agregar medio de pago") }
+        static var split: String { tr("Split payment", "Dividir el pago") }
         static func useDeposit(_ date: String) -> String { tr("Deposit from \(date)", "Abono del \(date)") }
         static var deposits: String { tr("Deposits", "Abonos") }
         static var toCollect: String { tr("To collect now", "Por cobrar ahora") }
@@ -279,7 +320,7 @@ enum L {
         }
         static func cardLeft(_ amount: String) -> String { tr("\(amount) left on it", "Le quedan \(amount)") }
         static var paymentsMismatch: String { tr("What was paid doesn't match the total.", "Lo pagado no cuadra con el total.") }
-        static var depositTitle: String { tr("Record a deposit", "Registrar abono") }
+        static var depositTitle: String { tr("Record deposit", "Registrar abono") }
         static var depositHint: String {
             tr("Money the customer leaves in advance. It's taken off when you charge their appointment.",
                "El dinero que el cliente deja por adelantado. Se descuenta cuando cobras su cita.")
@@ -320,49 +361,48 @@ enum L {
 
     enum Booking {
         static var title: String { tr("New appointment", "Nueva cita") }
-        static var hint: String {
-            tr("Book an appointment yourself: by phone, WhatsApp or at the counter.",
-               "Agenda una cita tú mismo: por teléfono, por WhatsApp o en el local.")
-        }
         static var customer: String { tr("Customer", "Cliente") }
         static var existing: String { tr("Search", "Buscar") }
         static var newCustomer: String { tr("New", "Nuevo") }
-        static var searchCustomer: String { tr("Name, phone or email…", "Nombre, celular o email…") }
+        static var searchCustomer: String { tr("Name, mobile or email…", "Nombre, celular o email…") }
         static var typeToSearch: String { tr("Type at least 2 letters to search.", "Escribe al menos 2 letras para buscar.") }
         static var noCustomerFound: String { tr("We couldn't find that customer.", "No encontramos ese cliente.") }
         static var createCustomer: String { tr("Create them", "Crearlo") }
         static var changeCustomer: String { tr("Pick another customer", "Elegir otro cliente") }
         static var change: String { tr("Change", "Cambiar") }
-        static var pickCustomer: String { tr("Pick a customer or create a new one.", "Elige un cliente o crea uno nuevo.") }
+        static var pickCustomer: String { tr("Choose a customer or create a new one.", "Elige un cliente o crea uno nuevo.") }
         static var firstName: String { tr("First name", "Nombre") }
         static var lastName: String { tr("Last name", "Apellido") }
-        static var contactHint: String { tr("Leave at least a phone number or an email.", "Deja al menos un celular o un email.") }
+        static var contactHint: String { tr("Leave at least a mobile or an email.", "Deja al menos un celular o un email.") }
+        static var firstNameRequired: String { tr("Write the first name.", "Escribe el nombre.") }
+        static var lastNameRequired: String { tr("Write the last name.", "Escribe el apellido.") }
+        static var emailInvalid: String { tr("Enter a valid email.", "Escribe un email válido.") }
+        static var emailOptional: String { tr("Email (optional)", "Email (opcional)") }
         static var service: String { tr("Service", "Servicio") }
-        static var pickService: String { tr("Pick a service", "Elige un servicio") }
+        static var pickService: String { tr("Choose a service", "Elige un servicio") }
+        static var pickServiceError: String { tr("Choose a service.", "Elige un servicio.") }
+        static var pickServiceFirst: String { tr("Choose a service to see the free times.", "Elige un servicio para ver los horarios libres.") }
         static var professional: String { tr("Staff member", "Profesional") }
         static var anyFree: String { tr("Whoever is free", "Quien esté libre") }
         static var location: String { tr("Location", "Local") }
-        static var date: String { tr("Date", "Fecha") }
+        static var date: String { tr("Day and time", "Día y hora") }
         static var freeTimes: String { tr("Free times", "Horarios libres") }
         static var noFreeTimes: String {
             tr("No free times that day for this choice. Try another day or staff member.",
                "No hay horarios libres ese día con esta combinación. Prueba otro día u otro profesional.")
         }
-        static var pickTime: String { tr("Pick a free time.", "Elige un horario libre.") }
+        static var pickTime: String { tr("Choose a free time.", "Elige un horario libre.") }
         static func bookedForYou(_ name: String) -> String {
             tr("The appointment is booked with you (\(name)).", "La cita queda a tu nombre (\(name)).")
         }
         static var create: String { tr("Book appointment", "Agendar cita") }
         static var created: String { tr("Appointment booked", "Cita agendada") }
-        static func alreadyBooked(_ date: String, _ code: String) -> String {
-            tr("That customer already has an appointment on \(date) (code \(code)).",
-               "Ese cliente ya tiene una cita el \(date) (código \(code)).")
+        static func alreadyBooked(_ day: String, _ time: String, _ code: String) -> String {
+            tr("That customer already has an appointment on \(day) at \(time) (code \(code)).",
+               "Ese cliente ya tiene una cita el \(day) a las \(time) (código \(code)).")
         }
-        static var slotTaken: String {
-            tr("That time was just taken. Pick another time or someone who's still free.",
-               "Ese horario se acaba de ocupar. Elige otro horario u otra persona que esté libre.")
-        }
-        static var currentTime: String { tr("Current time", "Hora actual") }
+        static var slotTaken: String { tr("Someone just took that time. Pick another one.", "Alguien acaba de tomar ese horario. Elige otro.") }
+        static var currentTime: String { tr("Current time", "Hora actual de la cita") }
         static func rescheduleTitle(_ name: String) -> String { tr("Edit \(name)'s appointment", "Editar la cita de \(name)") }
         static func rescheduleHint(_ code: String) -> String {
             tr("Change the day, time, staff member or service. Code \(code).",
@@ -372,7 +412,7 @@ enum L {
 
     enum Customers {
         static var title: String { tr("Customers", "Clientes") }
-        static var search: String { tr("Search by name, email or phone", "Buscar por nombre, email o celular") }
+        static var search: String { tr("Search by name, mobile or email", "Buscar por nombre, celular o email") }
         static var new: String { tr("New customer", "Nuevo cliente") }
         static var edit: String { tr("Edit customer", "Editar cliente") }
         static var emptyTitle: String { tr("No customers yet", "Aún no tienes clientes") }
@@ -383,7 +423,11 @@ enum L {
         static var noResults: String { tr("No customer matches your search.", "Ningún cliente coincide con tu búsqueda.") }
         static func count(_ n: Int) -> String { n == 1 ? tr("1 customer", "1 cliente") : tr("\(n) customers", "\(n) clientes") }
         static func since(_ date: String) -> String { tr("Customer since \(date)", "Cliente desde \(date)") }
-        static var visits: String { tr("Visits", "Citas") }
+        static var visits: String { tr("Visits", "Visitas") }
+        static func visitCount(_ n: Int) -> String { n == 1 ? tr("1 visit", "1 visita") : tr("\(n) visits", "\(n) visitas") }
+        static func next(_ date: String) -> String { tr("Next \(date)", "Próxima \(date)") }
+        static var noContact: String { tr("No contact details", "Sin datos de contacto") }
+        static var details: String { tr("Details", "Datos") }
         static var lastVisit: String { tr("Last visit", "Última visita") }
         static var nextVisit: String { tr("Next visit", "Próxima cita") }
         static var never: String { "—" }
@@ -396,7 +440,6 @@ enum L {
         static var upcoming: String { tr("Upcoming", "Próximas") }
         static var history: String { tr("History", "Historial") }
         static var noHistory: String { tr("No appointments yet.", "Todavía no tiene citas.") }
-        static var attended: String { tr("Attended", "Atendida") }
         static var created: String { tr("Customer added", "Cliente agregado") }
         static var moreDetails: String { tr("More details", "Más datos") }
         static var birthDate: String { tr("Date of birth", "Fecha de nacimiento") }
@@ -410,24 +453,26 @@ enum L {
             default: return tr("Not set", "Sin definir")
             }
         }
-        static var bookFor: String { tr("Book", "Agendar") }
-        static var spent: String { tr("Total spent", "Total gastado") }
-        static var visitsDone: String { tr("Visits", "Visitas") }
+
     }
 
     enum Sales {
         static var title: String { tr("Sales", "Ventas") }
         static var salesTab: String { tr("Sales", "Ventas") }
         static var depositsTab: String { tr("Deposits", "Abonos") }
-        static var empty: String { tr("No sales on this day.", "No hay ventas este día.") }
-        static var emptyDeposits: String { tr("No deposits on this day.", "No hay abonos este día.") }
+        static var empty: String { tr("No sales in these dates.", "No hay ventas en estas fechas.") }
+        static var emptyDeposits: String { tr("No deposits in these dates.", "No hay abonos en estas fechas.") }
+        static var day: String { tr("Day", "Día") }
+        static var week: String { tr("Week", "Semana") }
+        static var month: String { tr("Month", "Mes") }
+        static func includesTips(_ amount: String) -> String { tr("Includes \(amount) in tips", "Incluye \(amount) en propinas") }
+        static var customer: String { tr("Customer", "Cliente") }
         static var collected: String { tr("Collected", "Recaudado") }
         static func count(_ n: Int) -> String { n == 1 ? tr("1 sale", "1 venta") : tr("\(n) sales", "\(n) ventas") }
-        static var tipsShort: String { tr("tips", "propinas") }
         static func average(_ amount: String) -> String { tr("Average \(amount)", "Promedio \(amount)") }
         static var byMethod: String { tr("By payment method", "Por medio de pago") }
         static var paid: String { tr("Paid", "Pagada") }
-        static var void: String { tr("Voided", "Anulada") }
+        static var void: String { tr("Void", "Anulada") }
         static var `internal`: String { tr("Internal", "Interna") }
         static func saleTitle(_ number: Int) -> String { tr("Sale #\(number)", "Venta #\(number)") }
         static var soldBy: String { tr("Recorded by", "Registrada por") }
@@ -435,11 +480,11 @@ enum L {
         static var voidAction: String { tr("Void sale", "Anular venta") }
         static func voidTitle(_ number: Int) -> String { tr("Void sale #\(number)?", "¿Anular la venta #\(number)?") }
         static var voidBody: String {
-            tr("It stays in the history as voided and stops counting in the cash register and reports. If a deposit paid for it, the deposit becomes available again.",
+            tr("It stays in the history as void and stops counting in the cash register and reports. If a deposit paid for it, the deposit becomes available again.",
                "Queda en el historial como anulada y deja de contar en la caja y los reportes. Si se pagó con un abono, el abono vuelve a quedar disponible.")
         }
         static var voided: String { tr("Sale voided", "Venta anulada") }
-        static var items: String { tr("Items", "Detalle") }
+        static var items: String { tr("Services and products", "Servicios y productos") }
         static var depositAvailable: String { tr("Available", "Disponible") }
         static func depositUsed(_ number: Int) -> String { tr("Used in sale #\(number)", "Usado en venta #\(number)") }
         static var depositReturned: String { tr("Returned", "Devuelto") }
@@ -457,7 +502,9 @@ enum L {
         }
         static var account: String { tr("My account", "Mi cuenta") }
         static var signOut: String { tr("Sign out", "Cerrar sesión") }
-        static var signOutTitle: String { tr("Sign out of this phone?", "¿Cerrar sesión en este teléfono?") }
+        static var signOutTitle: String { tr("Sign out?", "¿Cerrar sesión?") }
+        static var signOutBody: String { tr("You'll need your email and password to come back.", "Para volver necesitarás tu email y tu contraseña.") }
+        static var you: String { tr("You", "Tú") }
         static func version(_ value: String) -> String { tr("Version \(value)", "Versión \(value)") }
     }
 
@@ -518,7 +565,7 @@ enum L {
         static var email: String { tr("Contact email", "Email de contacto") }
         static var address: String { tr("Address", "Dirección") }
         static var description: String { tr("Description", "Descripción") }
-        static var bookingLink: String { tr("Booking page", "Página de reservas") }
+        static var bookingLink: String { tr("Your booking page", "Tu página de reservas") }
         static var bookingHint: String {
             tr("Share it so your customers book on their own, any time.",
                "Compártela para que tus clientes reserven solos, a cualquier hora.")
@@ -533,13 +580,20 @@ enum L {
         static var region: String { tr("Region", "Región") }
         static var timezone: String { tr("Time zone", "Zona horaria") }
         static var currency: String { tr("Currency", "Moneda") }
-        static func shareText(_ name: String) -> String { tr("Book with \(name):", "Reserva en \(name):") }
+        static func shareText(_ name: String) -> String { tr("Book with \(name):", "Reserva tu cita en \(name):") }
+        static var linkCopied: String { tr("Link copied", "Enlace copiado") }
     }
 
     enum Reports {
         static var title: String { tr("Reports", "Reportes") }
         static var summary: String { tr("Summary", "Resumen") }
         static var commissions: String { tr("Commissions", "Comisiones") }
+        static var noComparison: String { tr("Nothing to compare", "Sin datos para comparar") }
+        static var points: String { "pts" }
+        static var noTips: String { tr("No tips in these dates.", "No hay propinas en estas fechas.") }
+        static var noProfessionals: String { tr("No staff yet.", "Aún no tienes profesionales.") }
+        static func servicesCount(_ n: Int) -> String { tr("Services (\(n))", "Servicios (\(n))") }
+        static func productsCount(_ n: Int) -> String { tr("Products (\(n))", "Productos (\(n))") }
         static var bookings: String { tr("Bookings", "Reservas") }
         static var occupancy: String { tr("Occupancy", "Ocupación") }
         static var newCustomers: String { tr("New customers", "Clientes nuevos") }
@@ -585,12 +639,15 @@ enum L {
         }
         static var newPassword: String { tr("New password", "Nueva contraseña") }
         static var newPasswordHint: String { tr("At least 10 characters.", "Mínimo 10 caracteres.") }
+        static var repeatPassword: String { tr("Repeat the new password", "Repite la nueva contraseña") }
+        static var mismatch: String { tr("The passwords don't match.", "Las contraseñas no coinciden.") }
+        static var session: String { tr("Session", "Sesión") }
         static var changePassword: String { tr("Change password", "Cambiar contraseña") }
         static var passwordChanged: String { tr("Password changed", "Contraseña cambiada") }
         static var server: String { tr("Server", "Servidor") }
         static var role: String { tr("Role", "Rol") }
         static var installOwner: String { tr("Administrator", "Administrador") }
-        static var appearance: String { tr("Appearance follows your phone's light or dark mode.", "La apariencia sigue el modo claro u oscuro de tu teléfono.") }
+        static var appearance: String { tr("The app follows your phone's light or dark mode.", "La app sigue el modo claro u oscuro de tu teléfono.") }
     }
 
     enum Notifications {
@@ -603,17 +660,20 @@ enum L {
             }
         }
         static var unreadLabel: String { tr("Unread", "Sin leer") }
-        static var justNow: String { tr("Just now", "Ahora") }
+        static var justNow: String { tr("Now", "Ahora") }
+        static func minutesAgo(_ n: Int) -> String { tr("\(n) min ago", "Hace \(n) min") }
+        static func hoursAgo(_ n: Int) -> String { tr("\(n) h ago", "Hace \(n) h") }
+        static func daysAgo(_ n: Int) -> String { tr("\(n) days ago", "Hace \(n) días") }
         static var emptyTitle: String { tr("No notifications yet", "Sin avisos todavía") }
         static var emptyBody: String { tr("New, moved and cancelled appointments will show up here.", "Aquí verás las citas nuevas, movidas y canceladas.") }
         static var onThisPhone: String { tr("Notifications on this phone", "Avisos en este teléfono") }
         static var onThisPhoneHint: String {
-            tr("A notice on this phone when one of your appointments is booked, moved or cancelled.",
-               "Un aviso en este teléfono cuando una de tus citas se reserva, se mueve o se cancela.")
+            tr("We let you know about new bookings, and appointments moved or cancelled, even when the app is closed.",
+               "Te avisamos de las reservas nuevas y de las citas movidas o canceladas, aunque la app esté cerrada.")
         }
         static func deniedHint(_ app: String) -> String {
-            tr("Notifications for \(app) are turned off in your phone's Settings.",
-               "Los avisos de \(app) están desactivados en los Ajustes del teléfono.")
+            tr("Notifications for \(app) are turned off in your phone's settings.",
+               "Los avisos de \(app) están desactivados en los ajustes del teléfono.")
         }
         static var openSettings: String { tr("Open Settings", "Abrir Ajustes") }
     }
@@ -666,7 +726,7 @@ enum L {
     }
 
     enum Errors {
-        static var generic: String { tr("Something went wrong. Please try again.", "Algo salió mal. Inténtalo de nuevo.") }
-        static var network: String { tr("Can't reach the server. Check your connection.", "No hay conexión con el servidor. Revisa tu conexión.") }
+        static var generic: String { tr("Something went wrong. Try again.", "Algo salió mal. Inténtalo de nuevo.") }
+        static var network: String { tr("No connection to the server. Check your internet.", "No hay conexión con el servidor. Revisa tu internet.") }
     }
 }

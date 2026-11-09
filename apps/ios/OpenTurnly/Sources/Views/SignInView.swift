@@ -1,3 +1,4 @@
+import SafariServices
 import SwiftUI
 
 /// Signing in.
@@ -5,8 +6,8 @@ import SwiftUI
 /// A build with an account directory (Brand.hostedSignInURL) asks for an e-mail
 /// and a password and nothing else; the directory answers with the accounts that
 /// person can open, each with its own server. A build with a hosted template asks
-/// for the account name first. Every build can "Use another address" to type a
-/// server, and a build with no hosted values starts there.
+/// for the account name on the same screen. Every build can "Use another address"
+/// to type a server, and a build with no hosted values starts there.
 struct SignInView: View {
     @State private var path: [Route] = []
 
@@ -21,7 +22,7 @@ struct SignInView: View {
                 if Brand.hostedSignInURL != nil {
                     LoginForm(target: .directory, path: $path)
                 } else if Brand.hosted != nil {
-                    AccountEntry(path: $path)
+                    LoginForm(target: .account, path: $path)
                 } else {
                     ServerEntry(path: $path)
                 }
@@ -37,24 +38,22 @@ struct SignInView: View {
     }
 }
 
-/// The logo, a title and a line under it.
+/// The mark (turning while something is in progress), the brand's name, a title
+/// and a line under it.
 private struct SignInHeader: View {
     let title: String
     let subtitle: String
+    var busy = false
 
     var body: some View {
         VStack(spacing: 0) {
-            Image("BrandLogoWhite")
-                .resizable().scaledToFit()
-                .frame(width: 38, height: 38)
-                .frame(width: 64, height: 64)
-                .background(
-                    LinearGradient(colors: [Color(hex: "#14b8a6"), Brand.primaryColor], startPoint: .topLeading, endPoint: .bottomTrailing),
-                    in: RoundedRectangle(cornerRadius: 18, style: .continuous)
-                )
-                .shadow(color: Brand.primaryColor.opacity(0.35), radius: 14, y: 6)
-                .accessibilityLabel(Brand.name)
-                .padding(.bottom, 24)
+            ClockLoader(animating: busy, showsName: false)
+                .accessibilityHidden(true)
+                .padding(.bottom, 14)
+            Text(Brand.name)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Brand.primaryColor)
+                .padding(.bottom, 10)
             Text(title)
                 .font(.largeTitle.weight(.bold))
                 .foregroundStyle(Theme.ink)
@@ -82,10 +81,12 @@ private struct SignInBackground: View {
     }
 }
 
-/// The frame of every sign-in screen: the form in the middle, the brand's links
-/// at the bottom, and all of it scrolling when the keyboard needs the room.
-private struct SignInScaffold<Content: View>: View {
+/// The frame of every sign-in screen: the form in the middle, an optional quiet
+/// line and the brand's links at the bottom, and all of it scrolling when the
+/// keyboard needs the room.
+private struct SignInScaffold<Content: View, Footer: View>: View {
     @ViewBuilder let content: Content
+    @ViewBuilder let footer: Footer
 
     var body: some View {
         GeometryReader { proxy in
@@ -94,6 +95,7 @@ private struct SignInScaffold<Content: View>: View {
                     Spacer(minLength: 16)
                     content.frame(maxWidth: 460)
                     Spacer(minLength: 24)
+                    footer.frame(maxWidth: 460)
                     BrandLinks()
                 }
                 .padding(.horizontal, 24)
@@ -108,9 +110,39 @@ private struct SignInScaffold<Content: View>: View {
     }
 }
 
+extension SignInScaffold where Footer == EmptyView {
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+        self.footer = EmptyView()
+    }
+}
+
+/// «Conectado a localhost:4100 · Cambiar»: which server the form signs in to,
+/// kept small, with the way back to the server step.
+private struct ServerLine: View {
+    let server: String
+    let change: () -> Void
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Text(L.SignIn.connectedTo(ServerAddress.displayHost(server)))
+                .foregroundStyle(Theme.muted)
+                .lineLimit(1)
+                .truncationMode(.middle)
+            Text("·").foregroundStyle(Theme.muted)
+            Button(L.SignIn.changeServer, action: change)
+                .foregroundStyle(Brand.primaryColor)
+                .fixedSize()
+        }
+        .font(.footnote)
+        .frame(maxWidth: .infinity, minHeight: 36)
+    }
+}
+
 /// A labelled input on a filled, rounded background.
 struct InputBox<Content: View>: View {
     let label: String
+    var hint: String?
     @ViewBuilder let content: Content
 
     var body: some View {
@@ -121,11 +153,15 @@ struct InputBox<Content: View>: View {
                 .frame(minHeight: 52)
                 .background(Theme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Theme.line, lineWidth: 1))
+            if let hint {
+                Text(hint).font(.footnote).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 }
 
-private struct BrandLinks: View {
+/// «Política de privacidad» · «Ayuda», when the brand has them.
+struct BrandLinks: View {
     @Environment(\.openURL) private var openURL
 
     var body: some View {
@@ -153,7 +189,7 @@ private struct ServerEntry: View {
     var body: some View {
         SignInScaffold {
             VStack(spacing: 24) {
-                SignInHeader(title: L.SignIn.serverTitle, subtitle: L.SignIn.serverHint(Brand.name))
+                SignInHeader(title: L.SignIn.serverTitle, subtitle: L.SignIn.serverHint(Brand.name), busy: busy)
                 if let notice = model.signInNotice {
                     NoticeBanner(text: notice)
                 }
@@ -171,8 +207,8 @@ private struct ServerEntry: View {
                 PrimaryButton(title: L.SignIn.continue, busy: busy, disabled: draft.trimmingCharacters(in: .whitespaces).isEmpty) {
                     Task { await proceed() }
                 }
-                if Brand.hosted != nil {
-                    Button(L.SignIn.useHosted(Brand.hosted?.label ?? Brand.name)) { path.removeAll() }
+                if let hosted = Brand.hosted {
+                    Button(L.SignIn.useHosted(hosted.label)) { path.removeAll() }
                         .foregroundStyle(Theme.muted)
                         .frame(maxWidth: .infinity, minHeight: 44)
                 }
@@ -182,6 +218,7 @@ private struct ServerEntry: View {
     }
 
     private func proceed() async {
+        guard !busy else { return }
         error = nil
         guard let server = ServerAddress.normalize(draft) else {
             error = L.SignIn.invalidServer
@@ -199,84 +236,59 @@ private struct ServerEntry: View {
         } catch {
             return
         }
-        if path.last == .server { path.removeLast() }
         path.append(.login(server))
     }
 }
 
-/// An account name on the publisher's hosted service.
-private struct AccountEntry: View {
-    @Binding var path: [SignInView.Route]
-    @State private var draft = ""
-    @State private var error: String?
-
-    var body: some View {
-        SignInScaffold {
-            VStack(spacing: 24) {
-                SignInHeader(title: L.SignIn.title, subtitle: L.SignIn.accountHint)
-                InputBox(label: L.SignIn.accountLabel) {
-                    TextField(L.SignIn.accountPlaceholder, text: $draft)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .submitLabel(.continue)
-                        .onSubmit(proceed)
-                }
-                FieldError(text: error)
-                PrimaryButton(title: L.SignIn.continue, disabled: draft.trimmingCharacters(in: .whitespaces).isEmpty, action: proceed)
-                Button(L.SignIn.otherAddress) { path.append(.server) }
-                    .foregroundStyle(Theme.muted)
-                    .frame(maxWidth: .infinity, minHeight: 44)
-            }
-        }
-    }
-
-    private func proceed() {
-        guard let server = Brand.hostedServer(for: draft) else {
-            error = L.SignIn.invalidAccount
-            return
-        }
-        error = nil
-        path.append(.login(server))
-    }
-}
-
-/// E-mail and password against one target: the hosted directory, or a server.
+/// E-mail and password against one target: the hosted directory, an account of
+/// the hosted service (named on the same screen), or a server.
 private struct LoginForm: View {
     enum Target: Equatable {
         case directory
+        case account
         case server(String)
     }
 
     let target: Target
     @Binding var path: [SignInView.Route]
     @Environment(AppModel.self) private var model
+    @State private var account = ""
+    @State private var accountError: String?
     @State private var email = ""
     @State private var password = ""
     @State private var reveal = false
     @State private var busy = false
     @State private var error: String?
     @State private var forgot = false
+    @State private var recovery: WebPage?
     @State private var accounts: [HostedAccount] = []
     @FocusState private var focus: Field?
 
-    private enum Field { case email, password }
+    private enum Field { case account, email, password }
 
     private var canSubmit: Bool { !email.trimmingCharacters(in: .whitespaces).isEmpty && !password.isEmpty && !busy }
-
-    private var subtitle: String {
-        switch target {
-        case .directory: return L.SignIn.subtitle
-        case .server(let server): return L.SignIn.connectedTo(ServerAddress.displayHost(server))
-        }
-    }
 
     var body: some View {
         SignInScaffold {
             VStack(spacing: 20) {
-                SignInHeader(title: L.SignIn.title, subtitle: subtitle)
+                SignInHeader(title: L.SignIn.title, subtitle: L.SignIn.subtitle, busy: busy)
                     .padding(.bottom, 4)
                 if let notice = model.signInNotice {
                     NoticeBanner(text: notice)
+                }
+                if target == .account {
+                    VStack(alignment: .leading, spacing: 7) {
+                        InputBox(label: L.SignIn.accountLabel, hint: L.SignIn.accountHint) {
+                            TextField(L.SignIn.accountPlaceholder, text: $account)
+                                .textContentType(.organizationName)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                                .submitLabel(.next)
+                                .focused($focus, equals: .account)
+                                .onSubmit { focus = .email }
+                        }
+                        FieldError(text: accountError)
+                    }
                 }
                 InputBox(label: L.SignIn.emailLabel) {
                     TextField(L.SignIn.emailPlaceholder, text: $email)
@@ -313,29 +325,51 @@ private struct LoginForm: View {
                 }
                 FieldError(text: error)
                 PrimaryButton(title: L.SignIn.submit, busy: busy, disabled: !canSubmit) { Task { await submit() } }
-                Button(L.SignIn.forgot) { forgot = true }
+                Button(L.SignIn.forgot) {
+                    if let url = recoveryURL { recovery = WebPage(url: url) } else { forgot = true }
+                }
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(Brand.primaryColor)
                     .frame(minHeight: 32)
-                VStack(spacing: 4) {
-                    switch target {
-                    case .directory:
-                        Button(L.SignIn.otherAddress) { path.append(.server) }
-                    case .server:
-                        Button(Brand.hosted != nil ? L.SignIn.useHosted(Brand.hosted?.label ?? Brand.name) : L.SignIn.changeServer) {
-                            path.removeAll()
-                        }
-                    }
+                if target == .directory || target == .account {
+                    Button(L.SignIn.otherAddress) { path.append(.server) }
+                        .foregroundStyle(Theme.muted)
+                        .frame(maxWidth: .infinity, minHeight: 44)
                 }
-                .foregroundStyle(Theme.muted)
-                .frame(maxWidth: .infinity, minHeight: 44)
             }
+        } footer: {
+            if case .server(let server) = target {
+                ServerLine(server: server) {
+                    if path.last == .login(server) { path.removeLast() } else { path.removeAll() }
+                }
+            }
+        }
+        .sheet(item: $recovery) { page in
+            SafariView(url: page.url).ignoresSafeArea()
         }
         .alert(L.SignIn.forgotTitle, isPresented: $forgot) {
             Button(L.Common.ok, role: .cancel) {}
         } message: { Text(L.SignIn.forgotBody) }
         .sheet(isPresented: Binding(get: { accounts.count > 1 }, set: { if !$0 { accounts = [] } })) { chooser }
-        .onAppear { if email.isEmpty { focus = .email } }
+        .onAppear {
+            guard focus == nil else { return }
+            if target == .account && account.isEmpty { focus = .account } else if email.isEmpty { focus = .email }
+        }
+    }
+
+    /// Where "Forgot your password?" leads: the server's own page when the server
+    /// is known (typed, or named by the account), the brand's recovery page for the
+    /// account directory, or nowhere (a note that the administrator sets passwords).
+    private var recoveryURL: URL? {
+        switch target {
+        case .server(let server):
+            return ServerAddress.forgotPasswordURL(server)
+        case .account:
+            if let server = Brand.hostedServer(for: account) { return ServerAddress.forgotPasswordURL(server) }
+            return Brand.passwordRecoveryURL
+        case .directory:
+            return Brand.passwordRecoveryURL
+        }
     }
 
     /// The same e-mail opens more than one account: pick one.
@@ -375,8 +409,18 @@ private struct LoginForm: View {
 
     private func submit() async {
         guard canSubmit else { return }
-        busy = true
         error = nil
+        accountError = nil
+        var accountServer: String?
+        if target == .account {
+            guard let resolved = Brand.hostedServer(for: account) else {
+                accountError = L.SignIn.invalidAccount
+                Haptics.error()
+                return
+            }
+            accountServer = resolved
+        }
+        busy = true
         model.signInNotice = nil
         defer { busy = false }
         let address = email.trimmingCharacters(in: .whitespaces)
@@ -390,6 +434,10 @@ private struct LoginForm: View {
                     return
                 }
                 if found.count == 1 { await finish(first) } else { accounts = found }
+            case .account:
+                guard let server = accountServer else { return }
+                let response = try await OpenTurnlyAPI.signIn(server, email: address, password: password)
+                await model.signedIn(server: server, token: response.token, user: response.user)
             case .server(let server):
                 let response = try await OpenTurnlyAPI.signIn(server, email: address, password: password)
                 await model.signedIn(server: server, token: response.token, user: response.user)
@@ -401,6 +449,25 @@ private struct LoginForm: View {
             self.error = L.Errors.generic
         }
     }
+}
+
+/// A web page to open inside the app.
+struct WebPage: Identifiable {
+    let url: URL
+    var id: String { url.absoluteString }
+}
+
+/// Safari inside the app, for pages that belong to the server or the brand.
+struct SafariView: UIViewControllerRepresentable {
+    let url: URL
+
+    func makeUIViewController(context: Context) -> SFSafariViewController {
+        let controller = SFSafariViewController(url: url)
+        controller.preferredControlTintColor = UIColor(Brand.primaryColor)
+        return controller
+    }
+
+    func updateUIViewController(_ controller: SFSafariViewController, context: Context) {}
 }
 
 /// A one-line notice on a tinted background.

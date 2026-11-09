@@ -28,7 +28,7 @@ struct CustomerFormView: View {
     private var namesValid: Bool {
         !firstName.trimmingCharacters(in: .whitespaces).isEmpty && !lastName.trimmingCharacters(in: .whitespaces).isEmpty
     }
-    private var contactValid: Bool { phone != nil || TextRules.isEmail(email.trimmingCharacters(in: .whitespaces)) }
+    private var contactValid: Bool { phone != nil || !email.trimmingCharacters(in: .whitespaces).isEmpty }
     private var emailValid: Bool { email.trimmingCharacters(in: .whitespaces).isEmpty || TextRules.isEmail(email.trimmingCharacters(in: .whitespaces)) }
 
     var body: some View {
@@ -38,7 +38,8 @@ struct CustomerFormView: View {
                     TextField(L.Booking.firstName, text: $firstName).textContentType(.givenName)
                     TextField(L.Booking.lastName, text: $lastName).textContentType(.familyName)
                 } footer: {
-                    if attempted && !namesValid { FieldError(text: ErrorText.text("required")) }
+                    if attempted && firstName.trimmingCharacters(in: .whitespaces).isEmpty { FieldError(text: L.Booking.firstNameRequired) }
+                    else if attempted && lastName.trimmingCharacters(in: .whitespaces).isEmpty { FieldError(text: L.Booking.lastNameRequired) }
                     else { FieldError(text: failure.flatMap { ErrorText.field($0, "firstName") ?? ErrorText.field($0, "lastName") }) }
                 }
                 Section {
@@ -57,7 +58,7 @@ struct CustomerFormView: View {
                         } else {
                             Text(L.Booking.contactHint)
                         }
-                        if attempted && !emailValid { FieldError(text: ErrorText.text("email_invalid_format")) }
+                        if attempted && !emailValid { FieldError(text: L.Booking.emailInvalid) }
                         FieldError(text: failure.flatMap { ErrorText.field($0, "phone") ?? ErrorText.field($0, "email") })
                     }
                 }

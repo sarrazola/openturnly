@@ -5,25 +5,37 @@ import Foundation
 /// The server is the authority; these rules mirror the web admin so the app only
 /// offers actions the server accepts for that role and state. There is no
 /// "completed" status: an appointment is done when a sale charged it.
+///
+/// The Android app implements the same tables (status chip, payment state, card
+/// badge, actions); the unit tests pin them so the two can't drift.
 enum AppointmentRules {
     /// How an appointment's state reads in a chip.
     enum DisplayStatus: Equatable {
         /// Confirmed and still ahead ("Próxima").
         case upcoming
-        /// Confirmed and already started ("Confirmada").
+        /// Confirmed and happening right now ("Ahora").
+        case ongoing
+        /// Confirmed and already over ("Confirmada").
         case confirmed
         case cancelled
         case noShow
         case pendingPayment
     }
 
-    static func displayStatus(_ status: AppointmentStatus, startsAt: Date, now: Date = Date()) -> DisplayStatus {
+    static func displayStatus(_ status: AppointmentStatus, startsAt: Date, endsAt: Date, now: Date = Date()) -> DisplayStatus {
         switch status {
         case .cancelled: return .cancelled
         case .noShow: return .noShow
         case .pendingPayment: return .pendingPayment
-        case .confirmed, .unknown: return startsAt > now ? .upcoming : .confirmed
+        case .confirmed, .unknown:
+            if now < startsAt { return .upcoming }
+            if now < endsAt { return .ongoing }
+            return .confirmed
         }
+    }
+
+    static func displayStatus(_ appointment: Appointment, now: Date = Date()) -> DisplayStatus {
+        displayStatus(appointment.status, startsAt: appointment.startsAt, endsAt: appointment.endsAt, now: now)
     }
 
     enum Action: Equatable, Hashable {
@@ -31,11 +43,11 @@ enum AppointmentRules {
         case cancel
         case markNoShow
         case undoNoShow
-        /// "Cobrar": the price is not covered yet.
+        /// "Cobrar $ X": the price is not covered yet.
         case charge
         /// "Cerrar venta": deposits already cover the price, only the sale is left.
         case closeSale
-        /// "Abono": leave money in advance.
+        /// "Registrar abono": leave money in advance.
         case deposit
         case viewSale
         case viewCustomer
@@ -44,6 +56,11 @@ enum AppointmentRules {
     /// What's still owed: price minus the booking discount minus unused deposits.
     static func owed(_ appointment: Appointment) -> Int {
         max(0, (appointment.priceAmount ?? 0) - appointment.discountAmount - appointment.depositAmount)
+    }
+
+    /// The price after the booking discount, when there is a price.
+    static func price(_ appointment: Appointment) -> Int? {
+        appointment.priceAmount.map { max(0, $0 - appointment.discountAmount) }
     }
 
     /// Deposits that already cover the price.
@@ -55,7 +72,7 @@ enum AppointmentRules {
         appointment.startsAt <= now
     }
 
-    /// The actions offered, in the order the detail screen lists them.
+    /// The actions allowed, in a stable order.
     ///
     /// - Professionals can only move their own confirmed appointments: the server
     ///   refuses cancelling, no-shows and anything to do with money for them.
@@ -70,7 +87,7 @@ enum AppointmentRules {
             break
         case .confirmed:
             if isAdmin {
-                if let _ = appointment.sale {
+                if appointment.sale != nil {
                     result.append(.viewSale)
                 } else {
                     result.append(covered(appointment) ? .closeSale : .charge)
@@ -86,7 +103,40 @@ enum AppointmentRules {
         return result
     }
 
-    /// The money line under an appointment.
+    /// The sticky bar under the detail: an optional secondary button on the left
+    /// and an optional primary one on the right. One button fills the width.
+    struct Bar: Equatable {
+        var secondary: Action?
+        var primary: Action?
+        var isEmpty: Bool { secondary == nil && primary == nil }
+    }
+
+    static func bar(_ actions: [Action]) -> Bar {
+        if actions.contains(.undoNoShow) { return Bar(secondary: nil, primary: .undoNoShow) }
+        let primary = [Action.charge, .closeSale, .viewSale].first(where: actions.contains)
+        return Bar(secondary: actions.contains(.reschedule) ? .reschedule : nil, primary: primary)
+    }
+
+    /// The rows of the detail's "Acciones" list, in order.
+    static func listed(_ actions: [Action]) -> [Action] {
+        [Action.deposit, .markNoShow, .cancel].filter(actions.contains)
+    }
+
+    /// The long-press menu on an agenda card, in order. "Llamar" and "WhatsApp"
+    /// go between the two parts.
+    static func menu(_ actions: [Action]) -> (before: [Action], after: [Action]) {
+        let money = [Action.charge, .closeSale, .viewSale].filter(actions.contains)
+        let edit = actions.contains(.reschedule) ? [Action.reschedule] : []
+        let after = [Action.markNoShow, .cancel].filter(actions.contains)
+        return (money + edit, after)
+    }
+
+    /// The amount on "Cobrar $ X": what is still owed, or nil without a price.
+    static func chargeAmount(_ appointment: Appointment) -> Int? {
+        appointment.priceAmount == nil ? nil : owed(appointment)
+    }
+
+    /// The money state of a confirmed appointment (admins).
     enum PaymentState: Equatable {
         /// Charged by sale #number.
         case paid(number: Int)
@@ -94,22 +144,58 @@ enum AppointmentRules {
         case covered(deposit: Int)
         /// Part was left as a deposit; this much is still owed.
         case partly(owed: Int, deposit: Int)
+        /// Nothing paid yet.
         case unpaid
         /// Nothing to collect (cancelled, no-show, pending online payment).
         case none
     }
 
     static func paymentState(_ appointment: Appointment) -> PaymentState {
-        if let sale = appointment.sale { return .paid(number: sale.number) }
         guard appointment.status == .confirmed else { return .none }
+        if let sale = appointment.sale { return .paid(number: sale.number) }
         if covered(appointment) { return .covered(deposit: appointment.depositAmount) }
-        if appointment.depositAmount > 0 && appointment.priceAmount != nil {
+        if appointment.depositAmount > 0 && owed(appointment) > 0 {
             return .partly(owed: owed(appointment), deposit: appointment.depositAmount)
         }
         return .unpaid
     }
 
-    /// The source line: booking page, panel, or an AI agent with the key's name.
+    /// What the agenda card shows at its bottom right.
+    enum Badge: Equatable {
+        /// The price after the booking discount, as muted text.
+        case price(Int)
+        /// «Sin cobrar» (warning).
+        case notCharged
+        /// «Abonó $ X» (neutral).
+        case deposited(Int)
+        /// «Faltan $ X» (warning).
+        case left(Int)
+        /// «Por cerrar» (warning).
+        case toClose
+        /// «Pagada» (info, check).
+        case paid
+        case none
+    }
+
+    static func badge(_ appointment: Appointment, isAdmin: Bool, now: Date = Date()) -> Badge {
+        let plain: Badge = price(appointment).map(Badge.price) ?? .none
+        guard isAdmin else { return plain }
+        let started = started(appointment, now: now)
+        switch paymentState(appointment) {
+        case .none: return .none
+        case .paid: return .paid
+        case .covered(let deposit): return started ? .toClose : .deposited(deposit)
+        case .partly(let owed, let deposit): return started ? .left(owed) : .deposited(deposit)
+        case .unpaid: return started ? .notCharged : plain
+        }
+    }
+
+    /// Confirmed, started and not charged: the day summary's «N por cobrar».
+    static func toCharge(_ appointment: Appointment, now: Date = Date()) -> Bool {
+        appointment.status == .confirmed && started(appointment, now: now) && appointment.sale == nil
+    }
+
+    /// The source line: booking page, the team, or an AI assistant with the key's name.
     enum Source: Equatable {
         case online, admin, agent(String?), other
     }
@@ -143,6 +229,11 @@ enum AgendaRules {
         var professionalIds: Set<String> = []
         var locationId: String?
         var showCancelled = false
+
+        /// A professional or a location narrows the list.
+        var narrowed: Bool { !professionalIds.isEmpty || locationId != nil }
+        /// Anything on: the filter button fills and the tag shows.
+        var active: Bool { narrowed || showCancelled }
     }
 
     static func apply(_ filter: Filter, to appointments: [Appointment]) -> [Appointment] {
@@ -154,6 +245,13 @@ enum AgendaRules {
             }
             return true
         }
+    }
+
+    /// The day has appointments, but the professional or location filter hides them all.
+    /// Cancelled ones hidden because «Mostrar canceladas» is off don't count.
+    static func hiddenByFilters(_ filter: Filter, all: [Appointment]) -> Bool {
+        guard filter.narrowed, apply(filter, to: all).isEmpty else { return false }
+        return !apply(Filter(showCancelled: filter.showCancelled), to: all).isEmpty
     }
 
     /// One day's appointments, in time order, split into morning / afternoon / evening.
@@ -171,9 +269,22 @@ enum AgendaRules {
         Dictionary(grouping: appointments) { clock.localDate(of: $0.startsAt) }
     }
 
+    /// Days with at least one confirmed or pending-payment appointment, after the
+    /// professional and location filters: the week strip's dots.
+    static func busyDays(_ appointments: [Appointment], filter: Filter, clock: BusinessClock) -> Set<LocalDate> {
+        let narrowed = Filter(professionalIds: filter.professionalIds, locationId: filter.locationId, showCancelled: false)
+        let counted = apply(narrowed, to: appointments).filter { [.confirmed, .pendingPayment].contains($0.status) }
+        return Set(counted.map { clock.localDate(of: $0.startsAt) })
+    }
+
     /// Happening right now.
     static func isOngoing(_ appointment: Appointment, now: Date = Date()) -> Bool {
         appointment.status == .confirmed && appointment.startsAt <= now && now < appointment.endsAt
+    }
+
+    /// The day summary's count: confirmed and pending payment (not no-shows, not cancelled).
+    static func count(_ appointments: [Appointment]) -> Int {
+        appointments.filter { [.confirmed, .pendingPayment].contains($0.status) }.count
     }
 
     /// The expected takings of a day: confirmed appointments' prices after discounts.
@@ -181,6 +292,28 @@ enum AgendaRules {
         appointments
             .filter { $0.status == .confirmed }
             .reduce(0) { $0 + max(0, ($1.priceAmount ?? 0) - $1.discountAmount) }
+    }
+
+    /// «N por cobrar»: confirmed, started and without a sale.
+    static func toCharge(_ appointments: [Appointment], now: Date = Date()) -> Int {
+        appointments.filter { AppointmentRules.toCharge($0, now: now) }.count
+    }
+
+    /// Where the red "now" line goes in a day that is today.
+    enum NowLine: Equatable {
+        /// Above the first segment: nothing has started yet.
+        case top
+        /// Right after this appointment, inside its segment. An appointment that
+        /// started is always above the line, so the line never lands under the
+        /// header of a later segment.
+        case after(String)
+    }
+
+    static func nowLine(_ segments: [(segment: Segment, items: [Appointment])], now: Date) -> NowLine? {
+        let items = segments.flatMap(\.items)
+        guard !items.isEmpty else { return nil }
+        guard let last = items.last(where: { $0.startsAt <= now }) else { return .top }
+        return .after(last.id)
     }
 }
 
@@ -204,9 +337,32 @@ enum BookingRules {
         }
     }
 
+    /// Services grouped by category in catalog order; services without one go last.
+    static func grouped(_ services: [Service]) -> [(category: String?, services: [Service])] {
+        var order: [String?] = []
+        var groups: [String?: [Service]] = [:]
+        for service in services {
+            let key = TextRules.clean(service.category)
+            if groups[key] == nil { order.append(key) }
+            groups[key, default: []].append(service)
+        }
+        let named = order.filter { $0 != nil }
+        let keys = named + (order.contains(where: { $0 == nil }) ? [nil] : [])
+        return keys.map { ($0, groups[$0] ?? []) }
+    }
+
     /// The free times for the chosen professional, or for anyone when nil.
     static func times(_ slots: [Slot], resourceId: String?) -> [Slot] {
         slots.filter { resourceId == nil || $0.resourceIds.contains(resourceId!) }
+    }
+
+    /// Free times by part of the day ("Por la mañana / Por la tarde / Por la noche").
+    static func timesBySegment(_ slots: [Slot]) -> [(segment: AgendaRules.Segment, slots: [Slot])] {
+        let grouped = Dictionary(grouping: slots) { AgendaRules.Segment.of(minuteOfDay: WallTime.minutes($0.time) ?? 0) }
+        return AgendaRules.Segment.allCases.compactMap { segment in
+            guard let items = grouped[segment], !items.isEmpty else { return nil }
+            return (segment, items)
+        }
     }
 
     /// Locations a booking can go to: active ones, plus the appointment's own.
@@ -221,5 +377,21 @@ enum BookingRules {
     /// A location must be named when more than one is active.
     static func needsLocation(_ locations: [Location]) -> Bool {
         locations.filter(\.active).count > 1
+    }
+
+    /// «Crearlo» from a search that found nobody: an e-mail, a phone, or a name.
+    struct Draft: Equatable {
+        var firstName = ""
+        var lastName = ""
+        var phone = ""
+        var email = ""
+    }
+
+    static func draft(from query: String) -> Draft {
+        let text = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        if text.contains("@") { return Draft(email: text) }
+        if text.filter(\.isNumber).count >= 6 { return Draft(phone: text.filter(\.isNumber)) }
+        let words = text.split(whereSeparator: \.isWhitespace).map(String.init)
+        return Draft(firstName: words.first ?? "", lastName: words.dropFirst().joined(separator: " "))
     }
 }

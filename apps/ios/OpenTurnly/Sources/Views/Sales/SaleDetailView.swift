@@ -40,35 +40,46 @@ struct SaleDetailView: View {
         ScrollView {
             VStack(spacing: 16) {
                 VStack(spacing: 8) {
+                    HStack(spacing: 6) {
+                        Chip(text: sale.isVoid ? L.Sales.void : L.Sales.paid, tone: sale.isVoid ? .danger : .info,
+                             symbol: sale.isVoid ? nil : "checkmark")
+                        if sale.isInternal { Chip(text: L.Sales.internal, tone: .neutral) }
+                    }
                     Text(workspace.money(sale.collected))
                         .font(.system(.largeTitle, design: .rounded).weight(.bold))
                         .monospacedDigit()
                         .foregroundStyle(sale.isVoid ? Theme.subtle : Theme.ink)
                         .strikethrough(sale.isVoid)
-                    HStack(spacing: 6) {
-                        Chip(text: sale.isVoid ? L.Sales.void : L.Sales.paid, tone: sale.isVoid ? .danger : .info)
-                        if sale.isInternal { Chip(text: L.Sales.internal, tone: .neutral) }
-                    }
                     Text(Fmt.dateTime(sale.createdAt, clock: workspace.clock)).font(.footnote).foregroundStyle(Theme.muted)
                 }
                 .frame(maxWidth: .infinity)
                 .card()
 
-                if let customer = sale.customer {
-                    NavigationLink(value: Route.customer(id: customer.id, name: customer.fullName)) {
-                        HStack(spacing: 12) {
-                            Avatar(name: customer.fullName, size: 40)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(customer.fullName).font(.body.weight(.semibold)).foregroundStyle(Theme.ink)
-                                Text(Phone.format(customer.phone).isEmpty ? (customer.email ?? "") : Phone.format(customer.phone))
-                                    .font(.footnote).foregroundStyle(Theme.muted)
+                if sale.customer != nil || sale.soldByName != nil || (sale.locationName != nil && workspace.activeLocations.count > 1) {
+                    VStack(spacing: 0) {
+                        if let customer = sale.customer {
+                            NavigationLink(value: Route.customer(id: customer.id, name: customer.fullName)) {
+                                HStack(spacing: 12) {
+                                    Text(L.Sales.customer).font(.subheadline).foregroundStyle(Theme.muted)
+                                    Spacer(minLength: 12)
+                                    Text(customer.fullName).font(.subheadline.weight(.medium)).foregroundStyle(Theme.brand)
+                                    Image(systemName: "chevron.right").font(.caption.weight(.bold)).foregroundStyle(Theme.subtle)
+                                }
+                                .padding(.vertical, 10)
+                                .contentShape(Rectangle())
                             }
-                            Spacer()
-                            Image(systemName: "chevron.right").font(.caption.weight(.bold)).foregroundStyle(Theme.subtle)
+                            .buttonStyle(.plain)
                         }
-                        .card(padding: 14)
+                        if let location = sale.locationName, workspace.activeLocations.count > 1 {
+                            if sale.customer != nil { Divider() }
+                            InfoRow(label: L.Appointment.location, value: location)
+                        }
+                        if let who = sale.soldByName {
+                            Divider()
+                            InfoRow(label: L.Sales.soldBy, value: who)
+                        }
                     }
-                    .buttonStyle(.plain)
+                    .card(padding: 14)
                 }
 
                 VStack(alignment: .leading, spacing: 8) {
@@ -77,13 +88,11 @@ struct SaleDetailView: View {
                         ForEach(sale.items) { item in
                             HStack(alignment: .top) {
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text(item.quantity > 1 ? "\(item.quantity) × \(item.name)" : item.name)
-                                        .font(.subheadline.weight(.medium)).foregroundStyle(Theme.ink)
-                                    if let who = item.resourceName {
-                                        Text(who).font(.caption).foregroundStyle(Theme.muted)
-                                    }
+                                    Text(item.name).font(.subheadline.weight(.medium)).foregroundStyle(Theme.ink)
+                                    Text(["\(item.quantity) × \(workspace.money(item.unitPrice))", item.resourceName].compactMap { $0 }.joined(separator: " · "))
+                                        .font(.caption).foregroundStyle(Theme.muted)
                                     if item.discountAmount > 0 {
-                                        Text("−\(workspace.money(item.discountAmount))").font(.caption).foregroundStyle(Theme.success)
+                                        Text("\(L.Checkout.discount) −\(workspace.money(item.discountAmount))").font(.caption).foregroundStyle(Theme.success)
                                     }
                                 }
                                 Spacer()
@@ -120,22 +129,20 @@ struct SaleDetailView: View {
                     .card(padding: 14)
                 }
 
-                VStack(spacing: 0) {
-                    if let location = sale.locationName, workspace.locations.count > 1 {
-                        InfoRow(label: L.Appointment.location, value: location)
+                if let note = sale.note, !note.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        SectionTitle(text: L.Checkout.note)
+                        Text(note).font(.subheadline).foregroundStyle(Theme.ink).card(padding: 14)
                     }
-                    if let who = sale.soldByName { InfoRow(label: L.Sales.soldBy, value: who) }
-                    if let note = sale.note, !note.isEmpty { InfoRow(label: L.Checkout.note, value: note) }
                 }
-                .card(padding: 14)
 
                 if !sale.isVoid {
                     SecondaryButton(title: L.Sales.voidAction, symbol: "arrow.uturn.backward.circle", tint: Theme.danger, busy: busy) {
                         confirmingVoid = true
                     }
-                    .confirmationDialog(L.Sales.voidTitle(sale.number), isPresented: $confirmingVoid, titleVisibility: .visible) {
+                    .alert(L.Sales.voidTitle(sale.number), isPresented: $confirmingVoid) {
                         Button(L.Sales.voidAction, role: .destructive) { Task { await void() } }
-                        Button(L.Common.cancel, role: .cancel) {}
+                        Button(L.Common.goBack, role: .cancel) {}
                     } message: {
                         Text(L.Sales.voidBody)
                     }

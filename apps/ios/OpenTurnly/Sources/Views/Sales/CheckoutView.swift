@@ -2,10 +2,11 @@ import SwiftUI
 
 /// Charging an appointment ("Cobrar" / "Cerrar venta") or a counter sale.
 ///
-/// The services done, a discount or code, tips for the professionals and how the
-/// customer paid, split across methods if needed. Deposits the customer left are
-/// offered first, and the appointment's own deposits come ticked. Payments must
-/// add up to the total plus tips exactly, as the server requires.
+/// Top to bottom, like the web's checkout: the customer (and the location of a
+/// counter sale), the lines, a discount or code, tips, the customer's deposits,
+/// how they paid, the summary, a note. The bar at the bottom says whether the
+/// payment matches and charges what is left to collect now. Payments must add up
+/// to the total plus tips exactly, as the server requires.
 struct CheckoutView: View {
     let appointment: Appointment?
     @Environment(Workspace.self) private var workspace
@@ -16,10 +17,14 @@ struct CheckoutView: View {
     @State private var choosingCustomer = false
     @State private var locationId: String?
     @State private var lines: [CheckoutRules.Line] = []
+    @State private var editingLine: CheckoutRules.Line.ID?
+    @State private var pickingService = false
+    @State private var pickingProduct = false
     @State private var products: [Product] = []
     @State private var isInternal = false
     @State private var manualDiscount: Int?
     @State private var codeText = ""
+    @State private var codeError: String?
     @State private var discountCode: GiftCard?
     @State private var checkingCode = false
     @State private var tips: [Tip] = []
@@ -59,12 +64,13 @@ struct CheckoutView: View {
         if let code = discountCode { return CheckoutRules.codeDiscount(percent: code.percent, amount: code.amount, subtotal: subtotal) }
         return min(manualDiscount ?? 0, subtotal)
     }
-    private var total: Int { CheckoutRules.total(subtotal: subtotal, discount: discount) }
     private var tipTotal: Int { tips.reduce(0) { $0 + ($1.amount ?? 0) } }
-    private var due: Int { CheckoutRules.due(total: total, tips: tipTotal) }
     private var available: [Deposit] { deposits.filter(\.isAvailable) }
     private var depositTotal: Int { available.filter { usedDeposits.contains($0.id) }.reduce(0) { $0 + $1.amount } }
-    private var remaining: Int { CheckoutRules.remaining(due: due, deposits: depositTotal) }
+    private var summary: CheckoutRules.Summary {
+        CheckoutRules.summary(lines: lines, discount: discount, tips: tipTotal, deposits: depositTotal)
+    }
+    private var due: Int { CheckoutRules.due(total: summary.total, tips: tipTotal) }
     private var difference: Int { CheckoutRules.difference(due: due, deposits: depositTotal, payments: payments) }
 
     private var location: Location? {
@@ -74,19 +80,13 @@ struct CheckoutView: View {
     private var forSale: [Product] { products.filter { $0.active && $0.forSale } }
     private var team: [Professional] {
         workspace.professionals.filter { professional in
+            guard professional.active || lines.contains(where: { $0.resourceId == professional.id }) else { return false }
             guard let ids = location?.resourceIds else { return true }
             return ids.contains(professional.id)
         }
     }
 
-    private var title: String {
-        if let appointment { return L.Checkout.titleAppointment(appointment.customer.firstName) }
-        return L.Checkout.newSale
-    }
-
-    private var closingOnly: Bool {
-        appointment.map(AppointmentRules.covered) ?? false
-    }
+    private var title: String { appointment == nil ? L.Checkout.newSale : L.Checkout.titleAppointment }
 
     // MARK: Body
 
@@ -94,7 +94,7 @@ struct CheckoutView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
-                    customerCard
+                    customerBlock
                     linesBlock
                     discountBlock
                     tipsBlock
@@ -102,12 +102,9 @@ struct CheckoutView: View {
                     paymentsBlock
                     summaryCard
                     extrasBlock
-                    if let failure {
-                        NoticeBanner(text: failure, symbol: "exclamationmark.triangle.fill", tone: .danger)
-                    }
                 }
                 .padding(16)
-                .padding(.bottom, 90)
+                .padding(.bottom, 24)
             }
             .scrollDismissesKeyboard(.interactively)
             .background(Theme.canvas)
@@ -118,69 +115,107 @@ struct CheckoutView: View {
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button(L.Common.cancel) { dismiss() } } }
             .task { await prepare() }
             .task(id: customer?.id) { await loadDeposits() }
-            .onChange(of: remaining) { _, value in syncPayment(value) }
+            .onChange(of: summary.toCollect) { _, _ in syncPayment() }
             .sheet(isPresented: $choosingCustomer) {
                 CustomerChooser { picked in customer = picked }
+            }
+            .sheet(isPresented: $pickingService) {
+                ServicePicker(title: L.Checkout.chooseService, services: offeredServices) { addService($0) }
+            }
+            .sheet(isPresented: $pickingProduct) {
+                ProductPicker(products: forSale, isInternal: isInternal) { addProduct($0) }
+            }
+            .sheet(item: Binding(get: { editingLine.map(LineID.init) }, set: { editingLine = $0?.id })) { item in
+                if let index = lines.firstIndex(where: { $0.id == item.id }) {
+                    LineEditor(line: $lines[index], team: team, currency: workspace.currency) {
+                        let id = item.id
+                        editingLine = nil
+                        withAnimation { lines.removeAll { $0.id == id } }
+                    }
+                }
             }
         }
         .interactiveDismissDisabled(busy)
     }
 
-    // MARK: Blocks
+    // MARK: Customer and location
 
-    private var customerCard: some View {
-        HStack(spacing: 12) {
-            if let customer {
-                Avatar(name: customer.name, size: 44)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(customer.name).font(.body.weight(.semibold)).foregroundStyle(Theme.ink)
-                    if let appointment {
-                        Text("\(appointment.code) · \(workspace.clock.time(of: appointment.startsAt))")
-                            .font(.footnote).foregroundStyle(Theme.muted)
-                    }
-                }
-                Spacer()
-                if appointment == nil {
-                    Button(L.Common.remove) { self.customer = nil }.font(.footnote.weight(.semibold))
-                }
-            } else {
-                Button {
-                    choosingCustomer = true
-                } label: {
-                    HStack(spacing: 12) {
-                        Image(systemName: "person.crop.circle.badge.plus").font(.title2).foregroundStyle(Theme.brand)
+    private var customerBlock: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            SectionTitle(text: L.Checkout.customer)
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 12) {
+                    if let customer {
+                        Avatar(name: customer.name, size: 44)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(L.Checkout.pickCustomer).font(.body.weight(.semibold)).foregroundStyle(Theme.brand)
-                            Text("\(L.Checkout.customer) · \(L.Common.optional)").font(.footnote).foregroundStyle(Theme.muted)
+                            Text(customer.name).font(.body.weight(.semibold)).foregroundStyle(Theme.ink)
+                            if let appointment {
+                                Text("\(appointment.code) · \(workspace.clock.time(of: appointment.startsAt)) · \(appointment.serviceName)")
+                                    .font(.footnote).foregroundStyle(Theme.muted).lineLimit(1)
+                            }
                         }
                         Spacer()
+                        if appointment == nil {
+                            Button(L.Common.remove) { self.customer = nil }.font(.footnote.weight(.semibold))
+                        }
+                    } else {
+                        Button {
+                            choosingCustomer = true
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: "person.crop.circle.badge.plus").font(.title2).foregroundStyle(Theme.brand)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(L.Checkout.pickCustomer).font(.body.weight(.semibold)).foregroundStyle(Theme.brand)
+                                    Text("\(L.Checkout.customer) · \(L.Common.optional)").font(.footnote).foregroundStyle(Theme.muted)
+                                }
+                                Spacer()
+                            }
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
-                .buttonStyle(.plain)
+                if appointment == nil && workspace.activeLocations.count > 1 {
+                    Divider().padding(.vertical, 10)
+                    MenuRow(label: L.Checkout.location, symbol: "mappin.and.ellipse",
+                            options: workspace.activeLocations.map { (value: Optional($0.id), title: $0.name, subtitle: $0.address) },
+                            selection: Binding(get: { location?.id }, set: { locationId = $0 }))
+                }
             }
+            .card(padding: 14)
         }
-        .card(padding: 14)
     }
+
+    // MARK: Lines
 
     private var linesBlock: some View {
         VStack(alignment: .leading, spacing: 8) {
             SectionTitle(text: L.Checkout.items)
-            VStack(spacing: 10) {
-                ForEach($lines) { $line in
-                    LineEditor(line: $line, services: offeredServices, products: forSale, team: team, currency: workspace.currency,
-                               removable: line.appointmentId == nil) {
-                        withAnimation { lines.removeAll { $0.id == line.id } }
+            VStack(alignment: .leading, spacing: 0) {
+                if lines.isEmpty {
+                    Text(L.Checkout.noLines).font(.subheadline).foregroundStyle(Theme.muted).padding(.vertical, 6)
+                }
+                ForEach(Array(lines.enumerated()), id: \.element.id) { index, line in
+                    if index > 0 { Divider() }
+                    Button {
+                        editingLine = line.id
+                    } label: {
+                        LineRow(line: line)
                     }
+                    .buttonStyle(.plain)
                 }
                 HStack(spacing: 10) {
-                    SecondaryButton(title: L.Checkout.addService, symbol: "plus") { addService() }
+                    SecondaryButton(title: L.Checkout.addService, symbol: "plus") { pickingService = true }
                     if !forSale.isEmpty {
-                        SecondaryButton(title: L.Checkout.addProduct, symbol: "shippingbox") { addProduct() }
+                        SecondaryButton(title: L.Checkout.addProduct, symbol: "shippingbox") { pickingProduct = true }
                     }
                 }
+                .padding(.top, 10)
             }
+            .card(padding: 14)
         }
     }
+
+    // MARK: Discount
 
     private var discountBlock: some View {
         FormBlock(title: L.Checkout.discount) {
@@ -191,21 +226,27 @@ struct CheckoutView: View {
                     Spacer()
                     Button(L.Checkout.removeCode) { withAnimation { discountCode = nil } }.font(.footnote.weight(.semibold))
                 }
-            } else {
-                HStack(spacing: 8) {
-                    Image(systemName: "ticket").foregroundStyle(Theme.subtle)
-                    TextField(L.Checkout.code, text: $codeText)
-                        .textInputAutocapitalization(.characters)
-                        .autocorrectionDisabled()
-                        .onSubmit { Task { await applyCode() } }
-                    Button {
-                        Task { await applyCode() }
-                    } label: {
-                        if checkingCode { ProgressView() } else { Text(L.Checkout.apply).fontWeight(.semibold) }
-                    }
-                    .disabled(codeText.trimmingCharacters(in: .whitespaces).count < 3 || checkingCode)
-                }
                 .frame(minHeight: 40)
+                Divider().padding(.vertical, 6)
+            }
+            // The field stays: a gift card can still pay after a discount code.
+            HStack(spacing: 8) {
+                Image(systemName: "ticket").foregroundStyle(Theme.subtle)
+                TextField(L.Checkout.code, text: $codeText)
+                    .textInputAutocapitalization(.characters)
+                    .autocorrectionDisabled()
+                    .onSubmit { Task { await applyCode() } }
+                    .onChange(of: codeText) { _, _ in codeError = nil }
+                Button {
+                    Task { await applyCode() }
+                } label: {
+                    if checkingCode { ProgressView() } else { Text(L.Checkout.apply).fontWeight(.semibold) }
+                }
+                .disabled(codeText.trimmingCharacters(in: .whitespaces).count < 3 || checkingCode)
+            }
+            .frame(minHeight: 40)
+            FieldError(text: codeError)
+            if discountCode == nil {
                 Divider().padding(.vertical, 6)
                 HStack {
                     Text(L.Checkout.discount).font(.subheadline).foregroundStyle(Theme.muted)
@@ -218,6 +259,8 @@ struct CheckoutView: View {
             }
         }
     }
+
+    // MARK: Tips
 
     private var tipsBlock: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -253,9 +296,8 @@ struct CheckoutView: View {
                     Divider()
                 }
                 Button {
-                    withAnimation {
-                        tips.append(Tip(resourceId: lines.first?.resourceId ?? team.first?.id, amount: nil))
-                    }
+                    let first = appointment?.resourceId.flatMap { id in team.first { $0.id == id } } ?? team.first
+                    withAnimation { tips.append(Tip(resourceId: first?.id, amount: nil)) }
                 } label: {
                     Label(L.Checkout.addTip, systemImage: "plus.circle.fill").font(.subheadline.weight(.semibold))
                 }
@@ -269,6 +311,8 @@ struct CheckoutView: View {
         }
     }
 
+    // MARK: Deposits
+
     private var depositsBlock: some View {
         FormBlock(title: L.Checkout.deposits) {
             ForEach(Array(available.enumerated()), id: \.element.id) { index, deposit in
@@ -281,7 +325,9 @@ struct CheckoutView: View {
                 )) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(workspace.money(deposit.amount)).font(.body.weight(.semibold)).foregroundStyle(Theme.ink)
-                        Text(L.Checkout.useDeposit(Fmt.dayShort(workspace.clock.localDate(of: deposit.createdAt))) + " · " + L.Payments.method(deposit.method))
+                        Text([L.Checkout.useDeposit(Fmt.dayShort(workspace.clock.localDate(of: deposit.createdAt))),
+                              L.Payments.method(deposit.method), deposit.appointmentCode.map(L.Sales.forAppointment)]
+                            .compactMap { $0 }.joined(separator: " · "))
                             .font(.footnote).foregroundStyle(Theme.muted)
                     }
                 }
@@ -291,6 +337,8 @@ struct CheckoutView: View {
         }
     }
 
+    // MARK: Payments
+
     private var paymentsBlock: some View {
         VStack(alignment: .leading, spacing: 8) {
             SectionTitle(text: L.Checkout.payments)
@@ -298,7 +346,8 @@ struct CheckoutView: View {
                 ForEach($payments) { $payment in
                     HStack(spacing: 10) {
                         if payment.method == "gift_card" {
-                            Label(payment.giftCardCode ?? "Gift card", systemImage: "giftcard").font(.subheadline).foregroundStyle(Theme.ink)
+                            Label("Gift card \(payment.giftCardCode ?? "")", systemImage: "giftcard").font(.subheadline).foregroundStyle(Theme.ink)
+                                .lineLimit(1).truncationMode(.middle)
                         } else {
                             Menu {
                                 ForEach(CheckoutRules.counterMethods, id: \.self) { method in
@@ -326,6 +375,7 @@ struct CheckoutView: View {
                         .frame(maxWidth: 140)
                         if payments.count > 1 {
                             Button {
+                                paymentsEdited = true
                                 withAnimation { payments.removeAll { $0.id == payment.id } }
                             } label: {
                                 Image(systemName: "minus.circle.fill").foregroundStyle(Theme.danger)
@@ -338,82 +388,72 @@ struct CheckoutView: View {
                 }
                 Button {
                     paymentsEdited = true
-                    let missing = max(0, -difference)
-                    withAnimation { payments.append(CheckoutRules.Payment(method: "card", amount: missing)) }
+                    withAnimation { payments = CheckoutRules.split(payments, difference: difference) }
                 } label: {
-                    Label(L.Checkout.addPayment, systemImage: "plus.circle.fill").font(.subheadline.weight(.semibold))
+                    Label(L.Checkout.split, systemImage: "plus.circle.fill").font(.subheadline.weight(.semibold))
                 }
+                .disabled(payments.count >= CheckoutRules.maxPayments)
                 .frame(minHeight: 40)
             }
             .card(padding: 14)
         }
     }
 
+    // MARK: Summary and extras
+
     private var summaryCard: some View {
-        VStack(spacing: 0) {
-            InfoRow(label: L.Checkout.subtotal, value: workspace.money(subtotal))
-            if discount > 0 {
-                InfoRow(label: L.Checkout.discount, value: "−\(workspace.money(discount))", valueColor: Theme.success)
+        let summary = self.summary
+        return VStack(spacing: 0) {
+            InfoRow(label: L.Checkout.subtotal, value: workspace.money(summary.subtotal))
+            if summary.discount > 0 {
+                InfoRow(label: L.Checkout.discount, value: "−\(workspace.money(summary.discount))", valueColor: Theme.success)
             }
-            if tipTotal > 0 {
-                InfoRow(label: L.Checkout.tips, value: workspace.money(tipTotal))
+            InfoRow(label: L.Common.total, value: workspace.money(summary.total))
+            if summary.tips > 0 {
+                InfoRow(label: L.Checkout.tips, value: "+\(workspace.money(summary.tips))")
+            }
+            if summary.deposits > 0 {
+                InfoRow(label: L.Checkout.deposits, value: "−\(workspace.money(summary.deposits))")
             }
             Divider().padding(.vertical, 4)
             HStack {
-                Text(L.Common.total).font(.headline).foregroundStyle(Theme.ink)
+                Text(L.Checkout.toCollect).font(.headline).foregroundStyle(Theme.ink)
                 Spacer()
-                Text(workspace.money(due)).font(.title2.weight(.bold)).fontDesign(.rounded).monospacedDigit().foregroundStyle(Theme.ink)
+                Text(workspace.money(summary.toCollect)).font(.title2.weight(.bold)).fontDesign(.rounded).monospacedDigit().foregroundStyle(Theme.ink)
             }
             .padding(.vertical, 6)
-            if depositTotal > 0 {
-                InfoRow(label: L.Checkout.deposits, value: "−\(workspace.money(depositTotal))")
-                InfoRow(label: L.Checkout.toCollect, value: workspace.money(remaining))
-            }
-            balanceLine
         }
         .card(padding: 14)
     }
 
-    @ViewBuilder
-    private var balanceLine: some View {
-        if difference == 0 {
-            Label(L.Checkout.balanced, systemImage: "checkmark.seal.fill")
-                .font(.footnote.weight(.semibold)).foregroundStyle(Theme.success)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        } else if difference < 0 {
-            Label(L.Checkout.missing(workspace.money(-difference)), systemImage: "exclamationmark.circle.fill")
-                .font(.footnote.weight(.semibold)).foregroundStyle(Theme.warning)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        } else {
-            Label(L.Checkout.over(workspace.money(difference)), systemImage: "exclamationmark.circle.fill")
-                .font(.footnote.weight(.semibold)).foregroundStyle(Theme.warning)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-
     private var extrasBlock: some View {
         FormBlock(title: L.Checkout.note) {
-            TextField(L.Checkout.note, text: $note, axis: .vertical)
+            TextField("\(L.Checkout.note) (\(L.Common.optional.lowercased()))", text: $note, axis: .vertical)
                 .lineLimit(1...4)
                 .frame(minHeight: 36)
-            Divider().padding(.vertical, 6)
-            Toggle(isOn: $isInternal) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(L.Checkout.internalSale).font(.subheadline.weight(.medium))
-                    Text(L.Checkout.internalHint).font(.caption).foregroundStyle(Theme.muted)
+            if appointment == nil {
+                Divider().padding(.vertical, 6)
+                Toggle(isOn: $isInternal) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(L.Checkout.internalSale).font(.subheadline.weight(.medium))
+                        Text(L.Checkout.internalHint).font(.caption).foregroundStyle(Theme.muted)
+                    }
                 }
+                .tint(Theme.brand)
+                .onChange(of: isInternal) { _, value in reprice(forTeam: value) }
             }
-            .tint(Theme.brand)
-            .onChange(of: isInternal) { _, value in reprice(forTeam: value) }
         }
     }
 
     private var submitBar: some View {
-        VStack(spacing: 0) {
+        let submit = CheckoutRules.submit(toCollect: summary.toCollect, forAppointment: appointment != nil)
+        return VStack(spacing: 0) {
             Divider()
-            PrimaryButton(title: closingOnly && remaining == 0 ? L.Checkout.closeSale : L.Checkout.chargeAmount(workspace.money(due)),
-                          symbol: "banknote", busy: busy, disabled: lines.isEmpty || difference != 0) {
-                Task { await submit() }
+            VStack(spacing: 8) {
+                statusLine
+                PrimaryButton(title: submitTitle(submit), symbol: "banknote", busy: busy, disabled: lines.isEmpty || difference != 0) {
+                    Task { await self.submit() }
+                }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
@@ -421,12 +461,42 @@ struct CheckoutView: View {
         .background(.bar)
     }
 
+    private func submitTitle(_ submit: CheckoutRules.Submit) -> String {
+        switch submit {
+        case .closeSale: return L.Checkout.closeSale
+        case .charge(let amount): return L.Checkout.chargeAmount(workspace.money(amount))
+        }
+    }
+
+    @ViewBuilder
+    private var statusLine: some View {
+        Group {
+            if let failure {
+                Label(failure, systemImage: "exclamationmark.triangle.fill").foregroundStyle(Theme.danger)
+            } else if lines.isEmpty {
+                Label(L.Checkout.noLines, systemImage: "exclamationmark.circle.fill").foregroundStyle(Theme.warning)
+            } else {
+                switch CheckoutRules.balance(difference) {
+                case .balanced:
+                    Label(L.Checkout.balanced, systemImage: "checkmark.seal.fill").foregroundStyle(Theme.success)
+                case .missing(let amount):
+                    Label(L.Checkout.missing(workspace.money(amount)), systemImage: "exclamationmark.circle.fill").foregroundStyle(Theme.warning)
+                case .over(let amount):
+                    Label(L.Checkout.over(workspace.money(amount)), systemImage: "exclamationmark.circle.fill").foregroundStyle(Theme.warning)
+                }
+            }
+        }
+        .font(.footnote.weight(.semibold))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
     // MARK: Work
 
     private func prepare() async {
         await workspace.loadCatalog()
         if locationId == nil { locationId = workspace.activeLocations.first?.id }
-        syncPayment(remaining)
+        syncPayment()
         do { products = try await workspace.api.products(workspace.id) } catch {}
     }
 
@@ -445,25 +515,25 @@ struct CheckoutView: View {
         } catch {
             deposits = []
         }
-        syncPayment(remaining)
+        syncPayment()
     }
 
-    /// The single payment follows what is left to pay until someone edits it.
-    private func syncPayment(_ value: Int) {
-        guard !paymentsEdited, payments.count == 1, payments[0].method != "gift_card" else { return }
-        payments[0].amount = value
+    /// The first counter payment follows what is left to collect until someone edits an amount.
+    private func syncPayment() {
+        guard !paymentsEdited, let index = payments.firstIndex(where: { $0.method != "gift_card" }) else { return }
+        let others = payments.enumerated().filter { $0.offset != index }.reduce(0) { $0 + $1.element.amount }
+        payments[index].amount = max(0, summary.toCollect - others)
     }
 
-    private func addService() {
-        guard let service = offeredServices.first else { return }
+    private func addService(_ service: Service) {
+        let resource = appointment?.resourceId.flatMap { id in team.first { $0.id == id }?.id }
         withAnimation {
             lines.append(CheckoutRules.Line(kind: .service, serviceId: service.id, name: service.name,
-                                            resourceId: appointment?.resourceId, unitPrice: service.priceAmount ?? 0))
+                                            resourceId: resource, unitPrice: service.priceAmount ?? 0))
         }
     }
 
-    private func addProduct() {
-        guard let product = forSale.first else { return }
+    private func addProduct(_ product: Product) {
         withAnimation {
             lines.append(CheckoutRules.Line(kind: .product, productId: product.id, name: product.name, resourceId: appointment?.resourceId,
                                             unitPrice: price(of: product, forTeam: isInternal)))
@@ -488,32 +558,27 @@ struct CheckoutView: View {
         let code = codeText.trimmingCharacters(in: .whitespaces)
         guard code.count >= 3 else { return }
         checkingCode = true
+        codeError = nil
         defer { checkingCode = false }
         do {
             let card = try await workspace.api.lookupGiftCard(workspace.id, code: code)
             guard card.state == "active" else {
-                toasts.show(L.Checkout.codeState(L.GiftCards.state(card.state).lowercased()), error: true)
+                codeError = L.Checkout.codeState(L.GiftCards.state(card.state).lowercased())
                 return
             }
             if card.kind == "discount" {
                 withAnimation { discountCode = card }
             } else if !payments.contains(where: { $0.giftCardId == card.id }) {
-                let amount = min(card.remaining ?? 0, remaining)
-                paymentsEdited = true
-                var next = [CheckoutRules.Payment(method: "gift_card", amount: amount, giftCardId: card.id, giftCardCode: card.code)]
-                if payments.count == 1 {
-                    var rest = payments[0]
-                    rest.amount = max(0, remaining - amount)
-                    next.append(rest)
-                } else {
-                    next.append(contentsOf: payments)
-                }
-                withAnimation { payments = next }
-                toasts.show(L.Checkout.cardLeft(workspace.money(card.remaining ?? 0)))
+                let gifts = payments.filter { $0.method == "gift_card" }.reduce(0) { $0 + $1.amount }
+                let amount = CheckoutRules.giftCardAmount(balance: card.remaining ?? 0, due: summary.toCollect - gifts)
+                let gift = CheckoutRules.Payment(method: "gift_card", amount: amount, giftCardId: card.id, giftCardCode: card.code)
+                withAnimation { payments.insert(gift, at: 0) }
+                syncPayment()
+                toasts.show(L.Checkout.cardLeft(workspace.money(max(0, (card.remaining ?? 0) - amount))))
             }
             codeText = ""
         } catch {
-            toasts.error(error)
+            codeError = ErrorText.message(error)
         }
     }
 
@@ -531,7 +596,7 @@ struct CheckoutView: View {
         defer { busy = false }
         var body: [String: JSON] = [
             "customerId": .opt(customer?.id),
-            "internal": .bool(isInternal),
+            "internal": .bool(appointment == nil && isInternal),
             "discountAmount": .int(discount),
             "items": .array(lines.map { line in
                 var item: [String: JSON] = [
@@ -575,98 +640,124 @@ struct CheckoutView: View {
     }
 }
 
-/// One line of a sale: what, who did it, how many and at what price.
-private struct LineEditor: View {
-    @Binding var line: CheckoutRules.Line
-    let services: [Service]
-    let products: [Product]
-    let team: [Professional]
-    let currency: String
-    let removable: Bool
-    let remove: () -> Void
+/// Lets a line's id drive `.sheet(item:)`.
+private struct LineID: Identifiable {
+    let id: CheckoutRules.Line.ID
+}
+
+/// One line of a sale as a row: what, «1 × $ 25.000 · Camila», the booking
+/// discount, the line total.
+private struct LineRow: View {
+    let line: CheckoutRules.Line
     @Environment(Workspace.self) private var workspace
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline) {
-                Image(systemName: line.kind == .product ? "shippingbox.fill" : "scissors").foregroundStyle(Theme.brand)
-                if line.appointmentId != nil {
-                    Text(line.name).font(.body.weight(.semibold)).foregroundStyle(Theme.ink)
-                } else if line.kind == .service {
-                    Menu {
-                        ForEach(services) { service in
-                            Button(service.name) {
-                                line.serviceId = service.id
-                                line.name = service.name
-                                line.unitPrice = service.priceAmount ?? 0
-                            }
-                        }
-                    } label: { menuLabel(line.name) }
-                } else {
-                    Menu {
-                        ForEach(products) { product in
-                            Button("\(product.name) · \(L.Inventory.inStock(product.totalStock))") {
-                                line.productId = product.id
-                                line.name = product.name
-                                line.unitPrice = product.priceAmount
-                            }
-                        }
-                    } label: { menuLabel(line.name) }
-                }
-                Spacer()
-                Text(workspace.money(line.total)).font(.body.weight(.semibold)).monospacedDigit().foregroundStyle(Theme.ink)
-                if removable {
-                    Button(action: remove) {
-                        Image(systemName: "xmark.circle.fill").foregroundStyle(Theme.subtle)
-                    }
-                    .accessibilityLabel(L.Common.remove)
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: line.kind == .product ? "shippingbox.fill" : "scissors")
+                .foregroundStyle(Theme.brand).frame(width: 22).padding(.top, 2)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(line.name).font(.body.weight(.semibold)).foregroundStyle(Theme.ink).lineLimit(2)
+                Text(["\(line.quantity) × \(workspace.money(line.unitPrice))", workspace.professional(line.resourceId)?.name]
+                    .compactMap { $0 }.joined(separator: " · "))
+                    .font(.footnote).foregroundStyle(Theme.muted)
+                if line.discountAmount > 0 {
+                    Text("−\(workspace.money(line.discountAmount))").font(.footnote).foregroundStyle(Theme.success)
                 }
             }
-            HStack(spacing: 10) {
-                Menu {
-                    Button(L.Checkout.nobody) { line.resourceId = nil }
-                    ForEach(team) { professional in
-                        Button(professional.name) { line.resourceId = professional.id }
-                    }
-                } label: {
-                    HStack(spacing: 5) {
-                        Circle().fill(workspace.color(for: line.resourceId)).frame(width: 7, height: 7)
-                        Text(workspace.professional(line.resourceId)?.name ?? L.Checkout.nobody).lineLimit(1)
-                        Image(systemName: "chevron.up.chevron.down").font(.caption2)
-                    }
-                    .font(.footnote)
-                    .foregroundStyle(Theme.muted)
-                    .padding(.horizontal, 10)
-                    .frame(minHeight: 32)
-                    .background(Theme.fill, in: Capsule())
-                }
-                if line.kind == .product {
-                    Stepper(value: $line.quantity, in: 1...999) {
-                        Text("× \(line.quantity)").font(.footnote.weight(.semibold)).monospacedDigit()
-                    }
-                    .fixedSize()
-                }
-                Spacer()
-                MoneyField(title: L.Checkout.unitPrice, amount: Binding(get: { line.unitPrice }, set: { line.unitPrice = $0 ?? 0 }), currency: currency)
-                    .font(.footnote)
-                    .multilineTextAlignment(.trailing)
-                    .frame(maxWidth: 110)
-                    .padding(.horizontal, 10)
-                    .frame(minHeight: 32)
-                    .background(Theme.fill, in: Capsule())
-            }
-            if line.discountAmount > 0 {
-                Text("−\(workspace.money(line.discountAmount))").font(.caption).foregroundStyle(Theme.success)
-            }
+            Spacer(minLength: 8)
+            Text(workspace.money(line.total)).font(.body.weight(.semibold)).monospacedDigit().foregroundStyle(Theme.ink)
+            Image(systemName: "chevron.right").font(.caption.weight(.bold)).foregroundStyle(Theme.subtle).padding(.top, 4)
         }
-        .card(padding: 14)
+        .padding(.vertical, 8)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
     }
+}
 
-    private func menuLabel(_ text: String) -> some View {
-        HStack(spacing: 4) {
-            Text(text).font(.body.weight(.semibold)).foregroundStyle(Theme.ink).lineLimit(1)
-            Image(systemName: "chevron.up.chevron.down").font(.caption2).foregroundStyle(Theme.subtle)
+/// A line's price, quantity and professional; «Quitar» unless it is the appointment's own.
+private struct LineEditor: View {
+    @Binding var line: CheckoutRules.Line
+    let team: [Professional]
+    let currency: String
+    let remove: () -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    HStack {
+                        Text(L.Checkout.unitPrice)
+                        MoneyField(title: "0", amount: Binding(get: { line.unitPrice }, set: { line.unitPrice = $0 ?? 0 }), currency: currency)
+                            .multilineTextAlignment(.trailing)
+                    }
+                    if line.appointmentId == nil {
+                        Stepper(value: $line.quantity, in: 1...999) {
+                            HStack {
+                                Text(L.Checkout.quantity)
+                                Spacer()
+                                Text("\(line.quantity)").monospacedDigit().foregroundStyle(Theme.muted)
+                            }
+                        }
+                    }
+                    Picker(L.Booking.professional, selection: $line.resourceId) {
+                        Text(L.Checkout.nobody).tag(String?.none)
+                        ForEach(team) { professional in
+                            Text(professional.name).tag(Optional(professional.id))
+                        }
+                    }
+                }
+                if line.appointmentId == nil {
+                    Section {
+                        Button(L.Common.remove, role: .destructive, action: remove)
+                    }
+                }
+            }
+            .navigationTitle(line.name)
+            .navigationBarTitleDisplayMode(.inline)
+            .keyboardDoneButton()
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) { Button(L.Common.done) { dismiss() }.fontWeight(.semibold) }
+            }
         }
+        .presentationDetents([.medium, .large])
+    }
+}
+
+/// Products for sale with their stock and price (the team's price for an internal sale).
+private struct ProductPicker: View {
+    let products: [Product]
+    let isInternal: Bool
+    let pick: (Product) -> Void
+    @Environment(Workspace.self) private var workspace
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List(products) { product in
+                Button {
+                    Haptics.selection()
+                    pick(product)
+                    dismiss()
+                } label: {
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(product.name).foregroundStyle(Theme.ink)
+                            Text(L.Inventory.inStock(product.totalStock)).font(.footnote).foregroundStyle(Theme.muted)
+                        }
+                        Spacer()
+                        Text(workspace.money(isInternal ? (product.internalPriceAmount ?? product.priceAmount) : product.priceAmount))
+                            .font(.subheadline.weight(.semibold)).monospacedDigit().foregroundStyle(Theme.ink)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+            .navigationTitle(L.Checkout.chooseProduct)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button(L.Common.cancel) { dismiss() } } }
+        }
+        .presentationDetents([.medium, .large])
     }
 }
 
@@ -680,7 +771,7 @@ struct CustomerChooser: View {
 
     var body: some View {
         NavigationStack {
-            List(results) { found in
+            List(results.prefix(8)) { found in
                 Button {
                     pick(PickedCustomer(id: found.id, name: found.fullName, phone: found.phone, email: found.email))
                     dismiss()

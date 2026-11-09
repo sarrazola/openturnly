@@ -37,6 +37,12 @@ final class ServerAddressTests: XCTestCase {
         XCTAssertFalse(ServerAddress.isLocal("example.com"))
     }
 
+    func testForgotPasswordPageLivesOnTheServer() {
+        XCTAssertEqual(ServerAddress.forgotPasswordURL("http://localhost:4100")?.absoluteString, "http://localhost:4100/forgot-password")
+        XCTAssertEqual(ServerAddress.forgotPasswordURL("https://turnos.example.com/")?.absoluteString, "https://turnos.example.com/forgot-password")
+        XCTAssertNil(ServerAddress.forgotPasswordURL("ftp://example.com"))
+    }
+
     func testDisplayHostKeepsThePort() {
         XCTAssertEqual(ServerAddress.displayHost("http://localhost:4100"), "localhost:4100")
         XCTAssertEqual(ServerAddress.displayHost("https://turnos.example.com"), "turnos.example.com")
