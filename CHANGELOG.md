@@ -6,6 +6,15 @@ All notable changes to OpenTurnly are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Add it to your calendar** on the booking confirmation: Google and Outlook open their new
+  event page already filled in, and "Apple and others" opens the event from the server
+  (`/api/public/businesses/<slug>/appointments/<code>/calendar.ics`), which Apple's calendar
+  and the others offer to save as it is. The event carries the service, the business, the
+  professional, the booking code, the business's phone and the address, never who booked
+  it. Based on a proposal by José Senén Oviedo.
+
 ### Security
 
 - Outgoing webhooks and a business's own email server: an IPv4 address written inside an
