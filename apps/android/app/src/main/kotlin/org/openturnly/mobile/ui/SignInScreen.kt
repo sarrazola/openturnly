@@ -4,7 +4,6 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -23,6 +22,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -33,7 +33,6 @@ import androidx.compose.material.icons.outlined.Dns
 import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -47,17 +46,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import org.openturnly.mobile.AppModel
 import org.openturnly.mobile.Brand
-import org.openturnly.mobile.R
 import org.openturnly.mobile.api.ApiClient
 import org.openturnly.mobile.api.ApiException
 import org.openturnly.mobile.api.Business
@@ -93,12 +91,14 @@ fun SignInScreen(model: AppModel) {
     var password by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var accountError by remember { mutableStateOf<String?>(null) }
     var accounts by remember { mutableStateOf<List<HostedAccount>>(emptyList()) }
     var forgot by remember { mutableStateOf(false) }
 
     fun describe(failure: ApiException): String = when {
         failure.code == "invalid_credentials" || failure.status == 401 -> s.wrongCredentials
-        failure.status == 404 || failure.status == 405 -> s.notOpenTurnly
+        failure.status == 404 || failure.status == 405 -> s.notAServer
+        failure.status == 0 && failure.code == "network" -> s.unreachable
         else -> failure.message
     }
 
@@ -107,8 +107,8 @@ fun SignInScreen(model: AppModel) {
         scope.launch {
             try {
                 val base = ServerAddress.normalize(chosen.server) ?: throw ApiException(0, "invalid_server")
-                model.signedIn(base, chosen.token, chosen.user)
                 accounts = emptyList()
+                model.signedIn(base, chosen.token, chosen.user)
             } catch (failure: CancellationException) { throw failure } catch (failure: ApiException) {
                 error = describe(failure)
             } finally { busy = false }
@@ -126,14 +126,16 @@ fun SignInScreen(model: AppModel) {
                 askServer = false
                 mode = "server"
             } catch (failure: CancellationException) { throw failure } catch (failure: ApiException) {
-                error = if (failure.status == 0) failure.message else s.notOpenTurnly
+                error = if (failure.status == 0) s.unreachable else s.notAServer
             } finally { busy = false }
         }
     }
 
     fun submit() {
         if (email.isBlank() || password.isEmpty() || busy) return
-        busy = true; error = null
+        error = null; accountError = null
+        val accountServer = if (mode == "account") Brand.hostedServer(account) ?: run { accountError = s.invalidAccount; return } else null
+        busy = true
         scope.launch {
             try {
                 when (mode) {
@@ -149,7 +151,7 @@ fun SignInScreen(model: AppModel) {
                         }
                     }
                     else -> {
-                        val base = if (mode == "account") Brand.hostedServer(account) ?: run { error = s.invalidServer; return@launch } else server
+                        val base = accountServer ?: server
                         val answer = OpenTurnlyApi.signIn(base, email, password)
                         model.signedIn(base, answer.token, answer.user)
                     }
@@ -160,14 +162,26 @@ fun SignInScreen(model: AppModel) {
         }
     }
 
+    /**
+     * Where "Forgot your password?" leads: the server's own page when the server
+     * is known (typed, or named by the account), the brand's recovery page for the
+     * account directory, or nowhere (a note that the administrator sets passwords).
+     */
+    fun recoveryUrl(): String? = when (mode) {
+        "server" -> ServerAddress.forgotPasswordUrl(server)
+        "account" -> Brand.hostedServer(account)?.let { ServerAddress.forgotPasswordUrl(it) } ?: Brand.passwordRecoveryUrl?.toString()
+        else -> Brand.passwordRecoveryUrl?.toString()
+    }
+
     val primary = MaterialTheme.colorScheme.primary
+    val ext = LocalExtended.current
     Box(
         Modifier.fillMaxSize().background(
-            Brush.verticalGradient(0f to MaterialTheme.colorScheme.primaryContainer.copy(alpha = if (LocalExtended.current.dark) 0.35f else 0.55f), 0.45f to MaterialTheme.colorScheme.background),
+            Brush.verticalGradient(0f to MaterialTheme.colorScheme.primaryContainer.copy(alpha = if (ext.dark) 0.35f else 0.55f), 0.45f to MaterialTheme.colorScheme.background),
         ),
     ) {
-        // The form sits in the middle of the screen; the links stay at the bottom.
-        // When the keyboard is up, or the screen is short, it all scrolls.
+        // The form sits in the middle of the screen; the server line and the links stay at
+        // the bottom. When the keyboard is up, or the screen is short, it all scrolls.
         BoxWithConstraints(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding()) {
             val screen = maxHeight
             Column(
@@ -176,14 +190,16 @@ fun SignInScreen(model: AppModel) {
             ) {
                 Spacer(Modifier.weight(1f))
                 Column(Modifier.widthIn(max = 460.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Image(painterResource(R.drawable.brand_logo), Brand.name, Modifier.size(76.dp).clip(RoundedCornerShape(20.dp)))
-                    Spacer(Modifier.height(16.dp))
-                    Text(Brand.name, style = MaterialTheme.typography.titleMedium, color = primary)
+                    // The mark turns while a sign-in or "Continue" is in progress.
+                    ClockLoader(animating = busy, showsName = false)
+                    Spacer(Modifier.height(14.dp))
+                    Text(Brand.name, style = MaterialTheme.typography.titleSmall, color = primary)
                     AnimatedContent(askServer, transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "signin") { serverStep ->
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             if (serverStep) {
-                                Text(s.serverTitle, style = MaterialTheme.typography.headlineMedium, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 4.dp))
-                                Text(s.serverHint, style = MaterialTheme.typography.bodyLarge, color = LocalExtended.current.muted, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 8.dp, bottom = 24.dp))
+                                Text(s.serverTitle, style = MaterialTheme.typography.headlineMedium, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 8.dp))
+                                Text(s.serverHint(Brand.name), style = MaterialTheme.typography.bodyLarge, color = ext.muted, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 8.dp, bottom = 24.dp))
+                                model.signInNotice?.let { NoticeBanner(it, Modifier.padding(bottom = 16.dp)) }
                                 Field(
                                     draft, { draft = it; error = null }, s.serverLabel, placeholder = s.serverPlaceholder,
                                     keyboard = KeyboardType.Uri, imeAction = ImeAction.Go, onDone = { connect() },
@@ -194,52 +210,41 @@ fun SignInScreen(model: AppModel) {
                                 PrimaryButton(s.connect, enabled = draft.isNotBlank(), busy = busy) { connect() }
                                 if (directory != null || hosted != null) {
                                     TextButton({ mode = if (directory != null) "directory" else "account"; askServer = false; error = null }, Modifier.fillMaxWidth().padding(top = 12.dp)) {
-                                        Text(s.useHosted(Brand.hostedLabel))
+                                        Text(s.useHosted(Brand.hostedLabel), color = ext.muted)
                                     }
                                 }
                             } else {
-                                Text(s.title, style = MaterialTheme.typography.headlineMedium, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 4.dp))
-                                Text(s.subtitle, style = MaterialTheme.typography.bodyLarge, color = LocalExtended.current.muted, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 8.dp, bottom = 24.dp))
-                                if (mode == "server") {
-                                    Row(
-                                        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.surfaceContainer)
-                                            .clickable { askServer = true; error = null }.padding(horizontal = 14.dp, vertical = 12.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                    ) {
-                                        androidx.compose.material3.Icon(Icons.Outlined.Dns, null, tint = primary, modifier = Modifier.size(20.dp))
-                                        Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
-                                            Text(s.connectedTo, style = MaterialTheme.typography.labelMedium, color = LocalExtended.current.muted)
-                                            Text(ServerAddress.display(server), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-                                        }
-                                        Text(s.changeServer, color = primary, style = MaterialTheme.typography.labelLarge)
-                                    }
-                                    Spacer(Modifier.height(16.dp))
-                                }
+                                Text(s.title, style = MaterialTheme.typography.headlineMedium, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 8.dp))
+                                Text(s.subtitle, style = MaterialTheme.typography.bodyLarge, color = ext.muted, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 8.dp, bottom = 24.dp))
+                                model.signInNotice?.let { NoticeBanner(it, Modifier.padding(bottom = 16.dp)) }
                                 if (mode == "account") {
-                                    Field(account, { account = it; error = null }, s.accountLabel, placeholder = s.accountPlaceholder, supporting = s.accountHint, keyboard = KeyboardType.Uri)
+                                    Field(
+                                        account, { account = it; accountError = null; error = null }, s.accountLabel, placeholder = s.accountPlaceholder,
+                                        supporting = s.accountHint, error = accountError, keyboard = KeyboardType.Uri, enabled = !busy,
+                                    )
                                     Spacer(Modifier.height(8.dp))
                                 }
                                 Field(email, { email = it; error = null }, s.emailLabel, placeholder = s.emailPlaceholder, keyboard = KeyboardType.Email, enabled = !busy)
                                 Spacer(Modifier.height(12.dp))
                                 Field(password, { password = it; error = null }, s.passwordLabel, password = true, imeAction = ImeAction.Go, onDone = { submit() }, enabled = !busy)
                                 error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) }
-                                model.signInNotice?.takeIf { error == null }?.let {
-                                    Text(it, color = LocalExtended.current.muted, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
-                                }
                                 Spacer(Modifier.height(20.dp))
                                 PrimaryButton(s.submit, enabled = email.isNotBlank() && password.isNotEmpty(), busy = busy) { submit() }
-                                TextButton({ forgot = true }, Modifier.fillMaxWidth().padding(top = 8.dp)) { Text(s.forgot) }
+                                TextButton({ recoveryUrl()?.let { context.openUrl(it) } ?: run { forgot = true } }, Modifier.fillMaxWidth().padding(top = 8.dp)) { Text(s.forgot) }
                                 if (mode != "server") {
-                                    TextButton({ askServer = true; error = null }, Modifier.fillMaxWidth()) { Text(s.otherAddress) }
+                                    TextButton({ askServer = true; error = null }, Modifier.fillMaxWidth()) { Text(s.otherAddress, color = ext.muted) }
                                 }
                             }
                         }
                     }
                 }
                 Spacer(Modifier.weight(1f))
-                Row(Modifier.widthIn(max = 460.dp).fillMaxWidth().padding(top = 24.dp), horizontalArrangement = Arrangement.spacedBy(24.dp, Alignment.CenterHorizontally)) {
-                    Brand.privacyPolicyUrl?.let { url -> Text(s.privacy, color = LocalExtended.current.muted, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.clickable { context.openUrl(url.toString()) }.padding(8.dp)) }
-                    Brand.supportUrl?.let { url -> Text(s.support, color = LocalExtended.current.muted, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.clickable { context.openUrl(url.toString()) }.padding(8.dp)) }
+                if (!askServer && mode == "server") ServerLine(server) { askServer = true; error = null }
+                if (Brand.privacyPolicyUrl != null || Brand.supportUrl != null) {
+                    Row(Modifier.widthIn(max = 460.dp).fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(24.dp, Alignment.CenterHorizontally)) {
+                        Brand.privacyPolicyUrl?.let { url -> Text(s.privacy, color = ext.muted, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.clickable { context.openUrl(url.toString()) }.padding(8.dp)) }
+                        Brand.supportUrl?.let { url -> Text(s.support, color = ext.muted, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.clickable { context.openUrl(url.toString()) }.padding(8.dp)) }
+                    }
                 }
             }
         }
@@ -258,7 +263,7 @@ fun SignInScreen(model: AppModel) {
             title = { Text(s.chooseAccount) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(s.chooseAccountBody, color = LocalExtended.current.muted)
+                    Text(s.chooseAccountBody, color = ext.muted)
                     accounts.forEach { option ->
                         Row(
                             Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceContainer).clickable { finish(option) }.padding(12.dp),
@@ -267,13 +272,34 @@ fun SignInScreen(model: AppModel) {
                             Avatar(option.name.ifEmpty { option.server }, size = 36.dp)
                             Column(Modifier.padding(start = 12.dp)) {
                                 Text(option.name.ifEmpty { ServerAddress.display(option.server) }, fontWeight = FontWeight.SemiBold)
-                                Text(ServerAddress.display(option.server), color = LocalExtended.current.muted, style = MaterialTheme.typography.bodySmall)
+                                Text(ServerAddress.display(option.server), color = ext.muted, style = MaterialTheme.typography.bodySmall)
                             }
                         }
                     }
                 }
             },
             confirmButton = {}, dismissButton = { TextButton({ accounts = emptyList() }) { Text(Copy.common.cancel) } },
+        )
+    }
+}
+
+/** «Conectado a localhost:4100 · Cambiar»: which server the form signs in to, kept small, with the way back. */
+@Composable
+private fun ServerLine(server: String, onChange: () -> Unit) {
+    val muted = LocalExtended.current.muted
+    Row(
+        Modifier.widthIn(max = 460.dp).fillMaxWidth().heightIn(min = 36.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center,
+    ) {
+        Text(
+            Copy.signIn.connectedTo(ServerAddress.display(server)), style = MaterialTheme.typography.bodySmall, color = muted,
+            maxLines = 1, overflow = TextOverflow.MiddleEllipsis, modifier = Modifier.weight(1f, fill = false),
+        )
+        Text(" · ", style = MaterialTheme.typography.bodySmall, color = muted)
+        Text(
+            Copy.signIn.changeServer, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary,
+            maxLines = 1, softWrap = false,
+            modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onChange).heightIn(min = 36.dp).wrapContentHeight().padding(horizontal = 4.dp),
         )
     }
 }
@@ -298,7 +324,7 @@ fun NoBusinessScreen(model: AppModel) {
         horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
     ) {
         EmptyState(Icons.Outlined.Storefront, Copy.signIn.noBusinesses, Copy.signIn.noBusinessesBody)
-        OutlinedButton({ model.restore() }) { Text(Copy.common.retry) }
+        PrimaryButton(Copy.common.retry, Modifier.widthIn(max = 320.dp)) { model.restore() }
         TextButton({ model.signOut() }, Modifier.padding(top = 12.dp)) { Text(Copy.nav.signOut) }
     }
 }
@@ -334,8 +360,8 @@ fun BusinessRow(model: AppModel, business: Business, selected: Boolean, onClick:
         Column(Modifier.weight(1f).padding(horizontal = 14.dp)) {
             Text(business.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, maxLines = 1)
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 4.dp)) {
-                Chip(Copy.nav.role(business.access.role), if (business.isAdmin) LocalExtended.current.brand else LocalExtended.current.neutral)
-                if (business.sample) Chip(Copy.nav.sample, LocalExtended.current.warning)
+                Chip(Copy.nav.role(business.access.role), LocalExtended.current.brand)
+                if (business.sample) Chip(Copy.nav.sample, LocalExtended.current.neutral)
             }
         }
         if (selected) androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Filled.CheckCircle, null, tint = MaterialTheme.colorScheme.primary)

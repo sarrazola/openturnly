@@ -1,5 +1,8 @@
 package org.openturnly.mobile.localization
 
+import org.openturnly.mobile.rules.Money
+import org.openturnly.mobile.rules.Periods
+
 object MoreCopy {
     val title get() = tr("More", "Más")
     val you get() = tr("You", "Tú")
@@ -44,11 +47,12 @@ object BusinessCopy {
     val title get() = tr("Business", "Negocio")
     val details get() = tr("Business details", "Datos del negocio")
     val bookingLink get() = tr("Your booking page", "Tu página de reservas")
-    val bookingLinkHint get() = tr("Share it so customers book on their own, any time.", "Compártela para que tus clientes reserven solos, a cualquier hora.")
+    val bookingLinkHint get() = tr("Share it so your customers book on their own, any time.", "Compártela para que tus clientes reserven solos, a cualquier hora.")
     val qrTitle get() = tr("QR code", "Código QR")
-    val qrHint get() = tr("Print it for your counter or show it from your phone.", "Imprímelo para tu mostrador o muéstralo desde tu celular.")
+    val qrHint get() = tr("Print it for the counter or the mirror: customers scan it and book.", "Imprímelo para el mostrador o el espejo: tus clientes lo escanean y reservan.")
     val shareQr get() = tr("Share QR", "Compartir QR")
-    val shareText get() = tr("Book your appointment here:", "Agenda tu cita aquí:")
+    /** What goes out with the link when it is shared: "Reserva tu cita en Barbería Centro: https://…". */
+    fun shareText(name: String, link: String) = tr("Book with $name: $link", "Reserva tu cita en $name: $link")
     val region get() = tr("Region", "Región")
     val timezone get() = tr("Time zone", "Zona horaria")
     val currency get() = tr("Currency", "Moneda")
@@ -69,35 +73,52 @@ object ReportsCopy {
     val billed get() = tr("Sales", "Ventas")
     fun vs(value: String) = tr("vs. $value before", "vs. $value antes")
     val noComparison get() = tr("Nothing to compare", "Sin datos para comparar")
-    val origin get() = tr("How bookings arrive", "Cómo llegan tus reservas")
+    val origin get() = tr("Where bookings come from", "Cómo llegan tus reservas")
     fun originLabel(key: String) = when (key) {
         "online" -> tr("Booking page", "Página de reservas")
         "agent" -> tr("AI assistant", "Asistente de IA")
-        else -> tr("Your team, from the agenda", "Tu equipo, desde la agenda")
+        else -> tr("Your team, from the calendar", "Tu equipo, desde la agenda")
     }
+    /** An origin row's figures: "12 · 60 %". */
+    fun originFigures(count: Int, share: Int) = "$count · " + Money.percent(share.toString(), AppLocale.locale)
     val topSold get() = tr("Best sellers", "Lo más vendido")
     fun sold(n: Int) = if (AppLocale.isSpanish) (if (n == 1) "1 vendido" else "$n vendidos") else "$n sold"
     val byProfessional get() = tr("Appointments by staff member", "Citas por profesional")
+    fun appointments(n: Int) = if (AppLocale.isSpanish) (if (n == 1) "1 cita" else "$n citas") else (if (n == 1) "1 appointment" else "$n appointments")
     val noProfessional get() = tr("No staff member", "Sin profesional")
-    val nothing get() = tr("No data in these dates yet.", "Aún no hay datos en estas fechas.")
+    val nothing get() = tr("No data for these dates yet.", "Aún no hay datos en estas fechas.")
     val noTips get() = tr("No tips in these dates.", "No hay propinas en estas fechas.")
     val points get() = tr("pts", "pts")
+    /** A whole percent as the language writes it: "45 %" / "45%". */
+    fun percent(value: Int) = Money.percent(value.toString(), AppLocale.locale)
+    /** A KPI's change: "+12 %" and "−5 %" (a real minus sign), "+3 pts" for occupancy, "0 %" when flat. */
+    fun change(trend: Periods.Trend, inPoints: Boolean): String {
+        val sign = when (trend.direction) { Periods.Direction.UP -> "+"; Periods.Direction.DOWN -> "\u2212"; Periods.Direction.FLAT -> "" }
+        return sign + if (inPoints) "${trend.amount}\u00A0$points" else percent(trend.amount)
+    }
     val today get() = tr("Today's appointments", "Citas de hoy")
     val noneToday get() = tr("No appointments today.", "Hoy no hay citas.")
     val chartBookings get() = tr("Bookings", "Reservas")
     val chartBilled get() = tr("Sales", "Ventas")
     val services get() = tr("Services", "Servicios")
     val products get() = tr("Products", "Productos")
+    fun servicesCount(n: Int) = tr("Services ($n)", "Servicios ($n)")
+    fun productsCount(n: Int) = tr("Products ($n)", "Productos ($n)")
     val toPay get() = tr("Total to pay", "Total a pagar")
-    fun rateOf(rate: String, amount: String) = tr("$rate % of $amount", "$rate % de $amount")
+    /** The base a commission is taken from: "10 % de $ 200.000" / "10% of $200,000". */
+    fun rateOf(rate: Double, amount: String): String {
+        val number = java.text.NumberFormat.getNumberInstance(AppLocale.locale).apply { maximumFractionDigits = 1; isGroupingUsed = false }.format(rate)
+        val percent = Money.percent(number, AppLocale.locale)
+        return tr("$percent of $amount", "$percent de $amount")
+    }
     val noProfessionals get() = tr("No staff yet.", "Aún no tienes profesionales.")
-    fun preset(key: org.openturnly.mobile.rules.Periods.Preset) = when (key) {
-        org.openturnly.mobile.rules.Periods.Preset.TODAY -> tr("Today", "Hoy")
-        org.openturnly.mobile.rules.Periods.Preset.WEEK -> tr("This week", "Esta semana")
-        org.openturnly.mobile.rules.Periods.Preset.MONTH -> tr("This month", "Este mes")
-        org.openturnly.mobile.rules.Periods.Preset.LAST_MONTH -> tr("Last month", "Mes pasado")
-        org.openturnly.mobile.rules.Periods.Preset.LAST_30 -> tr("Last 30 days", "Últimos 30 días")
-        org.openturnly.mobile.rules.Periods.Preset.YEAR -> tr("This year", "Este año")
+    fun preset(key: Periods.Preset) = when (key) {
+        Periods.Preset.TODAY -> tr("Today", "Hoy")
+        Periods.Preset.WEEK -> tr("This week", "Esta semana")
+        Periods.Preset.MONTH -> tr("This month", "Este mes")
+        Periods.Preset.LAST_MONTH -> tr("Last month", "Mes pasado")
+        Periods.Preset.LAST_30 -> tr("Last 30 days", "Últimos 30 días")
+        Periods.Preset.YEAR -> tr("This year", "Este año")
     }
     val paidBadge get() = tr("Paid", "Pagada")
 }
@@ -115,11 +136,11 @@ object AccountCopy {
     val mismatch get() = tr("The passwords don't match.", "Las contraseñas no coinciden.")
     val changePassword get() = tr("Change password", "Cambiar contraseña")
     val passwordChanged get() = tr("Password changed", "Contraseña cambiada")
-    val updated get() = tr("Details saved", "Datos guardados")
+    val updated get() = tr("Changes saved", "Cambios guardados")
     val session get() = tr("Session", "Sesión")
     val server get() = tr("Server", "Servidor")
     val role get() = tr("Role", "Rol")
-    val theme get() = tr("The app follows your phone's light or dark theme.", "La app sigue el tema claro u oscuro de tu celular.")
+    val theme get() = tr("The app follows your phone's light or dark mode.", "La app sigue el modo claro u oscuro de tu teléfono.")
 }
 
 object GiftCardsCopy {

@@ -18,6 +18,15 @@ object Inbox {
         else -> Kind.OTHER
     }
 
+    /**
+     * Whether a failed load means the server has no inbox at all: an older one
+     * answers 404 for the route, and then the bell stays hidden.
+     */
+    fun unsupported(status: Int): Boolean = status == 404
+
+    /** A row opens the appointment it is about; one without an appointment is not tappable. */
+    fun opens(appointmentId: String?): Boolean = !appointmentId.isNullOrBlank()
+
     /** Nothing at zero, the number up to nine, then "9+" so the badge stays small. */
     fun badge(count: Int): String? = when {
         count <= 0 -> null

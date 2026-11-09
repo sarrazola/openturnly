@@ -2,7 +2,9 @@ package org.openturnly.mobile.localization
 
 /**
  * Plain words for the server's error codes. The Spanish texts are the web's
- * (`errors` in its translations), so the same mistake reads the same on both.
+ * (`errors` in its translations), so the same mistake reads the same on both,
+ * and the iPhone app carries the same table. A message is looked up as
+ * `<field>_<code>`, then `<code>`, then a generic line.
  */
 object ErrorsCopy {
     val generic get() = tr("Something went wrong. Try again.", "Algo salió mal. Inténtalo de nuevo.")
@@ -11,7 +13,7 @@ object ErrorsCopy {
     private val es = mapOf(
         "network" to "No hay conexión con el servidor. Revisa tu internet.",
         "invalid_server" to "Esa dirección no es válida.",
-        "unauthorized" to "Tu sesión terminó. Vuelve a entrar.",
+        "unauthorized" to "Tu sesión terminó. Ingresa de nuevo.",
         "invalid_credentials" to "El email o la contraseña no son correctos.",
         "invalid_email_or_password" to "El email o la contraseña no son correctos.",
         "unknown_error" to "Algo salió mal. Inténtalo de nuevo.",
@@ -77,21 +79,31 @@ object ErrorsCopy {
         "birthDate_invalid_date" to "Revisa la fecha: no puede ser en el futuro.",
         "validation_failed" to "Revisa los datos marcados.",
         "invalid_json" to "Algo salió mal. Inténtalo de nuevo.",
-        "forbidden_origin" to "Esto solo se puede hacer desde las páginas de tu OpenTurnly.",
+        "forbidden_origin" to "Esto solo se puede hacer desde el panel web.",
         "invitation_invalid" to "La invitación venció o ya se usó.",
         "closure_exists" to "Esas fechas ya tienen un cierre.",
         "slug_locked" to "El enlace de un negocio no se puede cambiar.",
         "image_invalid" to "El archivo no es una imagen válida. Usa JPG, PNG o WebP.",
         "image_too_large" to "La imagen es demasiado grande.",
         "deposit_amount" to "Un abono se usa completo: no se puede partir.",
+        "payments_deposit_amount" to "Un abono se usa completo: no se puede partir.",
+        "deposit_not_found" to "No encontramos ese abono.",
+        "member_not_found" to "Esa persona ya no tiene acceso.",
+        "phone_customer_exists" to "Ya tienes un cliente con ese celular.",
+        "email_customer_exists" to "Ya tienes un cliente con ese email.",
+        "code_invalid_code" to "Usa de 3 a 24 letras, números o guiones.",
+        "currentPassword_wrong_password" to "La contraseña actual no es correcta.",
+        "email_already_member" to "Esa persona ya tiene acceso a este negocio.",
+        "firstName_too_small" to "Este campo es obligatorio.",
+        "lastName_too_small" to "Este campo es obligatorio.",
     )
 
     private val en = mapOf(
         "network" to "No connection to the server. Check your internet.",
         "invalid_server" to "That address isn't valid.",
         "unauthorized" to "Your session ended. Sign in again.",
-        "invalid_credentials" to "The email or the password is not right.",
-        "invalid_email_or_password" to "The email or the password is not right.",
+        "invalid_credentials" to "The email or password isn't right.",
+        "invalid_email_or_password" to "The email or password isn't right.",
         "unknown_error" to "Something went wrong. Try again.",
         "internal_error" to "Something went wrong on the server. Try again.",
         "not_found" to "We couldn't find that.",
@@ -155,13 +167,23 @@ object ErrorsCopy {
         "birthDate_invalid_date" to "Check the date: it can't be in the future.",
         "validation_failed" to "Check the highlighted details.",
         "invalid_json" to "Something went wrong. Try again.",
-        "forbidden_origin" to "This can only be done from your OpenTurnly's own pages.",
+        "forbidden_origin" to "This can only be done from the web panel.",
         "invitation_invalid" to "The invitation expired or was already used.",
         "closure_exists" to "Those dates already have a closure.",
         "slug_locked" to "A business's link can't be changed.",
         "image_invalid" to "The file isn't a valid image. Use JPG, PNG or WebP.",
         "image_too_large" to "The image is too large.",
         "deposit_amount" to "A deposit is used whole: it can't be split.",
+        "payments_deposit_amount" to "A deposit is used whole: it can't be split.",
+        "deposit_not_found" to "We couldn't find that deposit.",
+        "member_not_found" to "That person no longer has access.",
+        "phone_customer_exists" to "You already have a customer with that mobile.",
+        "email_customer_exists" to "You already have a customer with that email.",
+        "code_invalid_code" to "Use 3 to 24 letters, numbers or dashes.",
+        "currentPassword_wrong_password" to "The current password is not right.",
+        "email_already_member" to "That person already has access to this business.",
+        "firstName_too_small" to "This field is required.",
+        "lastName_too_small" to "This field is required.",
     )
 
     private val table get() = if (AppLocale.isSpanish) es else en

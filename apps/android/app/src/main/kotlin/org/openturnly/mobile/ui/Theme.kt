@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.openturnly.mobile.Brand
 import org.openturnly.mobile.rules.Appointments
+import org.openturnly.mobile.rules.Names
 
 /**
  * Colour, type and shape.
@@ -56,18 +57,25 @@ data class Extended(
     val info: Tone,
     val neutral: Tone,
     val whatsapp: Color,
-    val people: List<Color>,
+    val professionals: List<Color>,
+    val avatars: List<Color>,
 ) {
     fun status(status: Appointments.Status): Tone = when (status) {
         Appointments.Status.UPCOMING -> brand
-        Appointments.Status.CONFIRMED -> success
+        Appointments.Status.NOW, Appointments.Status.CONFIRMED -> success
         Appointments.Status.CANCELLED -> danger
         Appointments.Status.NO_SHOW -> orange
         Appointments.Status.PENDING_PAYMENT -> warning
     }
 
-    /** One colour per professional, by their position in the team. */
-    fun person(index: Int): Color = if (index < 0) muted else people[index % people.size]
+    /**
+     * One colour per professional, by their position in the team, as on the web's
+     * calendar. Someone not in the team takes the first colour.
+     */
+    fun person(index: Int): Color = professionals[if (index < 0) 0 else index % professionals.size]
+
+    /** A customer's avatar colour, from their name. */
+    fun avatar(name: String): Color = avatars[Names.colorIndex(name, avatars.size)]
 }
 
 private val zinc50 = hex("#fafafa")
@@ -81,8 +89,14 @@ private val zinc700 = hex("#3f3f46")
 private val zinc800 = hex("#27272a")
 private val zinc900 = hex("#18181b")
 
-private val peopleLight = listOf("#0d9488", "#6366f1", "#d97706", "#e11d48", "#0284c7", "#7c3aed", "#059669", "#ea580c").map(::hex)
-private val peopleDark = listOf("#2dd4bf", "#818cf8", "#fbbf24", "#fb7185", "#38bdf8", "#a78bfa", "#34d399", "#fb923c").map(::hex)
+/** The web calendar's colours, one per professional by their place in the team. */
+private val professionalColors = listOf("#0f766e", "#0284c7", "#d97706", "#db2777", "#65a30d", "#7c3aed", "#475569").map(::hex)
+
+/** Customers' avatar colours, picked by a hash of the name. */
+private val avatarColors = listOf("#0f766e", "#0284c7", "#7c3aed", "#db2777", "#d97706", "#65a30d", "#0891b2", "#4f46e5").map(::hex)
+
+/** The same colours lifted a quarter of the way to white, so they read on a dark background. */
+private fun lifted(colors: List<Color>): List<Color> = colors.map { lerp(it, Color.White, 0.25f) }
 
 object Palette {
     val brand: Color get() = hex(Brand.primaryColorHex)
@@ -146,7 +160,8 @@ object Palette {
         info = Tone(hex("#dbeafe"), hex("#1e40af")),
         neutral = Tone(zinc100, zinc600),
         whatsapp = hex("#16a34a"),
-        people = peopleLight,
+        professionals = professionalColors,
+        avatars = avatarColors,
     ) else Extended(
         dark = true,
         canvas = hex("#0a0f0e"), card = hex("#121a19"), cardBorder = hex("#1f2928"),
@@ -159,7 +174,8 @@ object Palette {
         info = Tone(hex("#132044"), hex("#93c5fd")),
         neutral = Tone(hex("#1c2423"), zinc300),
         whatsapp = hex("#4ade80"),
-        people = peopleDark,
+        professionals = lifted(professionalColors),
+        avatars = lifted(avatarColors),
     )
 }
 

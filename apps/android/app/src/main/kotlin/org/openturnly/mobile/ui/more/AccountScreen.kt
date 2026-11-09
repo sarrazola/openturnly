@@ -179,7 +179,7 @@ private fun PushSection(model: AppModel) {
         }
         AnimatedVisibility(blocked) {
             Column(Modifier.padding(top = 10.dp)) {
-                Text(Copy.notifications.blocked, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                Text(Copy.notifications.blocked(org.openturnly.mobile.Brand.name), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                 OutlinedButton(
                     onClick = {
                         context.launch(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName))

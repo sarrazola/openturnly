@@ -2,9 +2,9 @@
 
 package org.openturnly.mobile.ui.sales
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Block
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -30,8 +31,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import org.openturnly.mobile.AppModel
+import org.openturnly.mobile.api.CustomerSummary
 import org.openturnly.mobile.api.Sale
 import org.openturnly.mobile.localization.AppLocale
 import org.openturnly.mobile.localization.Copy
@@ -46,6 +50,7 @@ import org.openturnly.mobile.ui.ErrorState
 import org.openturnly.mobile.ui.Hairline
 import org.openturnly.mobile.ui.InfoRow
 import org.openturnly.mobile.ui.LocalExtended
+import org.openturnly.mobile.ui.Route
 import org.openturnly.mobile.ui.SectionTitle
 import org.openturnly.mobile.ui.SkeletonCards
 import org.openturnly.mobile.ui.rememberAction
@@ -66,20 +71,44 @@ fun SaleDetailScreen(model: AppModel, saleId: String, initial: Sale?) {
 
     DetailScaffold(title = sale?.let { Copy.sales.saleTitle(it.number) } ?: "", onBack = { model.nav.pop() }) { padding ->
         if (sale == null) {
-            if (loader.error != null) ErrorState(loader.error!!, { loader.load() }, Modifier.padding(padding)) else SkeletonCards(3, Modifier.padding(padding))
+            val error = loader.error
+            if (error != null) ErrorState(error, { loader.load() }, Modifier.padding(padding)) else SkeletonCards(3, Modifier.padding(padding))
             return@DetailScaffold
         }
         val at = BusinessTime.parse(sale.createdAt)
+        val void = sale.status == "void"
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            // Header: status, what came in, when; then who and where.
             AppCard {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Chip(if (sale.status == "void") Copy.sales.void else Copy.sales.paid, if (sale.status == "void") ext.danger else ext.success)
+                    Chip(if (void) Copy.sales.void else Copy.sales.paid, if (void) ext.danger else ext.info)
                     if (sale.internal) Chip(Copy.sales.internal, ext.neutral)
                 }
-                Text(Money.format(sale.total + sale.tipAmount, currency), style = MaterialTheme.typography.headlineMedium.tabular, modifier = Modifier.padding(top = 10.dp))
-                at?.let { Text(BusinessTime.longDay(BusinessTime.localDate(it, zone), AppLocale.locale) + " · " + BusinessTime.time(it, zone), color = ext.muted) }
+                Text(
+                    Money.format(sale.total + sale.tipAmount, currency), style = MaterialTheme.typography.headlineMedium.tabular,
+                    textDecoration = if (void) TextDecoration.LineThrough else null, color = if (void) ext.muted else MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(top = 10.dp),
+                )
+                at?.let { Text(BusinessTime.mediumDate(BusinessTime.localDate(it, zone), AppLocale.locale) + " · " + BusinessTime.time(it, zone), color = ext.muted) }
                 Hairline(Modifier.padding(vertical = 10.dp))
-                InfoRow(Copy.checkout.customer, sale.customer?.let { Names.full(it.firstName, it.lastName) } ?: Copy.sales.noCustomer)
+                val customer = sale.customer?.takeIf { it.id.isNotEmpty() }
+                if (customer != null) {
+                    Row(
+                        Modifier.fillMaxWidth().clickable {
+                            model.nav.push(Route.CustomerDetail(CustomerSummary(id = customer.id, firstName = customer.firstName, lastName = customer.lastName, phone = customer.phone, email = customer.email)))
+                        }.padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(Copy.sales.customer, color = ext.muted, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(end = 16.dp))
+                        Text(
+                            Names.full(customer.firstName, customer.lastName), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.primary, textAlign = TextAlign.End, modifier = Modifier.weight(1f),
+                        )
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = ext.subtle, modifier = Modifier.padding(start = 4.dp).size(20.dp))
+                    }
+                } else {
+                    InfoRow(Copy.sales.customer, Copy.sales.noCustomer)
+                }
                 if (model.catalog.activeLocations.size > 1) sale.locationName?.let { InfoRow(Copy.common.location, it) }
                 sale.soldByName?.let { InfoRow(Copy.sales.soldBy, it) }
             }
@@ -89,7 +118,7 @@ fun SaleDetailScreen(model: AppModel, saleId: String, initial: Sale?) {
                 sale.items.forEachIndexed { index, item ->
                     if (index > 0) Hairline(Modifier.padding(vertical = 8.dp))
                     Row(verticalAlignment = Alignment.Top) {
-                        Column(Modifier.weight(1f)) {
+                        Column(Modifier.weight(1f).padding(end = 12.dp)) {
                             Text(item.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
                             Text(
                                 listOfNotNull("${item.quantity} × ${Money.format(item.unitPrice, currency)}", item.resourceName).joinToString(" · "),
@@ -136,7 +165,7 @@ fun SaleDetailScreen(model: AppModel, saleId: String, initial: Sale?) {
                     model.agenda.invalidate()
                 }
             },
-            onDismiss = { confirmVoid = false }, danger = true,
+            onDismiss = { confirmVoid = false }, dismiss = Copy.sales.voidDismiss, danger = true,
         )
     }
 }

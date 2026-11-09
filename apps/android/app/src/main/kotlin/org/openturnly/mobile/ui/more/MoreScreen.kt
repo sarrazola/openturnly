@@ -24,6 +24,7 @@ import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.QrCode2
 import androidx.compose.material.icons.outlined.SwapHoriz
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -35,18 +36,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.openturnly.mobile.AppModel
 import org.openturnly.mobile.Brand
 import org.openturnly.mobile.BuildConfig
 import org.openturnly.mobile.localization.Copy
-import org.openturnly.mobile.rules.ServerAddress
 import org.openturnly.mobile.ui.AppCard
 import org.openturnly.mobile.ui.BusinessLogo
 import org.openturnly.mobile.ui.Chip
 import org.openturnly.mobile.ui.ConfirmDialog
 import org.openturnly.mobile.ui.Hairline
+import org.openturnly.mobile.ui.IconBadge
 import org.openturnly.mobile.ui.LocalExtended
 import org.openturnly.mobile.ui.NavRow
 import org.openturnly.mobile.ui.Route
@@ -63,15 +66,15 @@ fun MoreScreen(model: AppModel) {
     var confirmSignOut by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize().statusBarsPadding().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 24.dp)) {
         Text(Copy.more.title, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(top = 16.dp, bottom = 16.dp))
+        // Who and where: the business and your role in it. Not a button; switching has its own row.
         AppCard(padding = PaddingValues(0.dp)) {
-            Row(Modifier.fillMaxWidth().clickable { model.nav.push(Route.BookingLink) }.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                 BusinessLogo(model, business, 56.dp)
                 Column(Modifier.weight(1f).padding(start = 14.dp)) {
-                    Text(business.name, style = MaterialTheme.typography.titleLarge)
-                    Text(ServerAddress.display(model.server) + "/" + business.slug, style = MaterialTheme.typography.bodySmall, color = ext.muted, maxLines = 1)
+                    Text(business.name, style = MaterialTheme.typography.titleLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Chip(Copy.nav.role(business.access.role), if (admin) ext.brand else ext.neutral)
-                        if (business.sample) Chip(Copy.nav.sample, ext.warning)
+                        Chip(Copy.nav.role(business.access.role), ext.brand)
+                        if (business.sample) Chip(Copy.nav.sample, ext.neutral)
                     }
                 }
             }
@@ -82,16 +85,16 @@ fun MoreScreen(model: AppModel) {
         }
 
         AppCard(Modifier.padding(top = 12.dp), padding = PaddingValues(vertical = 4.dp)) {
-            NavRow(Copy.more.bookingLink, Icons.Outlined.QrCode2, iconTint = ext.person(2)) { model.nav.push(Route.BookingLink) }
+            NavRow(Copy.more.bookingLink, Icons.Outlined.QrCode2, iconTint = MaterialTheme.colorScheme.primary) { model.nav.push(Route.BookingLink) }
             if (admin) {
                 Hairline(Modifier.padding(start = 66.dp))
-                NavRow(Copy.reports.title, Icons.Outlined.BarChart, iconTint = ext.person(6)) { model.nav.push(Route.Reports) }
+                NavRow(Copy.reports.title, Icons.Outlined.BarChart, iconTint = ext.warning.content) { model.nav.push(Route.Reports) }
             }
         }
 
         if (admin) {
             AppCard(Modifier.padding(top = 12.dp), padding = PaddingValues(vertical = 4.dp)) {
-                NavRow(Copy.more.webPanel, Icons.Outlined.Language, iconTint = ext.person(5), trailing = {
+                NavRow(Copy.more.webPanel, Icons.Outlined.Language, iconTint = ext.neutral.content, trailing = {
                     Icon(Icons.AutoMirrored.Outlined.OpenInNew, null, tint = ext.muted, modifier = Modifier.size(18.dp))
                 }) { context.openUrl("${model.server}/admin") }
             }
@@ -100,9 +103,9 @@ fun MoreScreen(model: AppModel) {
 
         SectionTitle(Copy.more.you, Modifier.padding(top = 12.dp))
         AppCard(padding = PaddingValues(vertical = 4.dp)) {
-            NavRow(Copy.account.title, Icons.Outlined.AccountCircle, subtitle = model.user?.let { "${it.name} · ${it.email}" }) { model.nav.push(Route.Account) }
+            NavRow(Copy.account.title, Icons.Outlined.AccountCircle, iconTint = ext.neutral.content, subtitle = model.user?.let { "${it.name} · ${it.email}" }) { model.nav.push(Route.Account) }
             Hairline(Modifier.padding(start = 66.dp))
-            NavRow(Copy.nav.signOut, Icons.AutoMirrored.Outlined.Logout, iconTint = MaterialTheme.colorScheme.error, trailing = {}) { confirmSignOut = true }
+            SignOutRow(busy = model.signOutBusy) { confirmSignOut = true }
         }
 
         Spacer(Modifier.height(24.dp))
@@ -118,5 +121,19 @@ fun MoreScreen(model: AppModel) {
 
     if (confirmSignOut) {
         ConfirmDialog(Copy.nav.signOutTitle, Copy.nav.signOutBody, Copy.nav.signOut, onConfirm = { confirmSignOut = false; model.signOut() }, onDismiss = { confirmSignOut = false }, danger = true)
+    }
+}
+
+/** «Cerrar sesión», in red like every action that can't be undone, with progress while it runs. */
+@Composable
+private fun SignOutRow(busy: Boolean, onClick: () -> Unit) {
+    val danger = MaterialTheme.colorScheme.error
+    Row(
+        Modifier.fillMaxWidth().clickable(enabled = !busy, onClick = onClick).padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        IconBadge(Icons.AutoMirrored.Outlined.Logout, danger)
+        Text(Copy.nav.signOut, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium, color = danger, modifier = Modifier.weight(1f))
+        if (busy) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = danger)
     }
 }

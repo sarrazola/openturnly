@@ -73,6 +73,10 @@ object Money {
         return runCatching { number.movePointRight(places).setScale(0, RoundingMode.HALF_UP).longValueExact() }.getOrNull()
     }
 
+    /** "45 %" in Spanish, "45%" in English: the space follows the language's rule. */
+    fun percent(number: String, locale: Locale): String =
+        if (locale.language == "es") "$number\u00A0%" else "$number%"
+
     /** The currency's symbol as its own country writes it ("$", "€", "S/"). */
     fun symbol(currency: String): String = runCatching {
         Currency.getInstance(currency.uppercase()).getSymbol(locale(currency))

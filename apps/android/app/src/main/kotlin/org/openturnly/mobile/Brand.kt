@@ -76,5 +76,11 @@ object Brand {
     }
 
     val privacyPolicyUrl: URL? get() = localized(BuildConfig.BRAND_PRIVACY_POLICY_URL_EN, BuildConfig.BRAND_PRIVACY_POLICY_URL_ES)
+
+    /** The brand's own page to recover a password, for when no server is known yet. */
+    val passwordRecoveryUrl: URL? get() = httpsUrl(BuildConfig.BRAND_PASSWORD_RECOVERY_URL)
+
+    /** Whether brand_logo is the example's clock, which the app draws and animates itself. */
+    val animatedMark: Boolean = BuildConfig.BRAND_ANIMATED_MARK
     val supportUrl: URL? get() = localized(BuildConfig.BRAND_SUPPORT_URL_EN, BuildConfig.BRAND_SUPPORT_URL_ES)
 }

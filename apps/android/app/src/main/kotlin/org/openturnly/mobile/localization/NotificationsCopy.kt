@@ -29,18 +29,18 @@ object NotificationsCopy {
         "We let you know about new bookings, and appointments moved or cancelled, even when the app is closed.",
         "Te avisamos de las reservas nuevas y de las citas movidas o canceladas, aunque la app esté cerrada.",
     )
-    val blocked get() = tr(
-        "Notifications are turned off for this app in your phone's settings.",
-        "Los avisos de esta app están desactivados en los ajustes del teléfono.",
+    fun blocked(brand: String) = tr(
+        "$brand notifications are turned off in your phone's settings.",
+        "Los avisos de $brand están desactivados en los ajustes del teléfono.",
     )
     val openSettings get() = tr("Open settings", "Abrir ajustes")
 
     fun age(age: Inbox.Age, locale: Locale): String = when (age) {
-        Inbox.Age.Now -> tr("now", "ahora")
-        is Inbox.Age.Minutes -> tr("${age.count} min ago", "hace ${age.count} min")
-        is Inbox.Age.Hours -> tr("${age.count} h ago", "hace ${age.count} h")
-        Inbox.Age.Yesterday -> tr("yesterday", "ayer")
-        is Inbox.Age.Days -> tr("${age.count} days ago", "hace ${age.count} días")
+        Inbox.Age.Now -> tr("Now", "Ahora")
+        is Inbox.Age.Minutes -> tr("${age.count} min ago", "Hace ${age.count} min")
+        is Inbox.Age.Hours -> tr("${age.count} h ago", "Hace ${age.count} h")
+        Inbox.Age.Yesterday -> tr("Yesterday", "Ayer")
+        is Inbox.Age.Days -> tr("${age.count} days ago", "Hace ${age.count} días")
         is Inbox.Age.On -> BusinessTime.mediumDate(age.date, locale, withYear = false)
     }
 }

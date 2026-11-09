@@ -42,6 +42,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.WifiOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -130,7 +131,7 @@ fun Chip(text: String, tone: Tone, modifier: Modifier = Modifier, icon: ImageVec
 @Composable
 fun Avatar(name: String, modifier: Modifier = Modifier, size: Dp = 40.dp, color: Color? = null, photoUrl: String? = null) {
     val ext = LocalExtended.current
-    val tint = color ?: ext.people[Names.colorIndex(name, ext.people.size)]
+    val tint = color ?: ext.avatar(name)
     Box(
         modifier.size(size).clip(CircleShape).background(tint.copy(alpha = if (ext.dark) 0.22f else 0.14f)),
         contentAlignment = Alignment.Center,
@@ -229,9 +230,22 @@ fun EmptyState(
     }
 }
 
+/** A load that failed: «No se pudo cargar», what went wrong in the server's words, and a retry. */
 @Composable
 fun ErrorState(message: String, onRetry: () -> Unit, modifier: Modifier = Modifier) =
-    EmptyState(Icons.Outlined.WifiOff, message, null, modifier, Copy.common.retry, onRetry)
+    EmptyState(Icons.Outlined.WifiOff, Copy.common.loadFailed, message.takeIf { it != Copy.common.loadFailed }, modifier, Copy.common.retry, onRetry)
+
+/** A tinted line above a form or a screen: a session that ended, an appointment that is gone. */
+@Composable
+fun NoticeBanner(text: String, modifier: Modifier = Modifier, icon: ImageVector = Icons.Outlined.Info, tone: Tone = LocalExtended.current.warning) {
+    Row(
+        modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(tone.container).padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Icon(icon, null, tint = tone.content, modifier = Modifier.size(20.dp))
+        Text(text, style = MaterialTheme.typography.bodyMedium, color = tone.content, modifier = Modifier.weight(1f))
+    }
+}
 
 /** A soft pulsing block where content is about to appear. */
 @Composable
@@ -308,7 +322,8 @@ fun PrimaryButton(text: String, modifier: Modifier = Modifier, enabled: Boolean 
         onClick = onClick, enabled = enabled && !busy, colors = colors,
         modifier = modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(14.dp),
     ) {
-        if (busy) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
+        // The button greys out while it works; the spinner takes the greyed text's colour so it shows.
+        if (busy) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = androidx.compose.material3.LocalContentColor.current)
         else {
             if (icon != null) { Icon(icon, null, Modifier.size(20.dp)); Spacer(Modifier.width(8.dp)) }
             Text(text, style = MaterialTheme.typography.titleSmall)
@@ -358,7 +373,11 @@ fun Field(
         prefix = prefix?.let { { Text(it) } }, suffix = suffix?.let { { Text(it) } },
         leadingIcon = leading,
         trailingIcon = if (password) {
-            { IconButton({ reveal = !reveal }) { Icon(if (reveal) Icons.Filled.VisibilityOff else Icons.Filled.Visibility, null) } }
+            {
+                IconButton({ reveal = !reveal }) {
+                    Icon(if (reveal) Icons.Filled.VisibilityOff else Icons.Filled.Visibility, if (reveal) Copy.signIn.hidePassword else Copy.signIn.showPassword)
+                }
+            }
         } else trailing,
         shape = RoundedCornerShape(14.dp),
     )
@@ -433,12 +452,8 @@ fun RemoteImage(url: String, modifier: Modifier = Modifier, contentScale: Conten
     bitmap?.let { Image(it, null, modifier, contentScale = contentScale) }
 }
 
-/** The brand's mark while the saved session is checked, so launch flows on from the splash. */
+/** The brand's turning clock while the saved session is checked, centred where the splash drew its icon. */
 @Composable
 fun BrandLoading() {
-    Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-        Image(androidx.compose.ui.res.painterResource(org.openturnly.mobile.R.drawable.brand_logo), null, Modifier.size(72.dp).clip(RoundedCornerShape(20.dp)))
-        Spacer(Modifier.height(28.dp))
-        androidx.compose.material3.LinearProgressIndicator(Modifier.width(96.dp).clip(CircleShape))
-    }
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { ClockLoader() }
 }

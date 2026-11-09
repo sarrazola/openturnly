@@ -43,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -66,9 +67,13 @@ import org.openturnly.mobile.ui.LocalExtended
 import org.openturnly.mobile.ui.Route
 import org.openturnly.mobile.ui.SkeletonCards
 
-/** The agenda header's bell: the open business's unread count, and the way into the inbox. */
+/**
+ * The agenda header's bell: the open business's unread count, and the way into
+ * the inbox. A server without an inbox (it answers 404) shows no bell at all.
+ */
 @Composable
 fun NotificationBell(model: AppModel) {
+    if (!model.notifications.supported) return
     val unread = model.notifications.unread
     val badge = Inbox.badge(unread)
     // The count sits outside the button, which clips its content to a circle: "9+" would be cut.
@@ -76,14 +81,15 @@ fun NotificationBell(model: AppModel) {
         IconButton({ model.nav.push(Route.Notifications) }, Modifier.semantics { contentDescription = Copy.notifications.bell(unread) }) {
             Icon(if (badge != null) Icons.Filled.Notifications else Icons.Outlined.Notifications, null)
         }
-        if (badge != null) Badge(Modifier.align(Alignment.TopStart).offset(x = 26.dp, y = 6.dp)) { Text(badge) }
+        // The button already says how many («Avisos, 2 sin leer»): the badge is not read twice.
+        if (badge != null) Badge(Modifier.align(Alignment.TopStart).offset(x = 26.dp, y = 6.dp).clearAndSetSemantics {}) { Text(badge) }
     }
 }
 
 /**
  * "Avisos": the open business's latest notifications, newest first. Opening it
  * marks them read; the ones that were unread keep a dot while it stays open.
- * A row opens the appointment it is about.
+ * A row opens the appointment it is about; one without an appointment is not tappable.
  */
 @Composable
 fun NotificationsScreen(model: AppModel) {
@@ -136,9 +142,10 @@ fun NotificationsScreen(model: AppModel) {
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     items(list, key = { it.id }) { notification ->
-                        NotificationRow(model, notification, highlighted = notification.id in state.fresh, busy = state.opening == notification.id) {
-                            state.open(notification.appointmentId, notification.appointmentStartsAt, notification.id)
-                        }
+                        val onClick = if (Inbox.opens(notification.appointmentId)) {
+                            { state.open(notification.appointmentId, notification.appointmentStartsAt, notification.id) }
+                        } else null
+                        NotificationRow(model, notification, highlighted = notification.id in state.fresh, busy = state.opening == notification.id, onClick = onClick)
                     }
                 }
             }
@@ -147,7 +154,7 @@ fun NotificationsScreen(model: AppModel) {
 }
 
 @Composable
-private fun NotificationRow(model: AppModel, notification: AppNotification, highlighted: Boolean, busy: Boolean, onClick: () -> Unit) {
+private fun NotificationRow(model: AppModel, notification: AppNotification, highlighted: Boolean, busy: Boolean, onClick: (() -> Unit)?) {
     val ext = LocalExtended.current
     val primary = MaterialTheme.colorScheme.primary
     val created = BusinessTime.parse(notification.createdAt)

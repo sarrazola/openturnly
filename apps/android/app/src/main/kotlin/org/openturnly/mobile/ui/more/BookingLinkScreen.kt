@@ -10,7 +10,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -22,12 +21,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.ContentCopy
-import androidx.compose.material.icons.outlined.IosShare
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.QrCode2
+import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -42,12 +43,16 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import java.io.File
 import org.openturnly.mobile.AppModel
 import org.openturnly.mobile.localization.Copy
 import org.openturnly.mobile.rules.QrCode
+import org.openturnly.mobile.rules.ServerAddress
 import org.openturnly.mobile.ui.AppCard
 import org.openturnly.mobile.ui.BusinessLogo
 import org.openturnly.mobile.ui.DetailScaffold
@@ -65,33 +70,42 @@ fun BookingLinkScreen(model: AppModel) {
     val context = LocalContext.current
     val business = model.business ?: return
     val link = "${model.server}/${business.slug}"
+    // What people read and type: the address without its scheme.
+    val shown = "${ServerAddress.display(model.server)}/${business.slug}"
     val qr = remember(link) { QrCode.encode(link) }
 
     DetailScaffold(title = Copy.more.bookingLink, onBack = { model.nav.pop() }) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 BusinessLogo(model, business, 64.dp)
                 Column(Modifier.padding(start = 14.dp)) {
                     Text(business.name, style = MaterialTheme.typography.headlineSmall)
-                    business.description?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = ext.muted, maxLines = 2) }
+                    business.description?.takeIf { it.isNotBlank() }?.let {
+                        Text(it, style = MaterialTheme.typography.bodySmall, color = ext.muted, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    }
                 }
             }
 
             SectionTitle(Copy.business.bookingLink)
             AppCard {
                 Text(Copy.business.bookingLinkHint, style = MaterialTheme.typography.bodyMedium, color = ext.muted)
-                Text(
-                    link, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(vertical = 12.dp).fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)).padding(12.dp),
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilledTonalButton({ context.copyText(link); model.toast(Copy.business.linkCopied) }, Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 12.dp)) {
-                        Icon(Icons.Outlined.ContentCopy, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text(Copy.common.copy, maxLines = 1)
+                SelectionContainer {
+                    Text(
+                        shown, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(vertical = 12.dp).fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)).padding(12.dp),
+                    )
+                }
+                // Sharing is what the page is for, so it leads; copying and opening follow.
+                Button({ context.shareText(Copy.business.shareText(business.name, link), business.name) }, Modifier.fillMaxWidth()) {
+                    Icon(Icons.Outlined.Share, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text(Copy.common.share, maxLines = 1)
+                }
+                Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilledTonalButton({ context.copyText(link); model.toast(Copy.business.linkCopied) }, Modifier.weight(1f)) {
+                        Icon(Icons.Outlined.ContentCopy, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text(Copy.common.copy, maxLines = 1)
                     }
-                    FilledTonalButton({ context.shareText("${Copy.business.shareText} $link", business.name) }, Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 12.dp)) {
-                        Icon(Icons.Outlined.IosShare, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text(Copy.common.share, maxLines = 1)
+                    FilledTonalButton({ context.openUrl(link) }, Modifier.weight(1f)) {
+                        Icon(Icons.AutoMirrored.Outlined.OpenInNew, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text(Copy.common.open, maxLines = 1)
                     }
-                    FilledTonalButton({ context.openUrl(link) }, contentPadding = PaddingValues(horizontal = 14.dp)) { Icon(Icons.AutoMirrored.Outlined.OpenInNew, Copy.common.open, Modifier.size(18.dp)) }
                 }
             }
 
@@ -101,7 +115,7 @@ fun BookingLinkScreen(model: AppModel) {
                     Text(Copy.business.qrHint, style = MaterialTheme.typography.bodyMedium, color = ext.muted)
                     Box(Modifier.fillMaxWidth().padding(vertical = 16.dp), contentAlignment = Alignment.Center) {
                         Box(Modifier.widthIn(max = 260.dp).fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(20.dp)).background(Color.White).padding(18.dp)) {
-                            QrView(qr, Modifier.fillMaxSize())
+                            QrView(qr, Modifier.fillMaxSize().semantics { contentDescription = Copy.business.qrTitle })
                         }
                     }
                     Text(business.name, style = MaterialTheme.typography.titleSmall, modifier = Modifier.align(Alignment.CenterHorizontally))

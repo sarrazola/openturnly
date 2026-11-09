@@ -7,9 +7,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -21,7 +21,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.TrendingDown
+import androidx.compose.material.icons.automirrored.filled.TrendingFlat
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -43,10 +45,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import kotlin.math.roundToInt
 import org.openturnly.mobile.AppModel
 import org.openturnly.mobile.api.ReportSummary
 import org.openturnly.mobile.localization.AppLocale
@@ -55,6 +57,7 @@ import org.openturnly.mobile.rules.BusinessTime
 import org.openturnly.mobile.rules.Money
 import org.openturnly.mobile.rules.Periods
 import org.openturnly.mobile.ui.AppCard
+import org.openturnly.mobile.ui.Avatar
 import org.openturnly.mobile.ui.Chip
 import org.openturnly.mobile.ui.DetailScaffold
 import org.openturnly.mobile.ui.EmptyState
@@ -70,7 +73,7 @@ import org.openturnly.mobile.ui.tabular
 /** The key numbers the web's reports show, for a period: summary, tips and commissions. */
 @Composable
 fun ReportsScreen(model: AppModel) {
-    var preset by rememberSaveable { mutableStateOf(Periods.Preset.WEEK) }
+    var preset by rememberSaveable { mutableStateOf(Periods.default) }
     var tab by rememberSaveable { mutableIntStateOf(0) }
     val range = Periods.range(preset, model.today)
     val from = range.start.toString()
@@ -110,15 +113,14 @@ private fun Summary(model: AppModel, report: ReportSummary) {
     val currency = model.currency
     val current = report.current
     val before = report.before
-    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        Kpi(Copy.reports.bookings, current.bookings.toString(), Periods.change(current.bookings.toDouble(), before.bookings.toDouble()), before.bookings.toString(), Modifier.weight(1f))
-        val points = if (current.occupancy != null && before.occupancy != null) ((current.occupancy - before.occupancy) * 100).roundToInt() else null
-        Kpi(Copy.reports.occupancy, current.occupancy?.let { "${(it * 100).roundToInt()} %" } ?: "—",
-            points?.toDouble()?.div(100), before.occupancy?.let { "${(it * 100).roundToInt()} %" } ?: "—", Modifier.weight(1f), unit = Copy.reports.points)
+    val occupancy = { value: Double? -> value?.let { Copy.reports.percent(Periods.wholePercent(it)) } ?: "—" }
+    Row(Modifier.height(IntrinsicSize.Max), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Kpi(Copy.reports.bookings, current.bookings.toString(), Periods.percentTrend(current.bookings.toDouble(), before.bookings.toDouble()), before.bookings.toString(), Modifier.weight(1f))
+        Kpi(Copy.reports.occupancy, occupancy(current.occupancy), Periods.pointsTrend(current.occupancy, before.occupancy), occupancy(before.occupancy), Modifier.weight(1f), inPoints = true)
     }
-    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        Kpi(Copy.reports.newCustomers, current.newCustomers.toString(), Periods.change(current.newCustomers.toDouble(), before.newCustomers.toDouble()), before.newCustomers.toString(), Modifier.weight(1f))
-        Kpi(Copy.reports.billed, Money.format(current.billed, currency), Periods.change(current.billed.toDouble(), before.billed.toDouble()), Money.format(before.billed, currency), Modifier.weight(1f))
+    Row(Modifier.height(IntrinsicSize.Max), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Kpi(Copy.reports.newCustomers, current.newCustomers.toString(), Periods.percentTrend(current.newCustomers.toDouble(), before.newCustomers.toDouble()), before.newCustomers.toString(), Modifier.weight(1f))
+        Kpi(Copy.reports.billed, Money.format(current.billed, currency), Periods.percentTrend(current.billed.toDouble(), before.billed.toDouble()), Money.format(before.billed, currency), Modifier.weight(1f))
     }
 
     var measure by rememberSaveable { mutableIntStateOf(0) }
@@ -135,7 +137,7 @@ private fun Summary(model: AppModel, report: ReportSummary) {
             val color = MaterialTheme.colorScheme.primary
             val track = MaterialTheme.colorScheme.surfaceContainerHigh
             Text(
-                if (measure == 0) values.sum().roundToInt().toString() else Money.format(values.sum().toLong(), currency),
+                if (measure == 0) points.sumOf { it.bookings }.toString() else Money.format(points.sumOf { it.billed }, currency),
                 style = MaterialTheme.typography.titleLarge.tabular, modifier = Modifier.padding(top = 8.dp),
             )
             Canvas(Modifier.fillMaxWidth().height(140.dp).padding(top = 12.dp)) {
@@ -156,11 +158,12 @@ private fun Summary(model: AppModel, report: ReportSummary) {
         }
     }
 
-    if (report.origin.isNotEmpty()) {
+    val origins = Periods.origins(report.origin)
+    if (origins.isNotEmpty()) {
         SectionTitle(Copy.reports.origin)
         AppCard {
-            val total = report.origin.values.sum().coerceAtLeast(1)
-            report.origin.entries.sortedByDescending { it.value }.forEach { (key, count) -> BarRow(Copy.reports.originLabel(key), count.toString(), count.toFloat() / total) }
+            val total = origins.sumOf { it.count }.toFloat()
+            origins.forEach { row -> BarRow(Copy.reports.originLabel(row.key), Copy.reports.originFigures(row.count, row.share), row.count / total) }
         }
     }
     SectionTitle(Copy.reports.topSold)
@@ -182,9 +185,16 @@ private fun Summary(model: AppModel, report: ReportSummary) {
     AppCard {
         val max = report.byProfessional.maxOfOrNull { it.bookings }?.coerceAtLeast(1) ?: 1
         if (report.byProfessional.isEmpty()) Text(Copy.reports.nothing, color = ext.muted)
-        report.byProfessional.forEach { row -> BarRow(row.name.ifEmpty { Copy.reports.noProfessional }, row.bookings.toString(), row.bookings.toFloat() / max) }
+        report.byProfessional.forEach { row ->
+            // The rows carry only a name: the team list gives the professional's colour.
+            val index = model.catalog.professionals.indexOfFirst { it.name == row.name }
+            val color = if (row.name.isNotEmpty() && index >= 0) ext.person(index) else MaterialTheme.colorScheme.primary
+            BarRow(row.name.ifEmpty { Copy.reports.noProfessional }, Copy.reports.appointments(row.bookings), row.bookings.toFloat() / max, color)
+        }
     }
-    SectionTitle(Copy.reports.today)
+    SectionTitle(Copy.reports.today) {
+        Text(report.today.size.toString(), style = MaterialTheme.typography.labelLarge.tabular, color = ext.muted)
+    }
     AppCard {
         if (report.today.isEmpty()) Text(Copy.reports.noneToday, color = ext.muted)
         report.today.forEachIndexed { index, row ->
@@ -195,38 +205,49 @@ private fun Summary(model: AppModel, report: ReportSummary) {
                     Text(row.customer ?: "—", style = MaterialTheme.typography.bodyLarge)
                     Text(listOfNotNull(row.service, row.professional).joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = ext.muted)
                 }
-                if (row.paid) Chip(Copy.reports.paidBadge, ext.info)
+                if (row.paid) Chip(Copy.reports.paidBadge, ext.info, icon = Icons.Filled.Check)
             }
         }
     }
 }
 
+/**
+ * One headline figure: its value, how it moved against the period before
+ * («+12 %» green and up, «−5 %» red and down, occupancy in «pts») and what it was
+ * then («vs. 10 antes»), or «Sin datos para comparar».
+ */
 @Composable
-private fun Kpi(label: String, value: String, change: Double?, before: String, modifier: Modifier, unit: String = "%") {
+private fun Kpi(label: String, value: String, trend: Periods.Trend?, before: String, modifier: Modifier, inPoints: Boolean = false) {
     val ext = LocalExtended.current
-    AppCard(modifier) {
-        Text(label, style = MaterialTheme.typography.labelLarge, color = ext.muted)
-        Text(value, style = MaterialTheme.typography.headlineSmall.tabular, maxLines = 1, modifier = Modifier.padding(vertical = 4.dp))
-        if (change == null) Text(Copy.reports.noComparison, style = MaterialTheme.typography.labelSmall, color = ext.muted, maxLines = 1)
-        else Row(verticalAlignment = Alignment.CenterVertically) {
-            val up = change >= 0
-            val tone = if (up) ext.success else ext.danger
-            Icon(if (up) Icons.AutoMirrored.Filled.TrendingUp else Icons.AutoMirrored.Filled.TrendingDown, null, tint = tone.content, modifier = Modifier.size(16.dp))
-            Text("${if (up) "+" else ""}${(change * 100).roundToInt()} $unit", style = MaterialTheme.typography.labelMedium, color = tone.content, modifier = Modifier.padding(start = 4.dp))
-            Text(" · " + Copy.reports.vs(before), style = MaterialTheme.typography.labelSmall, color = ext.muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    AppCard(modifier.fillMaxHeight()) {
+        Text(label, style = MaterialTheme.typography.labelLarge, color = ext.muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(value, style = MaterialTheme.typography.headlineSmall.tabular, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(vertical = 4.dp))
+        if (trend == null) Text(Copy.reports.noComparison, style = MaterialTheme.typography.labelSmall, color = ext.muted)
+        else {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                val (icon, tint) = when (trend.direction) {
+                    Periods.Direction.UP -> Icons.AutoMirrored.Filled.TrendingUp to ext.success.content
+                    Periods.Direction.DOWN -> Icons.AutoMirrored.Filled.TrendingDown to ext.danger.content
+                    Periods.Direction.FLAT -> Icons.AutoMirrored.Filled.TrendingFlat to ext.muted
+                }
+                Icon(icon, null, tint = tint, modifier = Modifier.size(16.dp))
+                Text(Copy.reports.change(trend, inPoints), style = MaterialTheme.typography.labelMedium.tabular, fontWeight = FontWeight.SemiBold, color = tint, modifier = Modifier.padding(start = 4.dp))
+            }
+            Text(Copy.reports.vs(before), style = MaterialTheme.typography.labelSmall, color = ext.muted, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp))
         }
     }
 }
 
+/** A label and its figures over a bar that fills to its share. */
 @Composable
-private fun BarRow(label: String, value: String, fraction: Float) {
+private fun BarRow(label: String, value: String, fraction: Float, color: Color = MaterialTheme.colorScheme.primary) {
     Column(Modifier.padding(vertical = 6.dp)) {
         Row {
-            Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f).padding(end = 12.dp), maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(value, style = MaterialTheme.typography.bodyMedium.tabular, fontWeight = FontWeight.SemiBold)
         }
         Box(Modifier.fillMaxWidth().padding(top = 6.dp).height(8.dp).clip(RoundedCornerShape(4.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh)) {
-            Box(Modifier.fillMaxWidth(fraction.coerceIn(0f, 1f)).fillMaxHeight().clip(RoundedCornerShape(4.dp)).background(MaterialTheme.colorScheme.primary))
+            Box(Modifier.fillMaxWidth(fraction.coerceIn(0f, 1f)).fillMaxHeight().clip(RoundedCornerShape(4.dp)).background(color))
         }
     }
 }
@@ -252,7 +273,7 @@ private fun Tips(model: AppModel, report: org.openturnly.mobile.api.TipsReport) 
             val at = BusinessTime.parse(tip.createdAt)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text(tip.resourceName ?: "—", style = MaterialTheme.typography.bodyLarge)
+                    Text(tip.resourceName?.takeIf { it.isNotEmpty() } ?: Copy.reports.noProfessional, style = MaterialTheme.typography.bodyLarge)
                     Text(
                         listOfNotNull(at?.let { BusinessTime.shortDay(BusinessTime.localDate(it, model.zone), AppLocale.locale) }, tip.sale?.let { Copy.agenda.saleNumber(it.number) }, tip.customer).joinToString(" · "),
                         style = MaterialTheme.typography.bodySmall, color = ext.muted,
@@ -276,15 +297,28 @@ private fun Commissions(model: AppModel, report: org.openturnly.mobile.api.Commi
     report.professionals.forEach { row ->
         AppCard {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(row.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                val index = model.catalog.personIndex(row.id)
+                Avatar(row.name, size = 36.dp, color = if (index >= 0) ext.person(index) else MaterialTheme.colorScheme.primary)
+                Text(row.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f).padding(horizontal = 12.dp))
                 Text(Money.format(row.total, currency), style = MaterialTheme.typography.titleMedium.tabular, color = MaterialTheme.colorScheme.primary)
             }
             Hairline(Modifier.padding(vertical = 8.dp))
-            InfoRow("${Copy.reports.services} (${row.servicesCount})", Copy.reports.rateOf(trim(row.serviceRate), Money.format(row.services, currency)) + " = " + Money.format(row.serviceCommission, currency))
-            InfoRow("${Copy.reports.products} (${row.productsCount})", Copy.reports.rateOf(trim(row.productRate), Money.format(row.products, currency)) + " = " + Money.format(row.productCommission, currency))
+            CommissionRow(Copy.reports.servicesCount(row.servicesCount), Copy.reports.rateOf(row.serviceRate, Money.format(row.services, currency)), Money.format(row.serviceCommission, currency))
+            CommissionRow(Copy.reports.productsCount(row.productsCount), Copy.reports.rateOf(row.productRate, Money.format(row.products, currency)), Money.format(row.productCommission, currency))
             InfoRow(Copy.reports.tips, Money.format(row.tips, currency))
         }
     }
 }
 
-private fun trim(value: Double) = if (value % 1.0 == 0.0) value.toLong().toString() else value.toString()
+/** «Servicios (4)» with «10 % de $ 200.000» under it, and the commission it gives on the right. */
+@Composable
+private fun CommissionRow(label: String, base: String, amount: String) {
+    val ext = LocalExtended.current
+    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.Top) {
+        Column(Modifier.weight(1f).padding(end = 16.dp)) {
+            Text(label, color = ext.muted, style = MaterialTheme.typography.bodyMedium)
+            Text(base, color = ext.subtle, style = MaterialTheme.typography.bodySmall.tabular, modifier = Modifier.padding(top = 2.dp))
+        }
+        Text(amount, style = MaterialTheme.typography.bodyMedium.tabular, fontWeight = FontWeight.Medium)
+    }
+}

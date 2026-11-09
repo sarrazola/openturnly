@@ -2,8 +2,8 @@
 
 package org.openturnly.mobile.ui.agenda
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -19,18 +19,14 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.EventAvailable
-import androidx.compose.material.icons.outlined.PersonAdd
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -41,13 +37,16 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -56,13 +55,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import java.time.LocalDate
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.openturnly.mobile.AppModel
-import org.openturnly.mobile.api.ApiException
 import org.openturnly.mobile.api.CustomerSummary
 import org.openturnly.mobile.api.Omit
 import org.openturnly.mobile.api.objWithout
 import org.openturnly.mobile.localization.AppLocale
 import org.openturnly.mobile.localization.Copy
+import org.openturnly.mobile.rules.Booking
 import org.openturnly.mobile.rules.BusinessTime
 import org.openturnly.mobile.rules.Names
 import org.openturnly.mobile.rules.Phones
@@ -77,18 +77,22 @@ import org.openturnly.mobile.ui.PrimaryButton
 import org.openturnly.mobile.ui.rememberAction
 import org.openturnly.mobile.ui.rememberLoader
 
+private enum class Step { CUSTOMER, SERVICE, TIME }
+
 /**
  * "Nueva cita": the customer (found or created here), the service, who does it
  * (or whoever is free), the day and one of the free times the server offers.
+ * Opened from a customer, that customer is fixed.
  */
 @Composable
 fun NewAppointmentScreen(model: AppModel, presetCustomer: CustomerSummary?, presetDate: LocalDate?) {
     val ext = LocalExtended.current
     val haptics = LocalHapticFeedback.current
+    val scope = rememberCoroutineScope()
     val business = model.business ?: return
     val catalog = model.catalog
-    val locations = catalog.activeLocations
     val professional = !model.isAdmin
+    val places = Booking.places(catalog.locations, professionalId = model.ownResourceId)
 
     var customer by remember { mutableStateOf(presetCustomer) }
     var creating by remember { mutableStateOf(false) }
@@ -101,69 +105,96 @@ fun NewAppointmentScreen(model: AppModel, presetCustomer: CustomerSummary?, pres
     var national by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
 
-    var locationId by remember { mutableStateOf(model.agenda.locationId ?: locations.firstOrNull()?.id) }
+    // The agenda's location filter first, else the first place.
+    var locationId by remember { mutableStateOf(places.firstOrNull { it.id == model.agenda.locationId }?.id ?: places.firstOrNull()?.id) }
     var serviceId by remember { mutableStateOf<String?>(null) }
     var resourceId by remember { mutableStateOf<String?>(null) }
     var date by remember { mutableStateOf(presetDate?.takeIf { !it.isBefore(model.today) } ?: model.today) }
     var time by remember { mutableStateOf<String?>(null) }
     var pickingService by remember { mutableStateOf(false) }
     var errors by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
-    var formError by remember { mutableStateOf<String?>(null) }
+    var serverError by remember { mutableStateOf<String?>(null) }
+    var attempted by remember { mutableStateOf(false) }
     var slotsVersion by remember { mutableStateOf(0) }
+    val scroll = rememberScrollState()
+    val stepTop = remember { mutableStateMapOf<Step, Int>() }
 
     if (!catalog.loaded) LaunchedEffect(Unit) { model.refreshCatalog() }
-    if (locationId == null && locations.isNotEmpty()) locationId = locations.first().id
+    if (locationId == null && places.isNotEmpty()) locationId = places.first().id
 
-    val services = bookableServices(model, locationId)
+    // Professionals book only the services they offer.
+    val mine = catalog.professional(model.ownResourceId)?.serviceIds
+    val services = bookableServices(model, locationId).filter { mine == null || it.id in mine }
     val service = catalog.service(serviceId)
     val people = bookableProfessionals(model, serviceId, locationId)
 
-    // Searching customers as the person types (the server returns the first 20).
+    // Searching customers as the person types (the first 8 the server finds).
     LaunchedEffect(query) {
         val q = query.trim()
         if (q.length < 2) { results = null; searching = false; return@LaunchedEffect }
         searching = true
         delay(300)
-        results = runCatching { model.call { customers(it, q) } }.getOrNull() ?: emptyList()
+        results = runCatching { model.call { customers(it, q) } }.getOrNull()?.take(8) ?: emptyList()
         searching = false
     }
 
     val slots = rememberLoader(serviceId, date, locationId, slotsVersion) {
         val id = serviceId ?: return@rememberLoader emptyList()
-        model.call { slots(it, id, date.toString(), if (locations.size > 1) locationId else null) }
+        model.call { slots(it, id, date.toString(), if (catalog.activeLocations.size > 1) locationId else null) }
     }
     val visibleSlots = slots.value?.filter { resourceId == null || resourceId in it.resourceIds }
     LaunchedEffect(visibleSlots) { if (time != null && visibleSlots != null && visibleSlots.none { it.time == time }) time = null }
+
+    val phone = Phones.compose(country, national)
+    val customerProblem: String? = when {
+        customer != null -> null
+        !creating -> Copy.booking.pickCustomer
+        firstName.isBlank() -> Copy.customers.firstNameRequired
+        lastName.isBlank() -> Copy.customers.lastNameRequired
+        phone == null && email.isBlank() -> Copy.customers.contactRequired
+        else -> null
+    }
+    /** The first thing missing and the step it belongs to. */
+    val missing: Pair<Step, String>? = when {
+        customerProblem != null -> Step.CUSTOMER to customerProblem
+        serviceId == null -> Step.SERVICE to Copy.booking.pickServiceError
+        time == null -> Step.TIME to Copy.booking.pickTime
+        else -> null
+    }
 
     val action = rememberAction { failure ->
         when (failure.code) {
             "already_booked" -> {
                 val at = BusinessTime.parse(failure.fields["startsAt"])
-                val label = at?.let { BusinessTime.shortDay(BusinessTime.localDate(it, model.zone), AppLocale.locale) + " " + BusinessTime.time(it, model.zone) } ?: ""
-                formError = Copy.booking.alreadyBooked(label, failure.fields["code"] ?: "")
+                serverError = if (at != null) Copy.booking.alreadyBooked(
+                    BusinessTime.shortDay(BusinessTime.localDate(at, model.zone), AppLocale.locale), BusinessTime.time(at, model.zone), failure.fields["code"] ?: "",
+                ) else failure.message
             }
-            "slot_taken" -> { formError = Copy.booking.slotTaken; time = null; slotsVersion++ }
+            "slot_taken" -> { serverError = failure.message; time = null; slotsVersion++ }
             else -> {
                 errors = failure.fields.mapNotNull { (key, _) -> failure.fieldMessage(key.substringAfterLast('.'))?.let { key.substringAfterLast('.') to it } }.toMap()
-                formError = failure.message
+                serverError = failure.message
             }
         }
     }
+    BackHandler(enabled = action.busy) {}
 
     fun submit() {
-        formError = null
-        val fieldErrors = HashMap<String, String>()
-        val phone = Phones.compose(country, national)
-        if (customer == null) {
-            if (!creating) { formError = Copy.booking.pickCustomer; return }
+        serverError = null
+        attempted = true
+        if (creating && customer == null) {
+            val fieldErrors = HashMap<String, String>()
             if (firstName.isBlank()) fieldErrors["firstName"] = Copy.customers.firstNameRequired
             if (lastName.isBlank()) fieldErrors["lastName"] = Copy.customers.lastNameRequired
             if (phone == null && email.isBlank()) fieldErrors["phone"] = Copy.customers.contactRequired
+            errors = fieldErrors
         }
-        errors = fieldErrors
-        if (fieldErrors.isNotEmpty()) return
-        val chosenService = serviceId ?: run { formError = Copy.booking.pickService; return }
-        val chosenTime = time ?: run { formError = Copy.booking.pickTime; return }
+        missing?.let { (step, _) ->
+            stepTop[step]?.let { y -> scope.launch { scroll.animateScrollTo(y) } }
+            return
+        }
+        val chosenService = serviceId ?: return
+        val chosenTime = time ?: return
         action.run {
             val body = objWithout(
                 "locationId" to (locationId ?: Omit),
@@ -189,14 +220,17 @@ fun NewAppointmentScreen(model: AppModel, presetCustomer: CustomerSummary?, pres
 
     DetailScaffold(
         title = Copy.booking.title,
-        onBack = { model.nav.pop() },
+        onBack = { if (!action.busy) model.nav.pop() },
         bottomBar = {
             Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, tonalElevation = 2.dp) {
                 Column(Modifier.fillMaxWidth().navigationBarsPadding().imePadding().padding(16.dp)) {
-                    formError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(bottom = 10.dp)) }
-                    if (service != null && time != null) {
+                    // The server's word, or (after a try) the first thing missing; else what is being booked.
+                    val message = serverError ?: missing?.second?.takeIf { attempted }
+                    if (message != null) {
+                        Text(message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(bottom = 10.dp))
+                    } else if (service != null) {
                         Text(
-                            "${service.name} · ${BusinessTime.shortDay(date, AppLocale.locale)} · $time",
+                            listOfNotNull(service.name, BusinessTime.shortDay(date, AppLocale.locale), time).joinToString(" · "),
                             style = MaterialTheme.typography.bodyMedium, color = ext.muted, modifier = Modifier.padding(bottom = 10.dp),
                             maxLines = 1, overflow = TextOverflow.Ellipsis,
                         )
@@ -206,11 +240,11 @@ fun NewAppointmentScreen(model: AppModel, presetCustomer: CustomerSummary?, pres
             }
         },
     ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 24.dp)) {
-            Text(Copy.booking.hint, style = MaterialTheme.typography.bodyMedium, color = ext.muted)
-
+        Column(Modifier.fillMaxSize().padding(padding).verticalScroll(scroll).padding(horizontal = 16.dp).padding(bottom = 24.dp)) {
             // 1. Customer
-            StepTitle(1, Copy.booking.customer, customer != null || (creating && firstName.isNotBlank()))
+            Column(Modifier.onGloballyPositioned { stepTop[Step.CUSTOMER] = it.positionInParent().y.toInt() }) {
+                StepTitle(1, Copy.booking.customer, customerProblem == null)
+            }
             val chosen = customer
             if (chosen != null) {
                 AppCard {
@@ -218,9 +252,10 @@ fun NewAppointmentScreen(model: AppModel, presetCustomer: CustomerSummary?, pres
                         Avatar(Names.full(chosen.firstName, chosen.lastName), size = 44.dp)
                         Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
                             Text(Names.full(chosen.firstName, chosen.lastName), style = MaterialTheme.typography.titleMedium)
-                            Text(listOfNotNull(chosen.phone?.let { Phones.format(it) }, chosen.email).joinToString(" · ").ifEmpty { Copy.customers.noContact }, style = MaterialTheme.typography.bodySmall, color = ext.muted)
+                            Text(chosen.phone?.let { Phones.format(it) } ?: chosen.email ?: Copy.customers.noContact, style = MaterialTheme.typography.bodySmall, color = ext.muted)
                         }
-                        IconButton({ customer = null }) { Icon(Icons.Filled.Close, Copy.booking.changeCustomer) }
+                        // Opened from a customer, the customer is fixed.
+                        if (presetCustomer == null) TextButton({ customer = null }) { Text(Copy.booking.changeCustomer) }
                     }
                 }
             } else {
@@ -244,10 +279,10 @@ fun NewAppointmentScreen(model: AppModel, presetCustomer: CustomerSummary?, pres
                                         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                                             Text(Copy.booking.noCustomerFound, color = ext.muted, modifier = Modifier.weight(1f))
                                             TextButton({
+                                                val draft = Booking.draft(query)
+                                                firstName = draft.firstName; lastName = draft.lastName; email = draft.email
+                                                national = draft.phone
                                                 creating = true
-                                                val words = query.trim().split(" ")
-                                                if (words.firstOrNull()?.any { it.isLetter() } == true) { firstName = words.first(); lastName = words.drop(1).joinToString(" ") }
-                                                else national = query.filter { it.isDigit() }
                                             }) { Text(Copy.booking.createCustomer) }
                                         }
                                     }
@@ -282,32 +317,39 @@ fun NewAppointmentScreen(model: AppModel, presetCustomer: CustomerSummary?, pres
             }
 
             // 2. Location and service
-            StepTitle(2, Copy.booking.service, service != null)
-            if (locations.size > 1) {
+            Column(Modifier.onGloballyPositioned { stepTop[Step.SERVICE] = it.positionInParent().y.toInt() }) {
+                StepTitle(2, Copy.booking.service, service != null)
+            }
+            if (catalog.activeLocations.size > 1 && places.isNotEmpty()) {
+                Text(Copy.booking.location, style = MaterialTheme.typography.labelLarge, color = ext.muted, modifier = Modifier.padding(bottom = 6.dp))
                 Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(bottom = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    locations.forEach { location ->
-                        FilterChip(locationId == location.id, { locationId = location.id; time = null; if (serviceId !in bookableServices(model, location.id).map { it.id }) serviceId = null }, { Text(location.name) })
+                    places.forEach { location ->
+                        FilterChip(locationId == location.id, {
+                            locationId = location.id; time = null
+                            if (serviceId !in bookableServices(model, location.id).map { it.id }) serviceId = null
+                        }, { Text(location.name) })
                     }
                 }
             }
             ServiceField(model, service) { pickingService = true }
 
             // 3. Professional
+            StepTitle(3, Copy.booking.professional, service != null)
             if (professional) {
-                StepTitle(3, Copy.booking.professional, true)
-                Text(Copy.booking.bookedForYou(model.catalog.professional(model.ownResourceId)?.name ?: model.user?.name ?: ""), style = MaterialTheme.typography.bodyMedium, color = ext.muted)
+                Text(Copy.booking.bookedForYou(catalog.professional(model.ownResourceId)?.name ?: model.user?.name ?: ""), style = MaterialTheme.typography.bodyMedium, color = ext.muted)
             } else {
-                StepTitle(3, Copy.booking.professional, true)
                 ProfessionalPicker(model, people, resourceId) { resourceId = it }
             }
 
             // 4. Day and time
-            StepTitle(4, Copy.booking.date, time != null)
+            Column(Modifier.onGloballyPositioned { stepTop[Step.TIME] = it.positionInParent().y.toInt() }) {
+                StepTitle(4, Copy.booking.date, time != null, trailing = BusinessTime.longDay(date, AppLocale.locale, model.today))
+            }
             DateChooser(model, date) { date = it; time = null }
             Spacer(Modifier.height(14.dp))
             Text(Copy.booking.freeTimes, style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(bottom = 6.dp))
             SlotGrid(if (serviceId == null) null else visibleSlots, slots.loading, slots.error, time, waitingForService = serviceId == null) {
-                time = it; formError = null
+                time = it; serverError = null
                 haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
             }
         }

@@ -309,6 +309,13 @@ class AgendaState(private val model: AppModel) {
         loading = false
     }
 
+    /** The ✕ on the filter tag: everyone, every location, no cancelled ones. */
+    fun clearFilters() {
+        professionalId = null
+        locationId = null
+        showCancelled = false
+    }
+
     fun select(day: LocalDate) {
         date = day
         val week = BusinessTime.weekStart(day)

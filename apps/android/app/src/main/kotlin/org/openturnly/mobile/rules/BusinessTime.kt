@@ -64,10 +64,25 @@ object BusinessTime {
 
     fun dateKey(date: LocalDate): String = date.toString()
 
-    /** "lunes, 9 de noviembre" / "Monday, November 9". */
-    fun longDay(date: LocalDate, locale: Locale): String {
+    /**
+     * "Lunes, 9 de noviembre" / "Monday, November 9". Given today, a day in
+     * another year carries it: "… de 2027" / "…, 2027".
+     */
+    fun longDay(date: LocalDate, locale: Locale, today: LocalDate? = null): String {
         val pattern = if (locale.language == "es") "EEEE, d 'de' MMMM" else "EEEE, MMMM d"
-        return date.format(DateTimeFormatter.ofPattern(pattern, locale)).replaceFirstChar { it.titlecase(locale) }
+        val day = date.format(DateTimeFormatter.ofPattern(pattern, locale)).replaceFirstChar { it.titlecase(locale) }
+        if (today == null || date.year == today.year) return day
+        return if (locale.language == "es") "$day de ${date.year}" else "$day, ${date.year}"
+    }
+
+    /** How a day relates to today, when it is one of the three that have a name. */
+    enum class Relative { TODAY, TOMORROW, YESTERDAY }
+
+    fun relative(date: LocalDate, today: LocalDate): Relative? = when (date) {
+        today -> Relative.TODAY
+        today.plusDays(1) -> Relative.TOMORROW
+        today.minusDays(1) -> Relative.YESTERDAY
+        else -> null
     }
 
     /** "9 nov 2026" / "Nov 9, 2026": dates in lists. */

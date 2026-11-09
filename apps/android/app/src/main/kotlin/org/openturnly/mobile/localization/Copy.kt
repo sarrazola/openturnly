@@ -72,7 +72,8 @@ object CommonCopy {
     val copied get() = tr("Copied", "Copiado")
     val open get() = tr("Open", "Abrir")
     val optional get() = tr("Optional", "Opcional")
-    val loadFailed get() = tr("Could not load this", "No pudimos cargar esto")
+    val loadFailed get() = tr("Couldn't load this", "No se pudo cargar")
+    val loading get() = tr("Loading…", "Cargando…")
     val saved get() = tr("Saved", "Guardado")
     val none get() = tr("None", "Ninguno")
     val yes get() = tr("Yes", "Sí")
@@ -90,42 +91,55 @@ object CommonCopy {
 
 object SignInCopy {
     val title get() = tr("Sign in", "Inicia sesión")
-    val subtitle get() = tr("Your agenda, customers and sales, on your phone.", "Tu agenda, tus clientes y tus ventas, en tu celular.")
+    val subtitle get() = tr("Your calendar, customers and sales, on your phone.", "Tu agenda, tus clientes y tus ventas, en tu celular.")
     val serverTitle get() = tr("Connect to your server", "Conéctate a tu servidor")
-    val serverHint get() = tr("The address where your business's OpenTurnly runs.", "La dirección donde corre el OpenTurnly de tu negocio.")
+    fun serverHint(brand: String) = tr(
+        "The address where $brand runs for your business: the same one you open in the browser.",
+        "La dirección donde funciona $brand en tu negocio: la misma que abres en el navegador.",
+    )
     val serverLabel get() = tr("Server address", "Dirección del servidor")
-    val serverPlaceholder get() = "turnos.example.com"
-    val accountLabel get() = tr("Account", "Cuenta")
+    val serverPlaceholder get() = tr("bookings.yourbusiness.com", "turnos.tunegocio.com")
+    val accountLabel get() = tr("Account name", "Nombre de la cuenta")
     val accountPlaceholder get() = tr("your-business", "tu-negocio")
-    val accountHint get() = tr("Your account's name, or paste its address.", "El nombre de tu cuenta, o pega su dirección.")
+    val accountHint get() = tr("The name of your account, or its full address.", "El nombre de tu cuenta, o su dirección completa.")
+    val invalidAccount get() = tr("Enter your account name or its address.", "Escribe el nombre de tu cuenta o su dirección.")
     val otherAddress get() = tr("Use another address", "Usar otra dirección")
     fun useHosted(name: String) = tr("Use $name", "Usar $name")
     val connect get() = tr("Continue", "Continuar")
-    val connectedTo get() = tr("Connected to", "Conectado a")
-    val changeServer get() = tr("Change server", "Cambiar servidor")
+    fun connectedTo(host: String) = tr("Connected to $host", "Conectado a $host")
+    val changeServer get() = tr("Change", "Cambiar")
     val emailLabel get() = tr("Email", "Email")
     val emailPlaceholder get() = tr("you@business.com", "tu@negocio.com")
     val passwordLabel get() = tr("Password", "Contraseña")
-    val submit get() = tr("Sign in", "Entrar")
-    val invalidServer get() = tr("Enter a valid address. Plain http:// only works on a local network.", "Escribe una dirección válida. http:// sin cifrar solo funciona en una red local.")
-    val notOpenTurnly get() = tr("That address does not answer like an OpenTurnly server.", "Esa dirección no responde como un servidor de OpenTurnly.")
-    val wrongCredentials get() = tr("The email or the password is not right.", "El email o la contraseña no son correctos.")
+    val showPassword get() = tr("Show password", "Mostrar contraseña")
+    val hidePassword get() = tr("Hide password", "Ocultar contraseña")
+    val submit get() = tr("Sign in", "Ingresar")
+    val invalidServer get() = tr("Enter a valid address. Plain http:// only works on your local network.", "Escribe una dirección válida. http:// sin cifrar solo funciona en tu red local.")
+    val unreachable get() = tr("We couldn't reach that address. Check it and your connection.", "No pudimos conectar con esa dirección. Revísala y revisa tu conexión.")
+    val notAServer get() = tr("That address answers, but it doesn't look like a booking server.", "Esa dirección responde, pero no parece un servidor de reservas.")
+    val wrongCredentials get() = tr("The email or password isn't right.", "El email o la contraseña no son correctos.")
     val forgot get() = tr("Forgot your password?", "¿Olvidaste tu contraseña?")
-    val forgotTitle get() = tr("Ask your administrator", "Pídesela a tu administrador")
-    val forgotBody get() = tr("Whoever manages your business on OpenTurnly can set a new password for you.", "Quien administra tu negocio en OpenTurnly puede ponerte una contraseña nueva.")
+    val forgotTitle get() = tr("Your administrator manages access", "El administrador gestiona tu acceso")
+    val forgotBody get() = tr(
+        "Ask your business's administrator to set a new password for you from the web panel.",
+        "Pídele al administrador de tu negocio que te asigne una contraseña nueva desde el panel web.",
+    )
     val chooseAccount get() = tr("Which account?", "¿Qué cuenta?")
-    val chooseAccountBody get() = tr("This email opens more than one account. Pick the one you want to work in.", "Este email abre más de una cuenta. Elige en cuál quieres trabajar.")
-    val privacy get() = tr("Privacy", "Privacidad")
+    val chooseAccountBody get() = tr("This email opens more than one account. Pick the one you want to work in.", "Este email abre más de una cuenta. Elige con cuál quieres trabajar.")
+    val privacy get() = tr("Privacy policy", "Política de privacidad")
     val support get() = tr("Help", "Ayuda")
-    val reconnectTitle get() = tr("Could not connect", "No pudimos conectarnos")
+    val reconnectTitle get() = tr("Couldn't connect", "No se pudo conectar")
     val reconnectBody get() = tr("Your session is saved. Check your connection and try again.", "Tu sesión sigue guardada. Revisa tu conexión e inténtalo de nuevo.")
-    val sessionEnded get() = tr("Your session ended. Sign in again.", "Tu sesión terminó. Vuelve a entrar.")
-    val noBusinesses get() = tr("This account has no business yet", "Esta cuenta todavía no tiene negocios")
-    val noBusinessesBody get() = tr("Create one from the web panel, or ask for access to yours.", "Crea uno desde el panel web o pide acceso al tuyo.")
+    val sessionEnded get() = tr("Your session ended. Sign in again.", "Tu sesión terminó. Ingresa de nuevo.")
+    val noBusinesses get() = tr("No businesses yet", "Aún no tienes negocios")
+    val noBusinessesBody get() = tr(
+        "Ask an administrator to give you access, or create a business from the web panel.",
+        "Pídele a un administrador que te dé acceso, o crea un negocio desde el panel web.",
+    )
 }
 
 object NavCopy {
-    val agenda get() = tr("Agenda", "Agenda")
+    val agenda get() = tr("Calendar", "Agenda")
     val customers get() = tr("Customers", "Clientes")
     val sales get() = tr("Sales", "Ventas")
     val more get() = tr("More", "Más")

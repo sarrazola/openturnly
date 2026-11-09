@@ -98,6 +98,15 @@ object Names {
         return "$first$last"
     }
 
-    /** A stable colour slot for a name, so the same person keeps the same avatar tint. */
-    fun colorIndex(key: String, count: Int): Int = if (count <= 0) 0 else Math.floorMod(key.hashCode(), count)
+    /**
+     * A stable colour slot for a name, so the same person keeps the same avatar
+     * tint: a 31-hash over the name's code points, kept to 31 bits at each step,
+     * the same on every platform.
+     */
+    fun colorIndex(key: String, count: Int): Int {
+        if (count <= 0) return 0
+        var sum = 0L
+        key.codePoints().forEach { sum = (sum * 31 + it) and 0x7fffffffL }
+        return (sum % count).toInt()
+    }
 }

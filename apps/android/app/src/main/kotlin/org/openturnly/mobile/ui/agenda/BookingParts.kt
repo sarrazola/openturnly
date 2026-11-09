@@ -27,6 +27,17 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.ContentCut
@@ -171,13 +182,13 @@ fun ProfessionalPicker(model: AppModel, professionals: List<Professional>, selec
     }
 }
 
-/** The next two weeks as chips, and a calendar for any other day. Staff can't book in the past. */
+/** A calendar for any day first, then the next 60 days as chips. Staff can't book in the past. */
 @Composable
 fun DateChooser(model: AppModel, date: LocalDate, onPick: (LocalDate) -> Unit) {
     val locale = AppLocale.locale
     val today = model.today
     var picking by remember { mutableStateOf(false) }
-    val days = (0L until 21L).map { today.plusDays(it) }
+    val days = (0L until 60L).map { today.plusDays(it) }
     val ext = LocalExtended.current
     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Surface(
@@ -223,10 +234,22 @@ fun DateChooser(model: AppModel, date: LocalDate, onPick: (LocalDate) -> Unit) {
     }
 }
 
-/** The free times of the day, by part of the day. */
+/**
+ * The free times of the day, by part of the day. The current time of a moved
+ * appointment ([current]) is drawn with a dashed outline.
+ */
 @Composable
-fun SlotGrid(slots: List<Slot>?, loading: Boolean, error: String?, selected: String?, waitingForService: Boolean, onPick: (String) -> Unit) {
+fun SlotGrid(
+    slots: List<Slot>?,
+    loading: Boolean,
+    error: String?,
+    selected: String?,
+    waitingForService: Boolean,
+    current: String? = null,
+    onPick: (String) -> Unit,
+) {
     val ext = LocalExtended.current
+    val primary = MaterialTheme.colorScheme.primary
     Column(Modifier.fillMaxWidth().animateContentSize()) {
         when {
             waitingForService -> Text(Copy.booking.pickServiceFirst, style = MaterialTheme.typography.bodyMedium, color = ext.muted, modifier = Modifier.padding(vertical = 8.dp))
@@ -248,11 +271,14 @@ fun SlotGrid(slots: List<Slot>?, loading: Boolean, error: String?, selected: Str
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         list.forEach { slot ->
                             val isSelected = slot.time == selected
+                            val isCurrent = slot.time == current && !isSelected
                             Surface(
                                 onClick = { onPick(slot.time) }, shape = RoundedCornerShape(12.dp),
-                                color = if (isSelected) MaterialTheme.colorScheme.primary else ext.card,
-                                border = if (isSelected) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                                modifier = Modifier.size(width = 72.dp, height = 42.dp),
+                                color = if (isSelected) primary else ext.card,
+                                border = if (isSelected || isCurrent) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                                modifier = Modifier.size(width = 72.dp, height = 42.dp)
+                                    .let { if (isCurrent) it.drawBehind { dashedOutline(primary) } else it }
+                                    .let { if (slot.time == current) it.semantics { stateDescription = Copy.booking.currentTime } else it },
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
                                     Text(
@@ -269,17 +295,32 @@ fun SlotGrid(slots: List<Slot>?, loading: Boolean, error: String?, selected: Str
     }
 }
 
-/** A numbered step heading in the booking forms. */
+/** A 1.5 dp dashed rounded outline, inset so the stroke stays inside. */
+private fun DrawScope.dashedOutline(color: Color) {
+    val stroke = 1.5.dp.toPx()
+    val radius = 12.dp.toPx()
+    drawRoundRect(
+        color, topLeft = Offset(stroke / 2, stroke / 2), size = Size(size.width - stroke, size.height - stroke),
+        cornerRadius = CornerRadius(radius, radius),
+        style = Stroke(width = stroke, pathEffect = PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 3.dp.toPx()))),
+    )
+}
+
+/** A numbered step heading in the booking forms: the number turns into a check once the step is complete. */
 @Composable
-fun StepTitle(number: Int, title: String, done: Boolean) {
-    Row(Modifier.padding(top = 18.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+fun StepTitle(number: Int, title: String, done: Boolean, trailing: String? = null) {
+    Row(Modifier.fillMaxWidth().padding(top = 18.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(
             Modifier.size(24.dp).clip(CircleShape).background(if (done) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHighest),
             contentAlignment = Alignment.Center,
         ) {
-            Text(number.toString(), style = MaterialTheme.typography.labelMedium, color = if (done) MaterialTheme.colorScheme.onPrimary else LocalExtended.current.muted, fontWeight = FontWeight.Bold)
+            if (done) Icon(Icons.Filled.Check, null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(16.dp))
+            else Text(number.toString(), style = MaterialTheme.typography.labelMedium, color = LocalExtended.current.muted, fontWeight = FontWeight.Bold)
         }
         Spacer(Modifier.width(10.dp))
-        Text(title, style = MaterialTheme.typography.titleMedium)
+        Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+        if (trailing != null) {
+            Text(trailing, style = MaterialTheme.typography.bodyMedium, color = LocalExtended.current.muted, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 8.dp))
+        }
     }
 }

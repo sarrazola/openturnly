@@ -59,6 +59,9 @@ object ServerAddress {
         return "$scheme://${hostPart.lowercase()}$port$path"
     }
 
+    /** The server's own page to recover a password. */
+    fun forgotPasswordUrl(base: String): String = base.trimEnd('/') + "/forgot-password"
+
     /** The host as shown to people: "turnos.example.com" or "10.0.2.2:4100". */
     fun display(base: String): String = base.substringAfter("://").trimEnd('/')
 }

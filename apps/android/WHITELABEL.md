@@ -40,6 +40,32 @@ The directory receives `{email, password}` and answers
 `{accounts: [{server, name, token, user}]}`; with several accounts the app
 offers a picker. "Use another address" stays available for custom domains.
 
+"Forgot your password?" opens the server's own `/forgot-password` page once
+the server is known (typed, or named by the account). Before that, with the
+directory, it opens the brand's recovery page when there is one:
+
+```
+BRAND_PASSWORD_RECOVERY_URL=yourdomain.com/recover
+```
+
+With neither, it tells the person that their administrator sets passwords.
+
+## The loading mark
+
+While the app restores the session, and in the sign-in header while it signs
+in, it shows `brand_logo`'s tile. The example brand's logo is a clock, which the
+app draws itself from `docs/brand/openturnly-mark.svg` and animates: the long
+hand turns once every 1.6 seconds, the short one twelve times slower, and the
+square dot breathes. That needs:
+
+```
+BRAND_ANIMATED_MARK=true
+```
+
+Set it to `false` (or leave it out, as an older brand file does) when your logo
+is not that clock: the app then shows your `brand_logo` as it is, with a gentle
+pulse. With the phone's animations turned off, either one holds still.
+
 ## Push notifications
 
 The app always shows the server's notifications in its inbox (the bell on the

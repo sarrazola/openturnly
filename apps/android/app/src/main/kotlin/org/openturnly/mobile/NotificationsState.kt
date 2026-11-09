@@ -16,6 +16,7 @@ import org.openturnly.mobile.api.OpenTurnlyApi
 import org.openturnly.mobile.localization.Copy
 import org.openturnly.mobile.push.NotificationTap
 import org.openturnly.mobile.push.Push
+import org.openturnly.mobile.rules.Inbox
 import org.openturnly.mobile.rules.NotificationData
 import org.openturnly.mobile.storage.PushPreferences
 import org.openturnly.mobile.ui.Route
@@ -42,6 +43,9 @@ class NotificationsState(private val model: AppModel, private val context: Appli
     var fresh by mutableStateOf<Set<String>>(emptySet()); private set
     /** The row whose appointment is being looked up. */
     var opening by mutableStateOf<String?>(null); private set
+
+    /** False once the server answered that it has no inbox (404): the bell hides. */
+    var supported by mutableStateOf(true); private set
 
     /** Whether the server sends push, once it has said so. */
     var serverPush by mutableStateOf<Boolean?>(null); private set
@@ -104,6 +108,7 @@ class NotificationsState(private val model: AppModel, private val context: Appli
         unreadTotal = 0
         error = null
         opening = null
+        supported = true
         serverPush = null
         registered = null
         inboxOpen = false
@@ -128,6 +133,7 @@ class NotificationsState(private val model: AppModel, private val context: Appli
 
     /** The bell's count, from the server; the open inbox reloads instead. */
     fun refreshCount() {
+        if (!supported) return
         if (inboxOpen) { load(quiet = true); return }
         val businessId = model.business?.id ?: return
         if (countJob?.isActive == true) return
@@ -138,7 +144,8 @@ class NotificationsState(private val model: AppModel, private val context: Appli
             } catch (failure: CancellationException) {
                 throw failure
             } catch (failure: ApiException) {
-                // The bell keeps its last count; the next refresh tries again.
+                // A server without an inbox hides the bell; otherwise it keeps its last count until the next refresh.
+                if (Inbox.unsupported(failure.status)) supported = false
             }
         }
     }
@@ -172,6 +179,7 @@ class NotificationsState(private val model: AppModel, private val context: Appli
             } catch (failure: CancellationException) {
                 throw failure
             } catch (failure: ApiException) {
+                if (Inbox.unsupported(failure.status)) supported = false
                 if (!failure.isUnauthorized) error = failure.message
             } finally {
                 loading = false
@@ -214,7 +222,7 @@ class NotificationsState(private val model: AppModel, private val context: Appli
 
     /** Opens the appointment a notification is about, found in the week it starts. */
     fun open(appointmentId: String?, startsAt: String?, row: String? = null) {
-        if (appointmentId == null) { model.toast(Copy.notifications.notFound); return }
+        if (appointmentId == null || !Inbox.opens(appointmentId)) { model.toast(Copy.notifications.notFound); return }
         val businessId = model.business?.id ?: return
         if (opening != null) return
         opening = row ?: appointmentId

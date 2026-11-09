@@ -34,7 +34,12 @@ android {
             // A brand file without these (an older one) reads them as empty: no push.
             "BRAND_FIREBASE_PROJECT_ID", "BRAND_FIREBASE_APPLICATION_ID", "BRAND_FIREBASE_API_KEY",
             "BRAND_FIREBASE_SENDER_ID",
+            // Missing in an older brand file: no recovery page of the brand's own.
+            "BRAND_PASSWORD_RECOVERY_URL",
         ).forEach { key -> buildConfigField("String", key, brandField(key)) }
+        // Whether brand_logo is the example's clock, which the app then draws and animates itself.
+        // A brand file without the key (an older one) keeps its own logo, gently pulsing.
+        buildConfigField("boolean", "BRAND_ANIMATED_MARK", (brand("BRAND_ANIMATED_MARK").lowercase() in setOf("true", "yes", "1")).toString())
     }
 
     // The upload key lives outside the repository. It is read from Gradle properties
