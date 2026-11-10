@@ -80,11 +80,17 @@ function nextSaturday(): string {
   return date;
 }
 
-async function shop(options: { installNumber?: boolean } = {}) {
+async function shop(
+  options: {
+    installNumber?: boolean;
+    meter?: NonNullable<Parameters<typeof createTestApp>[0]>["meter"];
+  } = {},
+) {
   const whatsapp = await fakeWhatsapp();
   const app = await createTestApp({
     whatsappApiUrl: whatsapp.url,
     whatsapp: options.installNumber ? INSTALL_NUMBER : null,
+    meter: options.meter ?? null,
   });
   const owner = await setUpOwner(app);
   const business = await createBusiness(owner);
@@ -132,6 +138,83 @@ async function shop(options: { installNumber?: boolean } = {}) {
     engine: app.app.automations,
   };
 }
+
+describe("messages on the install's number", () => {
+  it("go out only while the meter allows them, and keep what each counted for", async () => {
+    let allow = true;
+    const asked: unknown[] = [];
+    const counted: unknown[] = [];
+    const meter = {
+      allows: async (message: unknown) => {
+        asked.push(message);
+        return allow;
+      },
+      counts: async (message: unknown) => {
+        counted.push(message);
+        return { amount: "0.0300", currency: "USD" };
+      },
+    };
+    const { app, owner, book, messageOnBooking, deliveries, whatsapp, engine } = await shop({
+      installNumber: true,
+      meter,
+    });
+    const { automation } = (await messageOnBooking()).body;
+    await book();
+    await engine.deliverDue();
+    expect(whatsapp.sent).toHaveLength(1);
+    expect(asked).toEqual([expect.objectContaining({ channel: "whatsapp", to: "+573001234567" })]);
+    expect(counted).toEqual([expect.objectContaining({ channel: "whatsapp", providerCost: null })]);
+    expect((await deliveries(automation.id))[0]).toMatchObject({
+      status: "sent",
+      channel: "whatsapp",
+      account: "default",
+      charge: "0.030000",
+      chargeCurrency: "USD",
+    });
+
+    // Held back: skipped with the reason, nothing sent, nothing counted.
+    allow = false;
+    await app.client().post("/api/public/businesses/fte-barber/bookings", {
+      serviceId: (
+        await owner.get(
+          `/api/businesses/${(await owner.get("/api/businesses")).body.businesses[0].id}/services`,
+        )
+      ).body.services[0].id,
+      resourceId: null,
+      date: nextSaturday(),
+      time: "11:00",
+      customer: { firstName: "Luis", lastName: "Gómez", phone: "+57 300 765 4321" },
+    });
+    await engine.deliverDue();
+    expect(whatsapp.sent).toHaveLength(1);
+    expect(counted).toHaveLength(1);
+    expect((await deliveries(automation.id))[0]).toMatchObject({
+      status: "skipped",
+      error: "default_account_held",
+      account: "default",
+      charge: null,
+    });
+  });
+
+  it("are never held back or counted on the business's own number", async () => {
+    const meter = {
+      allows: async () => false,
+      counts: async () => ({ amount: "1", currency: "USD" }),
+    };
+    const { owner, book, messageOnBooking, deliveries, whatsapp, engine } = await shop({ meter });
+    await owner.put(`/api/channels/whatsapp`, OWN_NUMBER);
+    await owner.post(`/api/channels/whatsapp/connect`);
+    const { automation } = (await messageOnBooking()).body;
+    await book();
+    await engine.deliverDue();
+    expect(whatsapp.sent.filter((item) => item.url.endsWith("/messages"))).toHaveLength(1);
+    expect((await deliveries(automation.id))[0]).toMatchObject({
+      status: "sent",
+      account: "own",
+      charge: null,
+    });
+  });
+});
 
 const OWN_NUMBER = {
   phoneNumberId: "333333",

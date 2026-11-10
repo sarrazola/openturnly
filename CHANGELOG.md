@@ -6,6 +6,25 @@ All notable changes to OpenTurnly are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-11-09
+
+Whoever runs the install gets a log of every send of every business's flows, and a
+deployment can hold back and count the messages that go out on the install's own accounts.
+Migration 0037 runs on start and fills in the channel of past sends.
+
+### Added
+
+- **Sends**, in the account menu for whoever runs the install: every message and notice the
+  flows of all its businesses sent, newest first, with the business, the flow and step, the
+  customer and booking, how it ended (delivered, read, failed and why, waiting for a retry,
+  skipped), what it cost, and, opened, what was sent. Filter by business, channel and status.
+- **Preview as a phone** in Settings → Booking page, and the recommended size of the logo
+  (400×400) and the cover (1200×400). Based on a proposal by José Senén Oviedo.
+- A deployment can pass `createApp({ meter })` to hold back and count the messages sent on
+  the install's own accounts (the WhatsApp number, email account and texts set in its
+  environment). A business's own accounts never go through it. Each send records whether it
+  went out on the business's account or the install's, and what it counted for.
+
 ## [1.4.2] - 2026-11-09
 
 ### Added
@@ -318,7 +337,8 @@ The first public release, under the MIT license.
   own pages, and "My account" waits 15 minutes after 5 wrong current passwords. See
   [SECURITY.md](SECURITY.md) for everything that's built in.
 
-[Unreleased]: https://github.com/sarrazola/openturnly/compare/v1.4.2...HEAD
+[Unreleased]: https://github.com/sarrazola/openturnly/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/sarrazola/openturnly/compare/v1.4.2...v1.5.0
 [1.4.2]: https://github.com/sarrazola/openturnly/compare/v1.4.1...v1.4.2
 [1.4.1]: https://github.com/sarrazola/openturnly/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/sarrazola/openturnly/compare/v1.3.0...v1.4.0

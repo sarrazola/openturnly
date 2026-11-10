@@ -38,6 +38,7 @@ export const router = createBrowserRouter([
       { path: "businesses/new", lazy: page("NewBusinessPage") },
       { path: "account", lazy: page("AccountPage") },
       { path: "channels", lazy: page("ChannelsPage") },
+      { path: "deliveries", lazy: page("DeliveriesPage") },
       // Links from before short ids: /admin/businesses/<uuid>/… → /admin/<short id>/….
       { path: "businesses/:businessId/*", lazy: page("LegacyBusinessRedirect") },
       {

@@ -6,7 +6,7 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { logger } from "hono/logger";
 import { secureHeaders } from "hono/secure-headers";
-import { createAutomations } from "./lib/automations.ts";
+import { createAutomations, type DefaultAccountMeter } from "./lib/automations.ts";
 import { createBookingGuard } from "./lib/booking-guard.ts";
 import { clientIp, hasProxyHeaders, networkKey, withClientIp } from "./lib/client-ip.ts";
 import { createEmail } from "./lib/email.ts";
@@ -20,6 +20,7 @@ import { createSms } from "./lib/sms.ts";
 import { createWhatsapp } from "./lib/whatsapp.ts";
 import { businessRoutes } from "./routes/businesses.ts";
 import { channelRoutes } from "./routes/channels.ts";
+import { deliveryRoutes } from "./routes/deliveries.ts";
 import { invitationRoutes } from "./routes/invitations.ts";
 import { mcpRoutes } from "./routes/mcp.ts";
 import { meRoutes } from "./routes/me.ts";
@@ -40,9 +41,12 @@ export function createApp({
   auth,
   config,
   push = pushProviderFromConfig(config),
+  meter = null,
 }: Pick<Deps, "db" | "auth" | "config"> & {
   /** Delivers notifications to the phone apps; by default, what PUSH_PROVIDER says. */
   push?: PushProvider | null;
+  /** Holds back and counts messages on the install's own accounts; none: they all go out. */
+  meter?: DefaultAccountMeter | null;
 }) {
   const guard = createBookingGuard({ db, secret: config.secret, settings: config.bookingGuard });
   const whatsapp = createWhatsapp({ db, config });
@@ -57,7 +61,7 @@ export function createApp({
       await notifications.appointmentBooked(appointmentId, null);
     },
   });
-  const automations = createAutomations({ db, config, whatsapp, email, sms, payments });
+  const automations = createAutomations({ db, config, whatsapp, email, sms, payments, meter });
   const deps: Deps = {
     db,
     auth,
@@ -151,6 +155,7 @@ export function createApp({
   app.route("/api/businesses", businessRoutes(deps));
   app.route("/api/businesses/:businessId", businessScopedRoutes(deps));
   app.route("/api/channels", channelRoutes(deps));
+  app.route("/api/deliveries", deliveryRoutes(deps));
   app.route("/api/invitations", invitationRoutes(deps));
   app.route("/api/public/whatsapp", whatsappWebhookRoutes(deps));
   app.route("/api/public/sms", smsWebhookRoutes(deps));
