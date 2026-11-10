@@ -6,6 +6,8 @@ All notable changes to OpenTurnly are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.4.2] - 2026-11-09
+
 ### Added
 
 - **Add it to your calendar** on the booking confirmation: Google and Outlook open their new
@@ -316,7 +318,8 @@ The first public release, under the MIT license.
   own pages, and "My account" waits 15 minutes after 5 wrong current passwords. See
   [SECURITY.md](SECURITY.md) for everything that's built in.
 
-[Unreleased]: https://github.com/sarrazola/openturnly/compare/v1.4.1...HEAD
+[Unreleased]: https://github.com/sarrazola/openturnly/compare/v1.4.2...HEAD
+[1.4.2]: https://github.com/sarrazola/openturnly/compare/v1.4.1...v1.4.2
 [1.4.1]: https://github.com/sarrazola/openturnly/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/sarrazola/openturnly/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/sarrazola/openturnly/compare/v1.2.0...v1.3.0
