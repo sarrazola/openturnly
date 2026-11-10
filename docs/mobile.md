@@ -11,12 +11,12 @@ their own and send nothing anywhere else: no analytics, no trackers.
 
 ## What each person sees
 
-| Tab | Admins | Professionals |
-| --- | --- | --- |
-| Agenda | Every professional's appointments; the filter button narrows them to one professional or location. Book, move, cancel, mark no-shows, take deposits and charge. | Their own appointments. They book with themselves and move their own. |
-| Customers | Search, history, create and edit. | Only when booking. |
-| Sales | The day's sales and deposits, totals by payment method, void, counter sales. | — |
-| More | The booking link and its QR code, reports, a shortcut to the web admin and their account. | The booking link and their account. |
+| Tab       | Admins                                                                                                                                                          | Professionals                                                         |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| Agenda    | Every professional's appointments; the filter button narrows them to one professional or location. Book, move, cancel, mark no-shows, take deposits and charge. | Their own appointments. They book with themselves and move their own. |
+| Customers | Search, history, create and edit.                                                                                                                               | Only when booking.                                                    |
+| Sales     | The day's sales and deposits, totals by payment method, void, counter sales.                                                                                    | —                                                                     |
+| More      | The booking link and its QR code, reports, a shortcut to the web admin and their account.                                                                       | The booking link and their account.                                   |
 
 The server decides what each role may do. The apps only hide what the server would refuse.
 

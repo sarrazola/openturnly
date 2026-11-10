@@ -19,7 +19,7 @@ Text messages belong to whoever runs the install, not to one business: they're s
 ## What you need from Twilio
 
 1. **The Account SID**, which starts with `AC`, from **Account → API keys & tokens**.
-2. **An API key**, from the same page: **Create API key**, of the *Standard* kind. Copy its
+2. **An API key**, from the same page: **Create API key**, of the _Standard_ kind. Copy its
    SID, which starts with `SK`, and its secret, which Twilio only shows once. A key of its own
    can be revoked without touching anything else on the account.
 3. **Where texts go out from**: one of the account's numbers that can send SMS, with its
@@ -73,9 +73,9 @@ or an install without a connected account, shows as failed too.
 
 Set these in `.env` for an account in the environment:
 
-| Variable | What it is |
-| --- | --- |
-| `TWILIO_ACCOUNT_SID` | The account, `AC…`. With the next three, it turns this account on |
-| `TWILIO_API_KEY_SID` | The API key, `SK…` |
-| `TWILIO_API_KEY_SECRET` | The API key's secret |
-| `TWILIO_FROM_NUMBER` | The number texts go out from, with its country code, or a messaging service, `MG…` |
+| Variable                | What it is                                                                         |
+| ----------------------- | ---------------------------------------------------------------------------------- |
+| `TWILIO_ACCOUNT_SID`    | The account, `AC…`. With the next three, it turns this account on                  |
+| `TWILIO_API_KEY_SID`    | The API key, `SK…`                                                                 |
+| `TWILIO_API_KEY_SECRET` | The API key's secret                                                               |
+| `TWILIO_FROM_NUMBER`    | The number texts go out from, with its country code, or a messaging service, `MG…` |

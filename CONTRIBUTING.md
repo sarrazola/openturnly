@@ -50,16 +50,16 @@ properties) and import local files with their `.ts` extension.
 
 ## Commands
 
-| Command               | What it does                                    |
-| --------------------- | ----------------------------------------------- |
-| `npm run dev`         | API + web app with auto-reload                  |
-| `npm test`            | Unit and API tests (Vitest)                     |
-| `npm run typecheck`   | TypeScript checks for every package             |
-| `npm run lint`        | Lint and format check (Biome)                   |
-| `npm run format`      | Fix formatting and safe lint issues             |
-| `npm run build`       | Build the web app into `apps/web/dist`          |
-| `npm start`           | Run the server, serving the built web app       |
-| `npm run db:generate` | Create a migration after changing the schema    |
+| Command               | What it does                                 |
+| --------------------- | -------------------------------------------- |
+| `npm run dev`         | API + web app with auto-reload               |
+| `npm test`            | Unit and API tests (Vitest)                  |
+| `npm run typecheck`   | TypeScript checks for every package          |
+| `npm run lint`        | Lint and format check (Biome)                |
+| `npm run format`      | Fix formatting and safe lint issues          |
+| `npm run build`       | Build the web app into `apps/web/dist`       |
+| `npm start`           | Run the server, serving the built web app    |
+| `npm run db:generate` | Create a migration after changing the schema |
 
 Before opening a pull request, run `npm run lint && npm run typecheck && npm test`.
 CI runs the same checks.

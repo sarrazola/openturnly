@@ -24,12 +24,12 @@ wrong token never stops messages that were already going out.
 In [Meta for Developers](https://developers.facebook.com/apps), with an app that has the
 WhatsApp use case and a number registered on it, you need:
 
-| Field | Where it is |
-| --- | --- |
-| Phone number ID | WhatsApp → API setup, or the number's page in WhatsApp Manager |
-| WhatsApp Business Account ID | The same page. Needed to see and create templates |
-| Permanent access token | Business settings → System users. Give it `whatsapp_business_messaging` and `whatsapp_business_management`, and access to the app, the WhatsApp account and the messaging account |
-| App secret | App settings → Basic |
+| Field                        | Where it is                                                                                                                                                                       |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Phone number ID              | WhatsApp → API setup, or the number's page in WhatsApp Manager                                                                                                                    |
+| WhatsApp Business Account ID | The same page. Needed to see and create templates                                                                                                                                 |
+| Permanent access token       | Business settings → System users. Give it `whatsapp_business_messaging` and `whatsapp_business_management`, and access to the app, the WhatsApp account and the messaging account |
+| App secret                   | App settings → Basic                                                                                                                                                              |
 
 The token and the app secret are stored encrypted with the install's `SECRET` and never come
 back to the browser. If you change `SECRET` they can't be read anymore and have to be pasted
@@ -81,11 +81,11 @@ reason.
 
 Set these in `.env` for a number in the environment:
 
-| Variable | What it is |
-| --- | --- |
-| `WHATSAPP_PHONE_NUMBER_ID` | The number's ID. With the token, it turns this number on |
-| `WHATSAPP_ACCESS_TOKEN` | The permanent token |
-| `WHATSAPP_WABA_ID` | The WhatsApp Business Account ID, to list its templates |
-| `WHATSAPP_APP_SECRET` | The app secret, to check the webhook's calls |
-| `WHATSAPP_VERIFY_TOKEN` | Any text you choose, to paste in the app next to the callback URL |
-| `WHATSAPP_CALLBACK_TAG` | Optional. Sent with each message and returned in its updates, so several installs sharing a number can tell theirs apart |
+| Variable                   | What it is                                                                                                               |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `WHATSAPP_PHONE_NUMBER_ID` | The number's ID. With the token, it turns this number on                                                                 |
+| `WHATSAPP_ACCESS_TOKEN`    | The permanent token                                                                                                      |
+| `WHATSAPP_WABA_ID`         | The WhatsApp Business Account ID, to list its templates                                                                  |
+| `WHATSAPP_APP_SECRET`      | The app secret, to check the webhook's calls                                                                             |
+| `WHATSAPP_VERIFY_TOKEN`    | Any text you choose, to paste in the app next to the callback URL                                                        |
+| `WHATSAPP_CALLBACK_TAG`    | Optional. Sent with each message and returned in its updates, so several installs sharing a number can tell theirs apart |

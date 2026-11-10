@@ -79,11 +79,11 @@ owner a warning.
 
 Conditions of free tiers change; check them when you sign up.
 
-| Option | What you get | Watch out for |
-| --- | --- | --- |
-| **Oracle Cloud Always Free** | ARM VM, up to 4 cores and 24 GB RAM, 200 GB disk | Needs a card to verify. Regions run out of capacity. Idle Always Free instances can be reclaimed; upgrading the account to Pay As You Go avoids that and stays free within the free limits. |
-| **Google Cloud `e2-micro`** | Small VM (1 GB RAM, 30 GB disk) in some US regions | Needs a card to verify. About 1 GB of free outbound traffic per month. |
-| **A computer at home + Cloudflare Tunnel** | HTTPS on your domain without opening router ports | Bookings stop when the power or internet goes down. |
+| Option                                     | What you get                                       | Watch out for                                                                                                                                                                               |
+| ------------------------------------------ | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Oracle Cloud Always Free**               | ARM VM, up to 4 cores and 24 GB RAM, 200 GB disk   | Needs a card to verify. Regions run out of capacity. Idle Always Free instances can be reclaimed; upgrading the account to Pay As You Go avoids that and stays free within the free limits. |
+| **Google Cloud `e2-micro`**                | Small VM (1 GB RAM, 30 GB disk) in some US regions | Needs a card to verify. About 1 GB of free outbound traffic per month.                                                                                                                      |
+| **A computer at home + Cloudflare Tunnel** | HTTPS on your domain without opening router ports  | Bookings stop when the power or internet goes down.                                                                                                                                         |
 
 On any of them: install Docker, follow [Install](#install) and [HTTPS with Caddy](#https-with-caddy)
 (or Cloudflare Tunnel), and set up [backups](#backups) — free VMs can disappear.

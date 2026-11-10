@@ -25,11 +25,11 @@ the background jobs, backed by PostgreSQL. The goal is an install that is a sing
 
 ## Packages
 
-| Path | Role |
-| --- | --- |
-| `packages/core` | Pure domain code shared by server and web: Zod schemas, slug rules. Later the availability engine. No I/O, so it is easy to test. |
-| `apps/server` | Hono app (`src/app.ts`), routes, Better Auth setup, Drizzle schema and migrations (PostgreSQL). Runs TypeScript directly through Node's type stripping. |
-| `apps/web` | React + Vite app: setup, sign-in, invitations, admin panel and public pages. The admin panel is a lazy-loaded chunk so the public page stays light. |
+| Path            | Role                                                                                                                                                    |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/core` | Pure domain code shared by server and web: Zod schemas, slug rules. Later the availability engine. No I/O, so it is easy to test.                       |
+| `apps/server`   | Hono app (`src/app.ts`), routes, Better Auth setup, Drizzle schema and migrations (PostgreSQL). Runs TypeScript directly through Node's type stripping. |
+| `apps/web`      | React + Vite app: setup, sign-in, invitations, admin panel and public pages. The admin panel is a lazy-loaded chunk so the public page stays light.     |
 
 ## Accounts and access
 
@@ -80,7 +80,6 @@ gets `X-Frame-Options: SAMEORIGIN` from Hono's secure headers, except a booking 
 (one segment that is a valid, unreserved slug) with `?embed`, which gets
 `Content-Security-Policy: frame-ancestors *` instead (`src/app.ts`). `embed.js` is served
 with `Cross-Origin-Resource-Policy: cross-origin` so other sites can load it.
-
 
 ### Roles
 

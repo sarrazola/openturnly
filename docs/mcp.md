@@ -37,22 +37,22 @@ Appointments an agent books show "AI agent · <key name>" in the calendar.
 Dates are `YYYY-MM-DD` and times `HH:MM`, in the business's time zone. Prices are in the
 business's currency, in its main unit.
 
-| Tool | Booking agent | Administration |
-| --- | :-: | :-: |
-| `get_business_info`: contact, locations and their hours, closures, holidays, rules, what a booking needs | ✓ | ✓ |
-| `list_services`, `list_professionals` | ✓ | ✓ (also inactive ones) |
-| `find_available_times`, `find_next_available` | ✓ customers' rules | ✓ business rules |
-| `book_appointment` | ✓ | ✓ (also existing customers) |
-| `find_appointment`: by booking code + phone or email | ✓ | |
-| `get_appointment`: by booking code | | ✓ |
-| `reschedule_appointment`, `cancel_appointment` | ✓ with code + phone or email, within the business's limit | ✓ |
-| `get_agenda`, `get_summary` | | ✓ |
-| `search_customers`, `get_customer`, `create_customer`, `update_customer` | | ✓ |
-| `create_service`, `update_service`, `create_professional`, `update_professional` | | ✓ |
-| `get_opening_hours`, `set_opening_hours` | | ✓ |
-| `list_closures`, `add_closure`, `remove_closure`, `list_holidays`, `set_holiday` | | ✓ |
-| `update_business_details`: name, description, phone, email, address | | ✓ |
-| `update_booking_rules` | | ✓ |
+| Tool                                                                                                     |                       Booking agent                       |       Administration        |
+| -------------------------------------------------------------------------------------------------------- | :-------------------------------------------------------: | :-------------------------: |
+| `get_business_info`: contact, locations and their hours, closures, holidays, rules, what a booking needs |                             ✓                             |              ✓              |
+| `list_services`, `list_professionals`                                                                    |                             ✓                             |   ✓ (also inactive ones)    |
+| `find_available_times`, `find_next_available`                                                            |                    ✓ customers' rules                     |      ✓ business rules       |
+| `book_appointment`                                                                                       |                             ✓                             | ✓ (also existing customers) |
+| `find_appointment`: by booking code + phone or email                                                     |                             ✓                             |                             |
+| `get_appointment`: by booking code                                                                       |                                                           |              ✓              |
+| `reschedule_appointment`, `cancel_appointment`                                                           | ✓ with code + phone or email, within the business's limit |              ✓              |
+| `get_agenda`, `get_summary`                                                                              |                                                           |              ✓              |
+| `search_customers`, `get_customer`, `create_customer`, `update_customer`                                 |                                                           |              ✓              |
+| `create_service`, `update_service`, `create_professional`, `update_professional`                         |                                                           |              ✓              |
+| `get_opening_hours`, `set_opening_hours`                                                                 |                                                           |              ✓              |
+| `list_closures`, `add_closure`, `remove_closure`, `list_holidays`, `set_holiday`                         |                                                           |              ✓              |
+| `update_business_details`: name, description, phone, email, address                                      |                                                           |              ✓              |
+| `update_booking_rules`                                                                                   |                                                           |              ✓              |
 
 A business with several locations needs a `location_id` (from `get_business_info`) to find
 free times and to book; agents should ask the customer which location they want. With one
