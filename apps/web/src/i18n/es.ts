@@ -927,6 +927,7 @@ export const es = {
     customColor: "Otro color",
     previewTitle: "Vista previa",
     previews: { page: "Página", form: "Formulario" },
+    previewDevices: { desktop: "Computador", mobile: "Celular" },
     imagesHint:
       "Haz clic en una imagen para subirla o cambiarla: el logo cuadrado y la portada horizontal. JPG, PNG o WebP.",
     cover: "Foto de portada",

@@ -928,6 +928,7 @@ export const en: Messages<typeof es> = {
     customColor: "Other colour",
     previewTitle: "Preview",
     previews: { page: "Page", form: "Form" },
+    previewDevices: { desktop: "Desktop", mobile: "Phone" },
     imagesHint:
       "Click an image to upload or change it: a square logo and a landscape cover. JPG, PNG or WebP.",
     cover: "Cover photo",
