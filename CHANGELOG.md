@@ -6,6 +6,17 @@ All notable changes to OpenTurnly are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Sends**, in the account menu for whoever runs the install: every message and notice the
+  flows of all its businesses sent, newest first, with the business, the flow and step, the
+  customer and booking, how it ended (delivered, read, failed and why, waiting for a retry,
+  skipped), what it cost, and, opened, what was sent. Filter by business, channel and status.
+- A deployment can pass `createApp({ meter })` to hold back and count the messages sent on
+  the install's own accounts (the WhatsApp number, email account and texts set in its
+  environment). A business's own accounts never go through it. Each send records whether it
+  went out on the business's account or the install's, and what it counted for.
+
 ## [1.4.2] - 2026-11-09
 
 ### Added

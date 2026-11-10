@@ -182,7 +182,8 @@ queue lives in PostgreSQL, so nothing is lost on a restart.
 Any 2xx answer counts as received. Otherwise (an error, a timeout after 10 seconds, or no
 answer) OpenTurnly tries again after 1 minute, 5 minutes and 30 minutes, then marks it as
 failed. Each step is sent and retried on its own, so one system being down doesn't hold
-back the others. The workflow's settings show the latest sends. Tests carry the
+back the others. The workflow's settings show its latest sends, and **Sends** in the
+account menu (for whoever runs the install) shows every business's, with filters. Tests carry the
 `X-OpenTurnly-Test: true` header, and `"test": true` in bodies built from fields (a JSON
 body is sent exactly as written). The history is kept 30 days.
 
@@ -193,3 +194,17 @@ network (localhost, private IPs, other containers), so one business can't reach 
 internal services. If your receiver runs next to OpenTurnly (for example in the same
 Docker network), set `WEBHOOKS_ALLOW_PRIVATE=true`. Those addresses (`localhost`, a private
 IP or a container's name, like `http://crm:8080/hooks`) may use plain `http://`.
+
+## Metering the install's own accounts
+
+Messages a flow sends on the install's own WhatsApp number, email account or text messages
+(the ones set in its environment, which every business shares) can be held back and
+counted by whoever deploys OpenTurnly, through `createApp({ meter })`:
+
+- `allows(message)` is asked before each one goes out. When it says no, the step is skipped
+  with `default_account_held`, and the history says so.
+- `counts(message)` is told after it went out (a text, once Twilio says its price) and
+  returns what it counted for, which the history shows next to the provider's own cost.
+
+Messages on a business's own accounts never go through it. Without a meter, every message
+goes out and nothing is counted.

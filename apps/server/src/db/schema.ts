@@ -1155,6 +1155,13 @@ export const automationDeliveries = pgTable(
     /** What the provider charged for the message, once it says. */
     cost: numeric("cost", { precision: 12, scale: 6 }),
     costCurrency: text("cost_currency"),
+    /** The step's kind when it was queued: webhook, whatsapp, email or sms. */
+    channel: text("channel"),
+    /** For a message: whether it went out on the business's own account or the install's. */
+    account: text("account", { enum: ["own", "default"] }),
+    /** What a message on the install's account counted for, when the install says (see meter). */
+    charge: numeric("charge", { precision: 12, scale: 6 }),
+    chargeCurrency: text("charge_currency"),
     /** When the provider was last asked about the message, so it isn't asked every minute. */
     messageCheckedAt: instant("message_checked_at"),
     createdAt: createdAt(),

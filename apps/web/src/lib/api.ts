@@ -529,11 +529,34 @@ export type AutomationDelivery = {
   error: string | null;
   createdAt: string;
   sentAt: string | null;
+  /** When a pending send goes out (again). */
+  nextAttemptAt: string;
   /** How far a message got: sent, delivered, read or failed. */
   messageStatus: string | null;
   /** What the provider charged for the message, once it says, e.g. "0.059200". */
   cost: string | null;
   costCurrency: string | null;
+};
+
+/** A send in the install's log: any business's flow, with what it was about. */
+export type DeliveryLogEntry = AutomationDelivery & {
+  automationId: string;
+  automationName: string;
+  channel: "webhook" | "whatsapp" | "email" | "sms" | null;
+  /** Whether a message went out on the business's own account or the install's. */
+  account: "own" | "default" | null;
+  /** What a message on the install's account counted for. */
+  charge: string | null;
+  chargeCurrency: string | null;
+  business: { id: string; name: string; timezone: string };
+  appointment: { code: string } | null;
+  customer: { firstName: string; lastName: string } | null;
+};
+
+export type DeliveryLog = {
+  deliveries: DeliveryLogEntry[];
+  more: boolean;
+  totals: { sends: number; charged: { currency: string; amount: string }[] };
 };
 
 /** The install's own WhatsApp number. The token and app secret never come back. */

@@ -4,6 +4,7 @@ import { createApp } from "../src/app.ts";
 import { createAuth } from "../src/auth.ts";
 import type { Config } from "../src/config.ts";
 import { openEmbeddedPostgres } from "../src/db/client.ts";
+import type { DefaultAccountMeter } from "../src/lib/automations.ts";
 import { type BookingGuardSettings, DEFAULT_GUARD_SETTINGS } from "../src/lib/booking-guard.ts";
 import type { PushProvider } from "../src/lib/push.ts";
 
@@ -52,6 +53,7 @@ export async function createTestApp(
     twilioApiUrl?: string;
     appUrl?: string;
     push?: PushProvider | null;
+    meter?: DefaultAccountMeter | null;
   } = {},
 ) {
   const config: Config = {
@@ -77,7 +79,13 @@ export async function createTestApp(
   };
   const { db } = await openEmbeddedPostgres();
   const auth = createAuth({ db, config });
-  const app = createApp({ db, auth, config, push: options.push ?? null });
+  const app = createApp({
+    db,
+    auth,
+    config,
+    push: options.push ?? null,
+    meter: options.meter ?? null,
+  });
 
   /** A browser-like client that keeps its own cookies. */
   const client = () => {

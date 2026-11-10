@@ -262,6 +262,34 @@ export function signDelivery(secret: string, timestamp: number, body: string) {
   return createHmac("sha256", secret).update(`${timestamp}.${body}`).digest("hex");
 }
 
+/** A message going out, or gone out, on one of the install's own accounts (its environment's). */
+export type DefaultAccountMessage = {
+  businessId: string;
+  channel: "whatsapp" | "email" | "sms";
+  /** The phone number or address it goes to. */
+  to: string;
+  /** Its entry in the history; null for a test that isn't kept. */
+  deliveryId: string | null;
+};
+
+/**
+ * What a deployment can do with the messages sent on the install's own accounts (the
+ * WhatsApp number, email account and texts set in its environment): hold them back, and
+ * give each one an amount that the history shows. A business's own accounts never go
+ * through it. Without one, every message goes out and nothing is counted.
+ */
+export type DefaultAccountMeter = {
+  /** Whether a message may go out now. */
+  allows(message: DefaultAccountMessage): Promise<boolean>;
+  /**
+   * After it went out, what it counts for (or null). A text is counted once the provider
+   * says its price, which comes as `providerCost`.
+   */
+  counts(
+    message: DefaultAccountMessage & { providerCost: { amount: string; currency: string } | null },
+  ): Promise<{ amount: string; currency: string } | null>;
+};
+
 type SendResult = {
   ok: boolean;
   status: number | null;
@@ -273,6 +301,10 @@ type SendResult = {
   messageId?: string | null;
   /** False when trying again can't help: a number that isn't on WhatsApp, say. */
   retry?: boolean;
+  /** For a message: the business's own account or the install's. */
+  account?: "own" | "default";
+  /** The install held it back (see DefaultAccountMeter): it's skipped, not failed. */
+  held?: boolean;
 };
 
 /** How far a message got: updates can arrive out of order and never go back. */
@@ -295,6 +327,7 @@ export function createAutomations({
   email,
   sms,
   payments,
+  meter = null,
 }: {
   db: Db;
   config: Config;
@@ -303,7 +336,56 @@ export function createAutomations({
   sms: Sms;
   /** Open payments are caught up on every sweep, which frees times nobody paid for. */
   payments?: Pick<Payments, "sweep">;
+  /** Holds back and counts messages on the install's own accounts; none: all go out. */
+  meter?: DefaultAccountMeter | null;
 }) {
+  type SendContext = { businessId: string; deliveryId: string | null };
+
+  /** Null when a message may go out on the install's account; otherwise why it can't. */
+  const holdBack = async (
+    channel: DefaultAccountMessage["channel"],
+    to: string,
+    context: SendContext,
+  ): Promise<SendResult | null> => {
+    if (!meter) return null;
+    const result = (error: string, held: boolean): SendResult => ({
+      ok: false,
+      status: null,
+      error,
+      durationMs: 0,
+      response: null,
+      retry: !held,
+      account: "default",
+      held,
+    });
+    try {
+      return (await meter.allows({ ...context, channel, to }))
+        ? null
+        : result("default_account_held", true);
+    } catch (error) {
+      console.error("automations: the meter didn't answer", error);
+      return result("default_account_unavailable", false);
+    }
+  };
+
+  /** Records what a message on the install's account counted for, when the meter says. */
+  const count = async (
+    message: DefaultAccountMessage,
+    providerCost: { amount: string; currency: string } | null,
+  ) => {
+    if (!meter) return;
+    try {
+      const charge = await meter.counts({ ...message, providerCost });
+      if (charge && message.deliveryId) {
+        await db
+          .update(automationDeliveries)
+          .set({ charge: charge.amount, chargeCurrency: charge.currency })
+          .where(eq(automationDeliveries.id, message.deliveryId));
+      }
+    } catch (error) {
+      console.error("automations: the meter didn't count a message", error);
+    }
+  };
   const loadAppointment = async (appointmentId: string) => {
     const [row] = await db
       .select({
@@ -403,6 +485,7 @@ export function createAutomations({
   const sendWhatsapp = async (
     payload: Record<string, unknown>,
     callback: string,
+    context: SendContext,
   ): Promise<SendResult> => {
     const refuse = (error: string): SendResult => ({
       ok: false,
@@ -416,19 +499,25 @@ export function createAutomations({
     if (typeof to !== "string" || !to) return refuse("whatsapp_no_phone");
     const sender = await whatsapp.sender();
     if (!sender) return refuse("whatsapp_not_connected");
-    return whatsapp.send(sender, {
+    if (sender.source === "default") {
+      const held = await holdBack("whatsapp", to, context);
+      if (held) return held;
+    }
+    const result = await whatsapp.send(sender, {
       to,
       template: String(template),
       language: String(language),
       variables: (variables ?? []) as WhatsappVariable[],
       callback,
     });
+    return { ...result, account: sender.source };
   };
 
   /** Sends a queued email, or says why it can't go. */
   const sendEmail = async (
     business: Pick<Business, "name" | "email">,
     payload: Record<string, unknown>,
+    context: SendContext,
   ): Promise<SendResult> => {
     const refuse = (error: string): SendResult => ({
       ok: false,
@@ -445,13 +534,18 @@ export function createAutomations({
     // The account from the environment only carries the ready-made texts: when an install
     // shares it between clients, its reputation is everybody's.
     const own = sender.source === "own";
-    return email.send(sender, {
+    if (!own) {
+      const held = await holdBack("email", to, context);
+      if (held) return held;
+    }
+    const result = await email.send(sender, {
       to,
       fromName: business.name,
       replyTo: business.email,
       subject: String((own && payload.subject) || payload.readySubject),
       body: String((own && payload.body) || payload.readyBody),
     });
+    return { ...result, account: sender.source };
   };
 
   /**
@@ -464,6 +558,7 @@ export function createAutomations({
   const sendSms = async (
     payload: Record<string, unknown>,
     deliveryId: string | null,
+    context: SendContext,
   ): Promise<SendResult> => {
     const refuse = (error: string): SendResult => ({
       ok: false,
@@ -481,11 +576,16 @@ export function createAutomations({
     const own = sender.source === "own";
     const body = smsText(String((own && payload.body) || payload.readyBody)).trim();
     if (!body) return refuse("sms_empty");
-    return sms.send(sender, {
+    if (!own) {
+      const held = await holdBack("sms", to, context);
+      if (held) return held;
+    }
+    const result = await sms.send(sender, {
       to,
       body,
       ...(deliveryId && reachable ? { statusUrl: sms.statusUrl(deliveryId) } : {}),
     });
+    return { ...result, account: sender.source };
   };
 
   /** Records what Twilio says about a text: how far it got and what it cost. */
@@ -495,8 +595,15 @@ export function createAutomations({
     now = Date.now(),
   ) => {
     const [delivery] = await db
-      .select({ messageStatus: automationDeliveries.messageStatus })
+      .select({
+        messageStatus: automationDeliveries.messageStatus,
+        account: automationDeliveries.account,
+        charge: automationDeliveries.charge,
+        payload: automationDeliveries.payload,
+        businessId: automations.businessId,
+      })
       .from(automationDeliveries)
+      .innerJoin(automations, eq(automations.id, automationDeliveries.automationId))
       .where(eq(automationDeliveries.id, deliveryId));
     if (!delivery) return;
     const progressed =
@@ -516,6 +623,18 @@ export function createAutomations({
             : {}),
       })
       .where(eq(automationDeliveries.id, deliveryId));
+    // A text on the install's account counts once its price is known, and only once.
+    if (state?.cost && delivery.account === "default" && delivery.charge === null) {
+      await count(
+        {
+          businessId: delivery.businessId,
+          channel: "sms",
+          to: String(delivery.payload.to ?? ""),
+          deliveryId,
+        },
+        { amount: state.cost, currency: state.currency ?? "USD" },
+      );
+    }
   };
 
   /**
@@ -589,14 +708,22 @@ export function createAutomations({
       const hold = await surveyHold(db, business, survey, now);
       if (hold) return skip(hold);
     }
+    const context = { businessId: business.id, deliveryId: delivery.id };
     const result =
       action.type === "whatsapp"
-        ? await sendWhatsapp(delivery.payload, delivery.id)
+        ? await sendWhatsapp(delivery.payload, delivery.id, context)
         : action.type === "email"
-          ? await sendEmail(business, delivery.payload)
+          ? await sendEmail(business, delivery.payload, context)
           : action.type === "sms"
-            ? await sendSms(delivery.payload, delivery.id)
+            ? await sendSms(delivery.payload, delivery.id, context)
             : await post(automation.secret, action, delivery.event, delivery.id, delivery.payload);
+    if (result.held) {
+      await db
+        .update(automationDeliveries)
+        .set({ status: "skipped", error: result.error, account: "default" })
+        .where(eq(automationDeliveries.id, delivery.id));
+      return;
+    }
     const attempts = delivery.attempts + 1;
     const retryIn = result.retry === false ? undefined : RETRY_DELAYS_MS[attempts - 1];
     await db
@@ -606,6 +733,7 @@ export function createAutomations({
         responseStatus: result.status,
         error: result.error,
         ...(result.messageId ? { messageId: result.messageId, messageStatus: "sent" } : {}),
+        ...(result.account ? { account: result.account } : {}),
         ...(result.ok
           ? { status: "sent" as const, sentAt: new Date(now) }
           : retryIn === undefined
@@ -614,6 +742,22 @@ export function createAutomations({
       })
       .where(eq(automationDeliveries.id, delivery.id));
     if (survey && result.ok) await markSurveySent(db, business, survey, now);
+    // Texts count once their price is known (recordSmsState); the rest right away.
+    if (
+      result.ok &&
+      result.account === "default" &&
+      action.type !== "webhook" &&
+      action.type !== "sms"
+    ) {
+      await count(
+        {
+          ...context,
+          channel: action.type,
+          to: String(delivery.payload.to ?? ""),
+        },
+        null,
+      );
+    }
   };
 
   let running = false;
@@ -653,6 +797,7 @@ export function createAutomations({
             payload: buildPayload(action, values),
             // Steps after a wait: queued now, sent when the wait is over.
             nextAttemptAt: new Date(Date.now() + delayMs),
+            channel: action.type,
           })),
         );
         if (rows.length > 0) await db.insert(automationDeliveries).values(rows);
@@ -738,6 +883,7 @@ export function createAutomations({
                 event,
                 payload: buildPayload(action, values),
                 nextAttemptAt: new Date(now + delayMs),
+                channel: action.type,
               })
               .onConflictDoNothing();
           }
@@ -845,6 +991,7 @@ export function createAutomations({
               ? { ...buildPayload(action, values), test: true }
               : buildPayload(action, values);
           const deliveryId = randomUUID();
+          const testContext = { businessId: business.id, deliveryId: flow.id ? deliveryId : null };
           // A message is real even in a test, so it only goes to a real appointment's customer:
           // the example data's phone number and address are made up and could be somebody's.
           const result =
@@ -862,10 +1009,10 @@ export function createAutomations({
                     response: null,
                   }
                 : action.type === "email"
-                  ? await sendEmail(business, payload)
+                  ? await sendEmail(business, payload, testContext)
                   : action.type === "sms"
-                    ? await sendSms(payload, flow.id ? deliveryId : null)
-                    : await sendWhatsapp(payload, deliveryId);
+                    ? await sendSms(payload, flow.id ? deliveryId : null, testContext)
+                    : await sendWhatsapp(payload, deliveryId, testContext);
           if (flow.id) {
             await db.insert(automationDeliveries).values({
               id: deliveryId,
@@ -882,7 +1029,21 @@ export function createAutomations({
               sentAt: result.ok ? new Date() : null,
               messageId: "messageId" in result ? (result.messageId ?? null) : null,
               messageStatus: "messageId" in result && result.messageId && result.ok ? "sent" : null,
+              channel: action.type,
+              account: "account" in result ? (result.account ?? null) : null,
             });
+          }
+          // A test's message on the install's account counts like any other.
+          if (
+            result.ok &&
+            "account" in result &&
+            result.account === "default" &&
+            (action.type === "whatsapp" || action.type === "email")
+          ) {
+            await count(
+              { ...testContext, channel: action.type, to: String(payload.to ?? "") },
+              null,
+            );
           }
           return { actionId: action.id, event, payload, ...result };
         }),

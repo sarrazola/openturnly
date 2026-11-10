@@ -2,6 +2,7 @@ import { accountUpdateSchema, PASSWORD_MIN_LENGTH, passwordChangeSchema } from "
 import {
   ChevronsUpDown,
   Compass,
+  History,
   LogOut,
   type LucideIcon,
   Monitor,
@@ -134,6 +135,17 @@ export function AccountMenu({ user, collapsed }: { user: User; collapsed: boolea
                 }}
               >
                 {t("channels.title")}
+              </MenuItem>
+            )}
+            {user.role === "owner" && (
+              <MenuItem
+                icon={History}
+                onClick={() => {
+                  setOpen(false);
+                  navigate("/admin/deliveries");
+                }}
+              >
+                {t("deliveries.menu")}
               </MenuItem>
             )}
           </div>

@@ -18,6 +18,7 @@ export { BusinessesPage } from "./businesses.tsx";
 export { CashPage } from "./cash.tsx";
 export { ChannelsPage } from "./channels.tsx";
 export { CustomersPage } from "./customers.tsx";
+export { DeliveriesPage } from "./deliveries.tsx";
 export { GiftCardsPage } from "./gift-cards.tsx";
 export { HoursPage } from "./hours.tsx";
 export { InventoryPage } from "./inventory.tsx";
