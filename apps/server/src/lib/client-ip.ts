@@ -46,8 +46,8 @@ const INTERNAL_V6 = /^(?:::1$|f[cd]|fe[89ab])/i;
 export function networkKey(ip: string | null): string | null {
   if (!ip) return null;
   const address = ip.split("%")[0] ?? ip;
-  const v4 = /^(?:::ffff:)?(\d{1,3}(?:\.\d{1,3}){3})$/i.exec(address);
-  if (v4?.[1]) return INTERNAL_V4.test(v4[1]) ? null : v4[1];
+  const v4 = ipv4Of(address);
+  if (v4) return INTERNAL_V4.test(v4) ? null : v4;
   if (!address.includes(":") || INTERNAL_V6.test(address)) return null;
   const [head = "", tail = ""] = address.split("::");
   const front = head ? head.split(":") : [];
@@ -69,13 +69,33 @@ export function hasProxyHeaders(c: Context): boolean {
   return PROXY_HEADERS.some((name) => c.req.header(name) !== undefined);
 }
 
+const DOTTED_V4 = /^\d{1,3}(?:\.\d{1,3}){3}$/;
+
+/**
+ * The IPv4 address an address stands for: itself, or the one inside an IPv4-mapped IPv6
+ * address however it's written. "::ffff:127.0.0.1" is also spelled "::ffff:7f00:1" (that's
+ * how URLs write it) or "0:0:0:0:0:ffff:7f00:1", and all three reach 127.0.0.1.
+ */
+export function ipv4Of(address: string): string | null {
+  if (DOTTED_V4.test(address)) return address;
+  const mapped = /^(?:::|(?:0{1,4}:){5})ffff:(.+)$/i.exec(address)?.[1];
+  if (!mapped) return null;
+  if (DOTTED_V4.test(mapped)) return mapped;
+  const hex = /^([0-9a-f]{1,4}):([0-9a-f]{1,4})$/i.exec(mapped);
+  if (!hex?.[1] || !hex[2]) return null;
+  const high = Number.parseInt(hex[1], 16);
+  const low = Number.parseInt(hex[2], 16);
+  return [high >> 8, high & 255, low >> 8, low & 255].join(".");
+}
+
 /**
  * Loopback, private, link-local, carrier-grade NAT or unspecified: addresses inside the
  * server's own network, which outgoing webhooks must not reach unless the install allows it.
  */
 export function isInternalAddress(ip: string): boolean {
-  const address = (ip.split("%")[0] ?? ip).replace(/^::ffff:/i, "");
-  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(address)) {
+  const raw = ip.split("%")[0] ?? ip;
+  const address = ipv4Of(raw) ?? raw;
+  if (DOTTED_V4.test(address)) {
     return (
       INTERNAL_V4.test(address) ||
       /^(?:0\.|100\.(?:6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.)/.test(address) ||
