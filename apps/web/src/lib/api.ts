@@ -555,8 +555,10 @@ export type DeliveryLogEntry = AutomationDelivery & {
 
 export type DeliveryLog = {
   deliveries: DeliveryLogEntry[];
-  more: boolean;
-  totals: { sends: number; charged: { currency: string; amount: string }[] };
+  /** This page, from 1, and how many sends a page holds; `totals.sends` says how many in all. */
+  page: number;
+  pageSize: number;
+  totals: { sends: number; failed: number; charged: { currency: string; amount: string }[] };
 };
 
 /** The install's own WhatsApp number. The token and app secret never come back. */

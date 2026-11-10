@@ -61,8 +61,8 @@ describe("send log", () => {
     const period = `from=${addDays(today, -1)}&to=${today}&timezone=America/Bogota`;
     const all = await owner.get(`/api/deliveries?${period}`);
     expect(all.status).toBe(200);
-    expect(all.body.totals).toEqual({ sends: 2, charged: [] });
-    expect(all.body.more).toBe(false);
+    expect(all.body.totals).toEqual({ sends: 2, failed: 0, charged: [] });
+    expect(all.body).toMatchObject({ page: 1, pageSize: 25 });
     expect(
       all.body.deliveries.map((item: { business: { name: string } }) => item.business.name).sort(),
     ).toEqual(["Barbería Norte", "Spa Sur"]);
@@ -87,7 +87,12 @@ describe("send log", () => {
       (await owner.get(`/api/deliveries?from=${tomorrow}&to=${tomorrow}&timezone=America/Bogota`))
         .body.totals.sends,
     ).toBe(0);
+    // A page past the last one is empty, with the same totals.
+    const past = await owner.get(`/api/deliveries?${period}&page=2`);
+    expect(past.body.deliveries).toEqual([]);
+    expect(past.body.totals.sends).toBe(2);
     expect((await owner.get("/api/deliveries?from=x&to=y")).status).toBe(400);
+    expect((await owner.get(`/api/deliveries?${period}&page=0`)).status).toBe(400);
 
     // Only whoever runs the install sees every business's sends.
     const admin = await addMember(app, owner, shops[0]?.id ?? "");

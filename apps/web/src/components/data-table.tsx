@@ -35,6 +35,7 @@ export function DataTable<T>({
   empty,
   pageSize = 10,
   flush,
+  paging,
 }: {
   columns: Column<T>[];
   rows: T[];
@@ -48,6 +49,11 @@ export function DataTable<T>({
   pageSize?: number;
   /** Inside a card: no border or rounded corners of its own. */
   flush?: boolean;
+  /**
+   * Pages kept by the server: `rows` is page `page` (from 0) of `total`, and moving between
+   * pages is up to `onChange`. Search filters only what's on the page.
+   */
+  paging?: { page: number; pageSize: number; total: number; onChange: (page: number) => void };
 }) {
   const { t } = useTranslation();
   const [query, setQuery] = useState("");
@@ -59,11 +65,14 @@ export function DataTable<T>({
     return rows.filter((row) => matches(row, normalized));
   }, [rows, query, matches]);
 
-  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const current = Math.min(page, pageCount - 1);
-  const visible = filtered.slice(current * pageSize, (current + 1) * pageSize);
-  const from = filtered.length === 0 ? 0 : current * pageSize + 1;
-  const to = current * pageSize + visible.length;
+  const size = paging?.pageSize ?? pageSize;
+  const total = paging?.total ?? filtered.length;
+  const pageCount = Math.max(1, Math.ceil(total / size));
+  const current = paging ? paging.page : Math.min(page, pageCount - 1);
+  const visible = paging ? filtered : filtered.slice(current * size, (current + 1) * size);
+  const from = visible.length === 0 ? 0 : current * size + 1;
+  const to = current * size + visible.length;
+  const goTo = (next: number) => (paging ? paging.onChange(next) : setPage(next));
 
   return (
     <div className={cn("overflow-hidden bg-white", !flush && "rounded-lg border border-zinc-200")}>
@@ -147,15 +156,15 @@ export function DataTable<T>({
         </>
       )}
 
-      {filtered.length > 0 && (
+      {visible.length > 0 && (
         <div className="flex items-center justify-between gap-3 border-t border-zinc-200 px-4 py-2.5 text-[13px] text-zinc-500">
-          <span>{t("table.showing", { from, to, total: filtered.length })}</span>
+          <span>{t("table.showing", { from, to, total })}</span>
           {pageCount > 1 && (
             <div className="flex items-center gap-1">
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setPage(current - 1)}
+                onClick={() => goTo(current - 1)}
                 disabled={current === 0}
               >
                 <ChevronLeft className="size-4" aria-hidden />
@@ -167,7 +176,7 @@ export function DataTable<T>({
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setPage(current + 1)}
+                onClick={() => goTo(current + 1)}
                 disabled={current >= pageCount - 1}
               >
                 {t("table.next")}

@@ -6,6 +6,19 @@ All notable changes to OpenTurnly are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.5.1] - 2026-11-09
+
+### Changed
+
+- **Sends** is a table with a column for each thing: when, the flow and its business, the
+  channel and whose account it went out on, the recipient, how it ended (sent, delivered,
+  read, failed and why, skipped) and what it cost, 25 to a page. The period's sends,
+  failures and cost sit above it, and the business filter is always there. The provider's
+  raw response code no longer stands in for the status.
+- `GET /api/deliveries` takes `page` (from 1) instead of `before`, and returns `page`,
+  `pageSize` and the number of failed sends in `totals.failed`.
+- `DataTable` can show pages kept by the server (`paging`).
+
 ## [1.5.0] - 2026-11-09
 
 Whoever runs the install gets a log of every send of every business's flows, and a
