@@ -1,7 +1,10 @@
 import {
   addDays,
+  appointmentEvent,
   bookingDetailsSchema,
   bookingSchema,
+  formatPhone,
+  icsFile,
   instantToZoned,
   isDateString,
   parseTime,
@@ -582,6 +585,48 @@ export function publicRoutes({ db, config, guard, automations, payments, notific
       })
 
       /** How a payment stands, for the page the customer comes back to from paying. */
+      // The booking as an event for the customer's calendar: what Apple's calendar and
+      // others open ready to save. The booking code is what the customer holds; the event
+      // carries the service, the time and the place, never who booked it.
+      .get("/businesses/:slug/appointments/:code/calendar.ics", async (c) => {
+        const business = await findBusiness(c.req.param("slug"));
+        const code = c.req.param("code").trim().toUpperCase();
+        const [found] = await db
+          .select({
+            appointment: appointments,
+            location: { name: locations.name, address: locations.address },
+          })
+          .from(appointments)
+          .leftJoin(locations, eq(locations.id, appointments.locationId))
+          .where(and(eq(appointments.businessId, business.id), eq(appointments.code, code)));
+        if (found?.appointment.status !== "confirmed") {
+          throw apiError(404, "appointment_not_found");
+        }
+        const { appointment, location } = found;
+        const event = appointmentEvent({
+          id: appointment.id,
+          code: appointment.code,
+          businessName: business.name,
+          businessPhone: business.phone ? formatPhone(business.phone) : null,
+          serviceName: appointment.serviceName,
+          resourceName: appointment.resourceName,
+          location: {
+            name: location?.name ?? null,
+            address: location?.address ?? business.address,
+          },
+          startsAt: appointment.startsAt,
+          endsAt: appointment.endsAt,
+          language: business.locale,
+        });
+        return c.body(icsFile(event), 200, {
+          "Content-Type": "text/calendar; charset=utf-8",
+          // Opened right away where the device can (Safari shows "Add to Calendar").
+          "Content-Disposition": `inline; filename="${appointment.code}.ics"`,
+          "Cache-Control": "no-store",
+          "X-Robots-Tag": "noindex",
+        });
+      })
+
       .get("/businesses/:slug/payments/:paymentId", async (c) => {
         const business = await findBusiness(c.req.param("slug"));
         if (!guard.allow.availability(network(c))) throw apiError(429, "too_many_requests");

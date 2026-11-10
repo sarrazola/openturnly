@@ -1,12 +1,15 @@
 import {
   addDays,
+  appointmentEvent,
   type BookingDetails,
   type BookingQuestion,
   bookingDetailsSchema,
   formatPhone,
   formatPrice,
   GENDERS,
+  googleCalendarUrl,
   instantToZoned,
+  outlookCalendarUrl,
   paymentDueNow,
   todayIn,
 } from "@openturnly/core";
@@ -14,6 +17,7 @@ import type { TFunction } from "i18next";
 import {
   ArrowRight,
   CalendarCheck,
+  CalendarPlus,
   Check,
   ChevronLeft,
   Clock,
@@ -475,6 +479,7 @@ function BookingWizard({
       <div className="mt-6 border-t border-zinc-100">
         <PaymentResult
           slug={slug}
+          business={{ slug, name: business.name, phone: business.phone }}
           paymentId={paymentId}
           showLocation={severalLocations}
           timeZone={business.timezone}
@@ -491,6 +496,7 @@ function BookingWizard({
       <div className="mt-6 border-t border-zinc-100">
         <BookingDone
           appointment={booked}
+          business={{ slug, name: business.name, phone: business.phone }}
           showLocation={severalLocations}
           t={t}
           locale={locale}
@@ -1515,6 +1521,7 @@ function PayChoice({
 /** The page customers come back to from paying: it follows the payment until it's decided. */
 function PaymentResult({
   slug,
+  business,
   paymentId,
   showLocation,
   timeZone,
@@ -1523,6 +1530,7 @@ function PaymentResult({
   onAgain,
 }: {
   slug: string;
+  business: CalendarBusiness;
   paymentId: string;
   showLocation: boolean;
   timeZone: string;
@@ -1539,6 +1547,7 @@ function PaymentResult({
     return (
       <BookingDone
         appointment={appointment}
+        business={business}
         paid={payment.amount}
         showLocation={showLocation}
         t={t}
@@ -1622,8 +1631,71 @@ function PaymentResult({
   );
 }
 
+/** What the calendar buttons need about the business. */
+type CalendarBusiness = { slug: string; name: string; phone: string | null };
+
+/**
+ * "Add to my calendar": Google's and Outlook's new event page filled in, and for Apple's
+ * calendar and the others the event file from the server, which they open ready to save.
+ */
+function AddToCalendar({
+  appointment,
+  business,
+  t,
+  locale,
+}: {
+  appointment: BookedAppointment;
+  business: CalendarBusiness;
+  t: T;
+  locale: string;
+}) {
+  const event = appointmentEvent({
+    id: appointment.id,
+    code: appointment.code,
+    businessName: business.name,
+    businessPhone: business.phone ? formatPhone(business.phone) : null,
+    serviceName: appointment.serviceName,
+    resourceName: appointment.resourceName,
+    location: appointment.location,
+    startsAt: appointment.startsAt,
+    endsAt: appointment.endsAt,
+    language: locale,
+  });
+  const links = [
+    { key: "google", label: "Google", href: googleCalendarUrl(event) },
+    { key: "outlook", label: "Outlook", href: outlookCalendarUrl(event) },
+    {
+      key: "apple",
+      label: t("booking.calendarApple"),
+      href: `/api/public/businesses/${encodeURIComponent(business.slug)}/appointments/${appointment.code}/calendar.ics`,
+    },
+  ];
+  return (
+    <div className="mt-6 w-full max-w-md">
+      <p className="flex items-center justify-center gap-1.5 text-sm font-medium text-zinc-700">
+        <CalendarPlus className="size-4 text-brand-600" aria-hidden />
+        {t("booking.addToCalendar")}
+      </p>
+      <div className="mt-2.5 grid grid-cols-3 gap-2">
+        {links.map((link) => (
+          <a
+            key={link.key}
+            href={link.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={buttonClass({ variant: "secondary", className: "w-full px-2 text-[13px]" })}
+          >
+            {link.label}
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function BookingDone({
   appointment,
+  business,
   paid,
   showLocation,
   t,
@@ -1631,6 +1703,7 @@ function BookingDone({
   onAgain,
 }: {
   appointment: BookedAppointment;
+  business: CalendarBusiness;
   /** How much was paid online, when it was. */
   paid?: number;
   showLocation: boolean;
@@ -1653,6 +1726,7 @@ function BookingDone({
           {appointment.code}
         </p>
       </div>
+      <AddToCalendar appointment={appointment} business={business} t={t} locale={locale} />
       <div className="mt-7 w-full max-w-md text-left">
         <Summary
           rows={[

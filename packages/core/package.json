@@ -1,6 +1,6 @@
 {
   "name": "@openturnly/core",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "private": true,
   "type": "module",
   "description": "Domain rules shared by the OpenTurnly server and web app. No I/O.",

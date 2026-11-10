@@ -2122,6 +2122,8 @@ export const en: Messages<typeof es> = {
     whoAtTime: "Who should see you at {{time}}?",
     onlyOneFree: "At that time you'll be seen by {{name}}.",
     bookAgain: "Book another appointment",
+    addToCalendar: "Add it to your calendar",
+    calendarApple: "Apple and others",
     errors: {
       busy: "This business is getting too many bookings right now. Try again in a few minutes or contact them directly.",
       challenge_failed: "We couldn't verify the booking. Please try again.",
