@@ -56,11 +56,11 @@ an email, or an install without a connected account, shows as failed with the re
 
 Set these in `.env` for an account in the environment:
 
-| Variable | What it is |
-| --- | --- |
-| `SMTP_HOST` | The server. With the next three, it turns this account on |
-| `SMTP_USER` | The user |
-| `SMTP_PASSWORD` | The password or API key |
-| `EMAIL_FROM` | The sender address |
-| `SMTP_PORT` | The port. 587 unless you say otherwise |
-| `EMAIL_FOOTER` | Optional. A last line for every email |
+| Variable        | What it is                                                |
+| --------------- | --------------------------------------------------------- |
+| `SMTP_HOST`     | The server. With the next three, it turns this account on |
+| `SMTP_USER`     | The user                                                  |
+| `SMTP_PASSWORD` | The password or API key                                   |
+| `EMAIL_FROM`    | The sender address                                        |
+| `SMTP_PORT`     | The port. 587 unless you say otherwise                    |
+| `EMAIL_FOOTER`  | Optional. A last line for every email                     |

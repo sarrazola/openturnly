@@ -81,16 +81,16 @@ updates, read the [self-hosting guide](docs/self-hosting.md), or follow the
 
 ## Configuration
 
-| Variable       | Default                    | Description                                                         |
-| -------------- | -------------------------- | ------------------------------------------------------------------- |
-| `APP_URL`      | `http://localhost:3000`    | Public URL of your install. Used in invitation and booking links.   |
-| `OPENTURNLY_PORT` | `3000`                     | Port published on the host by `docker-compose.yml`.                 |
-| `POSTGRES_PASSWORD` | `openturnly`             | Password of the bundled PostgreSQL. Set it before the first start.  |
-| `DATABASE_URL` | built by `docker-compose.yml` | PostgreSQL connection URL, if you use your own database server.  |
-| `SECRET`       | generated on first start   | Signs sessions. Saved to `/data/secret` if you don't set one.       |
-| `WEBHOOKS_ALLOW_PRIVATE` | `false`          | Let workflows post to addresses inside your network (e.g. a receiver in the same Docker network). |
-| `TRUST_PROXY`  | `false`                    | Set to `true` behind a reverse proxy (Caddy, Nginx, Cloudflare Tunnel) so login and anti-bot limits use the visitor's real IP. |
-| `DATA_DIR`     | `/data`                    | Where the generated secret is saved.                                |
+| Variable                 | Default                       | Description                                                                                                                    |
+| ------------------------ | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `APP_URL`                | `http://localhost:3000`       | Public URL of your install. Used in invitation and booking links.                                                              |
+| `OPENTURNLY_PORT`        | `3000`                        | Port published on the host by `docker-compose.yml`.                                                                            |
+| `POSTGRES_PASSWORD`      | `openturnly`                  | Password of the bundled PostgreSQL. Set it before the first start.                                                             |
+| `DATABASE_URL`           | built by `docker-compose.yml` | PostgreSQL connection URL, if you use your own database server.                                                                |
+| `SECRET`                 | generated on first start      | Signs sessions. Saved to `/data/secret` if you don't set one.                                                                  |
+| `WEBHOOKS_ALLOW_PRIVATE` | `false`                       | Let workflows post to addresses inside your network (e.g. a receiver in the same Docker network).                              |
+| `TRUST_PROXY`            | `false`                       | Set to `true` behind a reverse proxy (Caddy, Nginx, Cloudflare Tunnel) so login and anti-bot limits use the visitor's real IP. |
+| `DATA_DIR`               | `/data`                       | Where the generated secret is saved.                                                                                           |
 
 ## Features
 

@@ -58,12 +58,12 @@ or all:
 
 ## API
 
-| Method | Path | |
-| --- | --- | --- |
-| `GET` | `/api/businesses/:id/surveys/settings` | `{ enabled, validHours }` |
-| `PATCH` | `/api/businesses/:id/surveys/settings` | Either or both; `validHours` is 24, 48 or 168 |
-| `GET` | `/api/businesses/:id/surveys?from=&to=&resourceId=&locationId=` | `{ summary, responses }` |
-| `GET` | `/api/public/surveys/:code` | What the page shows; 404 for an unknown or unsent link |
-| `POST` | `/api/public/surveys/:code` | `{ rating, comment? }`; 409 `survey_answered`, 410 `survey_closed` |
+| Method  | Path                                                            |                                                                    |
+| ------- | --------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `GET`   | `/api/businesses/:id/surveys/settings`                          | `{ enabled, validHours }`                                          |
+| `PATCH` | `/api/businesses/:id/surveys/settings`                          | Either or both; `validHours` is 24, 48 or 168                      |
+| `GET`   | `/api/businesses/:id/surveys?from=&to=&resourceId=&locationId=` | `{ summary, responses }`                                           |
+| `GET`   | `/api/public/surveys/:code`                                     | What the page shows; 404 for an unknown or unsent link             |
+| `POST`  | `/api/public/surveys/:code`                                     | `{ rating, comment? }`; 409 `survey_answered`, 410 `survey_closed` |
 
 The admin routes are for the business's admins (and admin API keys), not its professionals.

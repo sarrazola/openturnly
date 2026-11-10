@@ -29,14 +29,14 @@ appointment.
 
 ## When they run
 
-| Trigger | Event | The flow starts |
-| --- | --- | --- |
-| When an appointment is booked | `appointment.created` | Right away, from the booking page, the panel or an AI agent |
-| When an appointment is moved | `appointment.rescheduled` | Right away, with `previous_date` and `previous_time` |
-| When an appointment is cancelled | `appointment.cancelled` | Right away |
-| When a customer doesn't come | `appointment.no_show` | Right away, when the appointment is marked "No-show" |
-| An appointment is coming up | `appointment.reminder` | X minutes, hours or days before it starts |
-| When an appointment ends | `appointment.followup` | When it ends (add a wait step to ask for a review later) |
+| Trigger                          | Event                     | The flow starts                                             |
+| -------------------------------- | ------------------------- | ----------------------------------------------------------- |
+| When an appointment is booked    | `appointment.created`     | Right away, from the booking page, the panel or an AI agent |
+| When an appointment is moved     | `appointment.rescheduled` | Right away, with `previous_date` and `previous_time`        |
+| When an appointment is cancelled | `appointment.cancelled`   | Right away                                                  |
+| When a customer doesn't come     | `appointment.no_show`     | Right away, when the appointment is marked "No-show"        |
+| An appointment is coming up      | `appointment.reminder`    | X minutes, hours or days before it starts                   |
+| When an appointment ends         | `appointment.followup`    | When it ends (add a wait step to ask for a review later)    |
 
 Only the reminder has a time of its own, because a wait can't go back in time; every other
 trigger starts the moment it happens, and **wait** steps send later. Waits add up: a step
@@ -64,12 +64,12 @@ way that system asks:
    addresses inside your own network (see below), where it never leaves the machine.
 2. **Authentication** (optional), the usual ways a webhook checks who's calling:
 
-   | Option | What OpenTurnly sends |
-   | --- | --- |
-   | None | Nothing extra. |
-   | Basic Auth | `Authorization: Basic …` with the username and password you give. |
-   | Header Auth | One header with the name and value you give, such as `Authorization: Bearer <token>` or `X-Api-Key: <key>`. |
-   | JWT Auth | `Authorization: Bearer <jwt>`: a JWT signed with HS256 and your secret, new on every send and valid for 5 minutes. Claims: `iss` (`openturnly`), `event`, `delivery`, `iat`, `exp`. The receiver checks it with the same secret. |
+   | Option      | What OpenTurnly sends                                                                                                                                                                                                            |
+   | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+   | None        | Nothing extra.                                                                                                                                                                                                                   |
+   | Basic Auth  | `Authorization: Basic …` with the username and password you give.                                                                                                                                                                |
+   | Header Auth | One header with the name and value you give, such as `Authorization: Bearer <token>` or `X-Api-Key: <key>`.                                                                                                                      |
+   | JWT Auth    | `Authorization: Bearer <jwt>`: a JWT signed with HS256 and your secret, new on every send and valid for 5 minutes. Claims: `iss` (`openturnly`), `event`, `delivery`, `iat`, `exp`. The receiver checks it with the same secret. |
 
 3. **Headers** (optional): any other header the receiver needs, like an account id.
 4. **Body**: built from **fields** or written as **JSON**.
@@ -85,12 +85,12 @@ it arrives at `customer.first_name`. **Insert data**, above the message and the 
 boxes, lists the groups (Appointment, Customer, Business); open one to see its data with
 an example of each, or search them all.
 
-| Group | Data |
-| --- | --- |
-| — | `event` (`appointment.created`, `appointment.reminder`…) |
+| Group         | Data                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| —             | `event` (`appointment.created`, `appointment.reminder`…)                                                                                                                                                                                                                                                                                                                                                                   |
 | `appointment` | `code`, `status`, `date` (YYYY-MM-DD), `time`, `time_text` (10:00 a. m.), `end_time`, `weekday`, `date_text`, `starts_at` and `ends_at` (ISO, UTC), `service`, `duration_minutes`, `professional`, `price` (a number), `price_text`, `booked_via` (`online`, `admin` or the AI agent's key name), `answers`, `previous_date`, `previous_time`, `survey_link` (only when an appointment ends, see [surveys.md](surveys.md)) |
-| `customer` | `name`, `first_name`, `last_name`, `phone` (+573001234567), `phone_digits` (573001234567, as WhatsApp APIs expect), `email` |
-| `business` | `name`, `phone`, `address`, `booking_page`, `time_zone` |
+| `customer`    | `name`, `first_name`, `last_name`, `phone` (+573001234567), `phone_digits` (573001234567, as WhatsApp APIs expect), `email`                                                                                                                                                                                                                                                                                                |
+| `business`    | `name`, `phone`, `address`, `booking_page`, `time_zone`                                                                                                                                                                                                                                                                                                                                                                    |
 
 Dates and times are in the business's time zone.
 
@@ -163,7 +163,9 @@ function fromOpenTurnly(rawBody, headers, secret) {
     .update(`${headers["x-openturnly-timestamp"]}.${rawBody}`)
     .digest("hex")}`;
   const given = String(headers["x-openturnly-signature"] ?? "");
-  return given.length === expected.length && timingSafeEqual(Buffer.from(given), Buffer.from(expected));
+  return (
+    given.length === expected.length && timingSafeEqual(Buffer.from(given), Buffer.from(expected))
+  );
 }
 ```
 
