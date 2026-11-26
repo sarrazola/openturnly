@@ -104,10 +104,10 @@ function useEmbedded(embedded: boolean) {
 
 /** The page a business shares with its customers: /<slug>. */
 export function PublicBookingPage() {
-  const { slug = "" } = useParams();
+  const { slug = "", link } = useParams();
   const [searchParams] = useSearchParams();
   const embedded = searchParams.has("embed");
-  const catalog = usePublicCatalog(slug);
+  const catalog = usePublicCatalog(slug, link);
   const { i18n } = useTranslation();
   // Shown in the business's language, without changing the visitor's saved preference.
   const locale = catalog.data?.business.locale ?? i18n.resolvedLanguage ?? "es";
@@ -115,7 +115,10 @@ export function PublicBookingPage() {
   const frame = useEmbedded(embedded && catalog.isSuccess);
 
   useEffect(() => {
-    if (catalog.data) document.title = catalog.data.business.name;
+    if (catalog.data) {
+      const { business, link } = catalog.data;
+      document.title = link ? `${link.name} · ${business.name}` : business.name;
+    }
   }, [catalog.data]);
 
   if (catalog.isPending) return <Spinner className={embedded ? "py-24" : "min-h-screen"} />;
@@ -139,6 +142,7 @@ export function PublicBookingPage() {
             searchParams.get("embed") !== "popup" && "rounded-2xl ring-1 ring-zinc-950/10",
           )}
         >
+          <LinkIntro catalog={catalog.data} />
           <BookingWizard slug={slug} catalog={catalog.data} t={t} locale={locale} />
         </main>
       </div>
@@ -157,8 +161,23 @@ export function PublicBookingPage() {
         )}
       >
         <BookingHeader business={business} />
+        <LinkIntro catalog={catalog.data} />
         <BookingWizard slug={slug} catalog={catalog.data} t={t} locale={locale} />
       </main>
+    </div>
+  );
+}
+
+/** Opened through one of the business's booking links: its name and what it's for. */
+function LinkIntro({ catalog }: { catalog: PublicCatalog }) {
+  const { link } = catalog;
+  if (!link) return null;
+  return (
+    <div className="border-b border-zinc-100 px-5 py-4 sm:px-8">
+      <h2 className="text-base font-semibold text-zinc-900">{link.name}</h2>
+      {link.description && (
+        <p className="mt-1 text-sm whitespace-pre-line text-zinc-600">{link.description}</p>
+      )}
     </div>
   );
 }
@@ -387,6 +406,7 @@ function BookingWizard({
     if (!service || !date || !time || !details) return;
     book.mutate(
       {
+        ...(catalog.link ? { link: catalog.link.slug } : {}),
         ...(location ? { locationId: location.id } : {}),
         serviceId: service.id,
         resourceId,
@@ -1334,6 +1354,7 @@ function DateTimeStep({
     resourceId: preferredId,
     from,
     to,
+    link: catalog.link?.slug ?? null,
   });
   const days = availability.data?.days ?? {};
   const available = useMemo(() => new Set(Object.keys(days)), [days]);

@@ -274,6 +274,13 @@
       "when": 1795660276536,
       "tag": "0038_connected_calendars",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1795663413311,
+      "tag": "0039_booking_links_and_limits",
+      "breakpoints": true
     }
   ]
 }

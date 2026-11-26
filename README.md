@@ -118,7 +118,11 @@ updates, read the [self-hosting guide](docs/self-hosting.md), or follow the
   services and team. Staff can work at several locations and are never booked at two at
   once.
 - **Services, staff and hours**: split shifts, closures, automatic public holidays per
-  country and booking rules, all time-zone aware.
+  country and booking rules (margins between appointments, most appointments a day, showing
+  fewer free times), all time-zone aware.
+- **Booking links**: several pages into the same agenda, each with its own services, and the
+  agenda shows which one each appointment came through
+  ([docs/booking-links.md](docs/booking-links.md)).
 - **Team access** with admin and professional roles, and a branded sign-in page per business.
 - **Phone apps** for iPhone and Android, native on each, for the owner, admins and staff: the
   agenda, booking, checkout, customers, sales and reports ([docs/mobile.md](docs/mobile.md)).

@@ -140,6 +140,8 @@ type AppointmentLike = {
   priceAmount: number | null;
   /** Online appointments: the video call's link, once it exists. */
   meetingUrl?: string | null;
+  /** The booking link it came through. */
+  bookingLinkName?: string | null;
 };
 
 /** An appointment as an agent reads it: local date and times, names and price. */
@@ -157,6 +159,7 @@ export function appointmentView(business: Business, appointment: AppointmentLike
     status: appointment.status,
     ...priceView(appointment.priceAmount, business.currency),
     ...(appointment.meetingUrl ? { meeting_link: appointment.meetingUrl } : {}),
+    ...(appointment.bookingLinkName ? { booking_link: appointment.bookingLinkName } : {}),
   };
 }
 

@@ -1,6 +1,13 @@
-import { addDays, closureSchema, SLOT_INTERVALS, slotsForDate, todayIn } from "@openturnly/core";
+import {
+  addDays,
+  closureSchema,
+  SLOT_INTERVALS,
+  slotsForDate,
+  todayIn,
+  visibleSlots,
+} from "@openturnly/core";
 import { CalendarOff, Trash2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
 import { useConfirm } from "../../components/confirm.tsx";
@@ -8,7 +15,7 @@ import { PageHeader, PageTabs, SettingsCard, Switch, Toggle } from "../../compon
 import { type Column, DataTable } from "../../components/data-table.tsx";
 import { type DateRange, RangeCalendar } from "../../components/range-calendar.tsx";
 import { toast } from "../../components/toast.tsx";
-import { Button, Field, Input, Select, Spinner } from "../../components/ui.tsx";
+import { Button, Field, InfoTip, Input, Select, Spinner } from "../../components/ui.tsx";
 import { formatHours, openMinutes, WeeklyHoursEditor } from "../../components/weekly-hours.tsx";
 import type { Closure, WeeklyRange } from "../../lib/api.ts";
 import { useUpdateBusiness } from "../../lib/businesses.ts";
@@ -164,6 +171,10 @@ const NOTICE_OPTIONS = [0, 30, 60, 120, 240, 720, 1440, 2880];
 const ADVANCE_OPTIONS = [7, 14, 30, 60, 90, 180, 365];
 /** Until how long before an appointment customers can change it themselves. */
 const CHANGE_NOTICE_OPTIONS = [0, 60, 120, 240, 720, 1440, 2880];
+/** Most appointments a day per professional; null: no limit. */
+const DAILY_LIMIT_OPTIONS = [null, 1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20];
+/** How much of the free time the booking page hides to look busier. */
+const HIDDEN_OPTIONS = [0, 10, 20, 30, 40, 50];
 
 function BookingRules() {
   const { t, i18n } = useTranslation();
@@ -174,6 +185,8 @@ function BookingRules() {
   const [minNoticeMin, setMinNotice] = useState(business.minNoticeMin);
   const [maxAdvanceDays, setMaxAdvance] = useState(business.maxAdvanceDays);
   const [customerChangeNoticeMin, setChangeNotice] = useState(business.customerChangeNoticeMin);
+  const [maxDailyAppointments, setDailyLimit] = useState(business.maxDailyAppointments);
+  const [hiddenSlotsPercent, setHidden] = useState(business.hiddenSlotsPercent);
 
   const noticeLabel = (minutes: number) =>
     minutes === 0
@@ -184,7 +197,7 @@ function BookingRules() {
           ? t("hours.hours", { count: minutes / 60 })
           : t("hours.days", { count: minutes / 1440 });
 
-  const rows = [
+  const rows: { label: string; hint: string; tip?: string; control: ReactNode }[] = [
     {
       label: t("hours.slotInterval"),
       hint: t("hours.slotIntervalHint"),
@@ -258,6 +271,47 @@ function BookingRules() {
         </Select>
       ),
     },
+    {
+      label: t("hours.dailyLimit"),
+      hint: t("hours.dailyLimitHint"),
+      control: (
+        <Select
+          aria-label={t("hours.dailyLimit")}
+          value={maxDailyAppointments ?? "none"}
+          onChange={(event) =>
+            setDailyLimit(event.target.value === "none" ? null : Number(event.target.value))
+          }
+        >
+          {DAILY_LIMIT_OPTIONS.map((count) => (
+            <option key={count ?? "none"} value={count ?? "none"}>
+              {count === null ? t("hours.dailyLimitNone") : t("hours.dailyLimitCount", { count })}
+            </option>
+          ))}
+        </Select>
+      ),
+    },
+    {
+      label: t("hours.hiddenSlots"),
+      hint: t("hours.hiddenSlotsHint"),
+      tip: t("hours.hiddenSlotsTip"),
+      control: (
+        <Select
+          aria-label={t("hours.hiddenSlots")}
+          value={hiddenSlotsPercent}
+          onChange={(event) => setHidden(Number(event.target.value))}
+        >
+          {[...new Set([...HIDDEN_OPTIONS, hiddenSlotsPercent])]
+            .sort((a, b) => a - b)
+            .map((percent) => (
+              <option key={percent} value={percent}>
+                {percent === 0
+                  ? t("hours.hiddenSlotsNone")
+                  : t("hours.hiddenSlotsPercent", { percent })}
+              </option>
+            ))}
+        </Select>
+      ),
+    },
   ];
 
   return (
@@ -270,7 +324,14 @@ function BookingRules() {
             loading={update.isPending}
             onClick={() =>
               update.mutate(
-                { slotIntervalMin, minNoticeMin, maxAdvanceDays, customerChangeNoticeMin },
+                {
+                  slotIntervalMin,
+                  minNoticeMin,
+                  maxAdvanceDays,
+                  customerChangeNoticeMin,
+                  maxDailyAppointments,
+                  hiddenSlotsPercent,
+                },
                 {
                   onSuccess: () => toast.success(t("common.saved")),
                   onError: (error) => toast.error(errorMessage(t, error)),
@@ -289,7 +350,10 @@ function BookingRules() {
               className="flex flex-col gap-3 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:gap-8"
             >
               <div className="min-w-0">
-                <p className="text-sm font-medium text-zinc-800">{row.label}</p>
+                <p className="flex items-center gap-1.5 text-sm font-medium text-zinc-800">
+                  {row.label}
+                  {row.tip && <InfoTip text={row.tip} label={row.label} />}
+                </p>
                 <p className="mt-0.5 text-[13px] text-zinc-500">{row.hint}</p>
               </div>
               <div className="w-full shrink-0 sm:w-52">{row.control}</div>
@@ -297,7 +361,10 @@ function BookingRules() {
           ))}
         </div>
       </SettingsCard>
-      <SlotsPreview rules={{ slotIntervalMin, minNoticeMin, maxAdvanceDays }} language={language} />
+      <SlotsPreview
+        rules={{ slotIntervalMin, minNoticeMin, maxAdvanceDays, hiddenSlotsPercent }}
+        language={language}
+      />
     </div>
   );
 }
@@ -307,7 +374,12 @@ function SlotsPreview({
   rules,
   language,
 }: {
-  rules: { slotIntervalMin: number; minNoticeMin: number; maxAdvanceDays: number };
+  rules: {
+    slotIntervalMin: number;
+    minNoticeMin: number;
+    maxAdvanceDays: number;
+    hiddenSlotsPercent: number;
+  };
   language: string;
 }) {
   const { t } = useTranslation();
@@ -328,11 +400,16 @@ function SlotsPreview({
     const today = todayIn(business.timezone, now);
     for (let offset = 0; offset <= Math.min(rules.maxAdvanceDays, 14); offset++) {
       const date = addDays(today, offset);
-      const slots = slotsForDate(date, shortest, [schedule], bookingRules, now);
+      const slots = visibleSlots(
+        slotsForDate(date, shortest, [schedule], bookingRules, now),
+        date,
+        rules.hiddenSlotsPercent,
+        business.id,
+      );
       if (slots.length > 0) return { date, times: slots.map((slot) => slot.time) };
     }
     return { date: null, times: [] };
-  }, [hours.data, rules, business.timezone, shortest]);
+  }, [hours.data, rules, business.timezone, business.id, shortest]);
 
   const visible = preview?.times.slice(0, 15) ?? [];
   const hidden = (preview?.times.length ?? 0) - visible.length;

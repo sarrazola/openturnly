@@ -448,6 +448,7 @@ export const es = {
         previous_time: "Hora anterior",
         survey_link: "Enlace de la encuesta",
         meeting_link: "Enlace de la videollamada",
+        booking_link: "Enlace de reserva usado",
       },
       customer: {
         name: "Nombre completo",
@@ -696,6 +697,7 @@ export const es = {
     sales: "Ventas",
     locations: "Locales",
     services: "Servicios",
+    bookingLinks: "Enlaces de reserva",
     customers: "Clientes",
     professionals: "Profesionales",
     hours: "Horarios",
@@ -880,6 +882,43 @@ export const es = {
         body: "General: datos, región y usuarios. Página de reservas: imágenes, colores y el formulario. Integraciones (MCP): asistentes de IA. Flujos: avisos automáticos a tus clientes y a otros sistemas.",
       },
     },
+  },
+  bookingLinks: {
+    title: "Enlaces de reserva",
+    subtitle:
+      "Más formas de entrar a la misma agenda. Cada enlace tiene su nombre y sus servicios, y lo que reservan por él aparece en tu agenda con ese nombre.",
+    new: "Nuevo enlace",
+    edit: "Editar enlace",
+    formHint:
+      "Usa la misma disponibilidad de tu equipo: lo que se reserve aquí ocupa ese horario en todas partes.",
+    colLink: "Enlace",
+    colServices: "Servicios",
+    colStatus: "Estado",
+    on: "Activo",
+    off: "Apagado",
+    search: "Buscar enlace…",
+    emptyTitle: "Aún no tienes enlaces de reserva",
+    emptyBody:
+      'Crea uno por cada tipo de cliente o de cita, como "Clientes" o "Interesados", con sus propios servicios. Todos usan la misma agenda.',
+    name: "Nombre",
+    nameHint:
+      "Así aparece en la página y en tu agenda, junto a cada cita que llegue por este enlace.",
+    namePlaceholder: "Interesados",
+    address: "Dirección",
+    copy: "Enlace para compartir",
+    description: "Descripción",
+    descriptionHint: "Lo que ve el cliente arriba de los servicios.",
+    services: "Servicios que ofrece",
+    servicesRequired: "Elige al menos un servicio.",
+    active: "Activo",
+    activeHint:
+      "Apagado, el enlace deja de funcionar. Las citas que ya llegaron por él no cambian.",
+    created: "Enlace creado",
+    deleted: "Enlace eliminado",
+    deleteTitle: "¿Eliminar el enlace {{name}}?",
+    deleteBody:
+      "Deja de funcionar. Las citas que llegaron por él conservan su nombre en la agenda.",
+    bookedThrough: "Enlace",
   },
   calendarSync: {
     title: "Google Calendar",
@@ -1906,6 +1945,14 @@ export const es = {
       "Lo reintentamos cada hora. Revisa que tu cuenta de Mercado Pago tenga saldo disponible.",
   },
   services: {
+    bufferBefore: "Margen antes",
+    bufferAfter: "Margen después",
+    bufferHint:
+      "Tiempo libre antes y después de cada cita, para preparar o tomar notas. Nadie puede reservar con el profesional en ese rato.",
+    bufferNone: "Sin margen",
+    listed: "En tu página de reservas",
+    listedHint: "Apagado, solo se puede reservar desde los enlaces de reserva que lo ofrezcan.",
+    onlyLinks: "Solo por enlace",
     modeLabel: "Dónde se atiende",
     modes: { in_person: "Presencial", online: "En línea (Google Meet)" },
     modeHints: {
@@ -1984,6 +2031,14 @@ export const es = {
     servicesLabel: "Servicios que realiza",
     serviceCommission: "Comisión por servicios",
     productCommission: "Comisión por productos",
+    dailyLimit: "Máximo de citas por día",
+    dailyLimitDefault: "El del negocio",
+    dailyLimitHint:
+      "En tu página de reservas. El negocio no tiene un máximo (Horarios → Reservas en línea).",
+    dailyLimitBusiness_one:
+      "En tu página de reservas. El del negocio es {{count}} cita (Horarios → Reservas en línea).",
+    dailyLimitBusiness_other:
+      "En tu página de reservas. El del negocio es {{count}} citas (Horarios → Reservas en línea).",
     locationsLabel: "Locales donde atiende",
     colLocations: "Locales",
     ownHoursAt: "Horario propio en {{name}}",
@@ -2004,6 +2059,18 @@ export const es = {
       "Hasta cuándo un cliente puede mover o cancelar su cita por su cuenta (con un agente de IA).",
     customerChangesNever: "Solo el negocio",
     customerChangesAnytime: "Hasta la hora de la cita",
+    dailyLimit: "Máximo de citas por día",
+    dailyLimitHint:
+      "Por profesional, en tu página de reservas. Al llegar al máximo no se ofrecen más horarios ese día; tu equipo sí puede agendar desde la agenda. Cada profesional puede tener el suyo.",
+    dailyLimitNone: "Sin límite",
+    dailyLimitCount_one: "{{count}} cita",
+    dailyLimitCount_other: "{{count}} citas",
+    hiddenSlots: "Mostrar menos horarios",
+    hiddenSlotsHint: "Esconde parte de tus horarios libres para que tu agenda no se vea vacía.",
+    hiddenSlotsTip:
+      "En tu página de reservas se esconde este porcentaje de tus horarios libres, siempre los mismos de cada día y nunca un día completo. Los horarios escondidos no se pueden reservar. Tu equipo sigue viendo todo en la agenda.",
+    hiddenSlotsNone: "No esconder",
+    hiddenSlotsPercent: "Esconder {{percent}} %",
     customerChangesUntil: "Hasta {{notice}} antes",
     title: "Horarios",
     tabs: {

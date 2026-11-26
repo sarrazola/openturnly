@@ -190,10 +190,14 @@ export function createApp({
   return Object.assign(app, { automations });
 }
 
-/** "/studio-central": a business's booking page, never an app page like /admin or /login. */
+/**
+ * "/studio-central", or one of its booking links ("/studio-central/clientes"): a booking page,
+ * never an app page like /admin or /<slug>/login.
+ */
 function isBookingPagePath(pathname: string) {
-  const match = /^\/([^/]+)\/?$/.exec(pathname);
-  return match?.[1] !== undefined && checkSlug(match[1]) === null;
+  const match = /^\/([^/]+)(?:\/([^/]+))?\/?$/.exec(pathname);
+  if (match?.[1] === undefined || checkSlug(match[1]) !== null) return false;
+  return match[2] === undefined || checkSlug(match[2]) === null;
 }
 
 /** Serves the built React app. Any unknown path gets index.html so client routing works. */

@@ -110,7 +110,7 @@ export function appointmentRoutes({ db, automations, notifications, calendar }: 
       ignoreAppointmentId,
     );
     const own = access.role === "professional" ? access.resourceId : null;
-    return slotsForDate(date, service.durationMin, schedules, staffRules(business), Date.now())
+    return slotsForDate(date, service, schedules, staffRules(business), Date.now())
       .map((slot) => ({
         time: slot.time,
         resourceIds: slot.resourceIds.filter(
@@ -160,6 +160,7 @@ export function appointmentRoutes({ db, automations, notifications, calendar }: 
             sourceLabel: appointments.sourceLabel,
             mode: appointments.mode,
             meetingUrl: appointments.meetingUrl,
+            bookingLinkName: appointments.bookingLinkName,
             createdAt: appointments.createdAt,
             cancelledAt: appointments.cancelledAt,
             customer: {
@@ -317,7 +318,7 @@ export function appointmentRoutes({ db, automations, notifications, calendar }: 
           );
           const slot = slotsForDate(
             input.date,
-            service.durationMin,
+            service,
             schedules,
             staffRules(business),
             Date.now(),
@@ -345,6 +346,8 @@ export function appointmentRoutes({ db, automations, notifications, calendar }: 
               resourceName: resource?.name ?? null,
               priceAmount: service.priceAmount,
               mode: service.mode,
+              bufferBeforeMin: service.bufferBeforeMin,
+              bufferAfterMin: service.bufferAfterMin,
               // Booked by an AI agent with the business's admin key, or by its people.
               source: access.apiKey ? "agent" : "admin",
               sourceLabel: access.apiKey?.name ?? null,

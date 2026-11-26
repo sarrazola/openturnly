@@ -5,6 +5,7 @@ import { apiError, type BusinessEnv, type Deps, requireUser } from "../lib/http.
 import { apiKeyRoutes } from "./api-keys.ts";
 import { appointmentRoutes } from "./appointments.ts";
 import { automationRoutes } from "./automations.ts";
+import { bookingLinkRoutes } from "./booking-links.ts";
 import { cashRoutes } from "./cash.ts";
 import { businessChannelRoutes } from "./channels.ts";
 import { customerRoutes } from "./customers.ts";
@@ -70,6 +71,7 @@ export function businessScopedRoutes(deps: Deps) {
     })
     .route("/locations", locationRoutes(deps))
     .route("/services", serviceRoutes(deps))
+    .route("/booking-links", bookingLinkRoutes(deps))
     .route("/professionals", professionalRoutes(deps))
     .route("/appointments", appointmentRoutes(deps))
     .route("/customers", customerRoutes(deps))

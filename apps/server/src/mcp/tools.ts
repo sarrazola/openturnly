@@ -1,5 +1,5 @@
 import type { McpServer } from "@modelcontextprotocol/server";
-import { addDays, slotsBetween, todayIn } from "@openturnly/core";
+import { addDays, slotsBetween, todayIn, visibleSlots } from "@openturnly/core";
 import { and, asc, eq, gte, isNull, lte } from "drizzle-orm";
 import { z } from "zod";
 import {
@@ -151,7 +151,16 @@ export function registerTools(server: McpServer, ctx: ToolContext) {
         : undefined,
     );
     const rules = admin ? staffRules(business) : bookingRules(business);
-    const slots = slotsBetween(from, to, service.durationMin, schedules, rules, Date.now());
+    const all = slotsBetween(from, to, service, schedules, rules, Date.now());
+    // Customers' agents see what the booking page shows: none of the times hidden to look busier.
+    const slots = admin
+      ? all
+      : Object.fromEntries(
+          Object.entries(all).map(([day, list]) => [
+            day,
+            visibleSlots(list, day, business.hiddenSlotsPercent, business.id),
+          ]),
+        );
     return {
       location: { id: location.id, name: location.name },
       service: { id: service.id, name: service.name, duration_minutes: service.durationMin },

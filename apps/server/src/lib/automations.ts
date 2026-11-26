@@ -86,6 +86,7 @@ type AppointmentWithCustomer = {
     | "sourceLabel"
     | "mode"
     | "meetingUrl"
+    | "bookingLinkName"
   >;
   customer: Pick<Customer, "firstName" | "lastName" | "phone" | "email">;
   location?: Pick<Location, "name" | "address"> | null;
@@ -160,6 +161,7 @@ export function automationValues(
       previous_time: previous?.time ?? null,
       survey_link: surveyLink ?? null,
       meeting_link: appointment.meetingUrl ?? null,
+      booking_link: appointment.bookingLinkName ?? null,
     },
     customer: {
       name: `${customer.firstName} ${customer.lastName}`,
@@ -1110,6 +1112,7 @@ export function sampleValues(business: Business, event: string, appUrl: string) 
         sourceLabel: null,
         mode: "in_person",
         meetingUrl: null,
+        bookingLinkName: null,
       },
       customer: {
         firstName: "Ana",

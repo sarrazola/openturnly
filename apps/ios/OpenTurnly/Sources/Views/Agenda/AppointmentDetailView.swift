@@ -349,6 +349,10 @@ struct AppointmentDetailView: View {
             SectionTitle(text: L.Appointment.details)
             VStack(spacing: 0) {
                 InfoRow(label: L.Appointment.bookedVia, value: sourceText)
+                if let link = appointment.bookingLinkName, !link.isEmpty {
+                    Divider()
+                    InfoRow(label: L.Appointment.bookingLink, value: link)
+                }
                 if let created = appointment.createdAt {
                     Divider()
                     InfoRow(label: L.Appointment.bookedOn, value: Fmt.dateTime(created, clock: workspace.clock))

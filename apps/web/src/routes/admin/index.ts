@@ -11,6 +11,7 @@ export {
 export { AccountPage } from "./account.tsx";
 export { AgendaPage } from "./agenda.tsx";
 export { AutomationBuilderPage } from "./automation-builder.tsx";
+export { BookingLinksPage } from "./booking-links.tsx";
 export { BusinessLayout, LegacyBusinessRedirect } from "./business.tsx";
 export { BusinessAccessPage } from "./business-access.tsx";
 export { SettingsPage } from "./business-details.tsx";

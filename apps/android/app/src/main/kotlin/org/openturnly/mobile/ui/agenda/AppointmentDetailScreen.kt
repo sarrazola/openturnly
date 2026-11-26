@@ -203,6 +203,10 @@ fun AppointmentDetailScreen(model: AppModel, initial: Appointment) {
                 SectionTitle(Copy.agenda.details)
                 AppCard(padding = PaddingValues(horizontal = 16.dp, vertical = 6.dp)) {
                     InfoRow(Copy.agenda.bookedVia, Copy.agenda.source(appointment.source, appointment.sourceLabel))
+                    appointment.bookingLinkName?.takeIf { it.isNotBlank() }?.let { link ->
+                        Hairline()
+                        InfoRow(Copy.agenda.bookingLink, link)
+                    }
                     BusinessTime.parse(appointment.createdAt)?.let { created ->
                         Hairline()
                         InfoRow(Copy.agenda.bookedOn, BusinessTime.mediumDate(BusinessTime.localDate(created, zone), AppLocale.locale) + " · " + BusinessTime.time(created, zone))

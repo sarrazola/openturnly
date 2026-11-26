@@ -1,6 +1,7 @@
 // Shows an OpenTurnly booking page inside another website. Where it should appear:
 //
 //   <div data-openturnly="your-business"></div>
+//   <div data-openturnly="your-business/your-link"></div>   (one of its booking links)
 //   <script src="https://your-openturnly-address/embed.js" async></script>
 //
 // Or a floating button that opens it over the page:
@@ -22,7 +23,9 @@
 
   const frameFor = (slug, fill) => {
     const frame = document.createElement("iframe");
-    frame.src = `${origin}/${encodeURIComponent(slug)}?embed=${fill ? "popup" : "1"}`;
+    // "<business>" or "<business>/<booking link>".
+    const path = slug.split("/").slice(0, 2).map(encodeURIComponent).join("/");
+    frame.src = `${origin}/${path}?embed=${fill ? "popup" : "1"}`;
     frame.title = spanish ? "Reservar una cita" : "Book an appointment";
     frame.style.cssText = `display:block;width:100%;border:0;background:transparent;height:${fill ? "100%" : "640px"}`;
     if (fill) frame.dataset.fill = "1";

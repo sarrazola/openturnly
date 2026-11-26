@@ -224,6 +224,7 @@ enum L {
         static var answers: String { tr("Booking answers", "Respuestas de la reserva") }
         static var customerNotes: String { tr("Customer notes", "Notas del cliente") }
         static var meeting: String { tr("Google Meet video call", "Videollamada de Google Meet") }
+        static var bookingLink: String { tr("Booking link", "Enlace de reserva") }
         static var joinMeeting: String { tr("Join", "Unirse") }
         static var meetingMissing: String {
             tr(

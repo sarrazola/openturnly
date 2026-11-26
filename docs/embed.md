@@ -28,6 +28,9 @@ A button in the bottom-right corner that opens the booking page on top of the we
 phone it takes the whole screen. `data-label` and `data-color` (a `#rrggbb` colour) are
 optional. Escape, the × or a click outside close it.
 
+One of the business's booking links goes the same way, with its path:
+`data-openturnly="your-business/your-link"` (see [booking-links.md](booking-links.md)).
+
 Several `data-openturnly` elements, of several businesses, can share one `embed.js`. Sites
 that add content after loading (single-page apps) can call `window.OpenTurnly.mount()` once
 the element is on the page.

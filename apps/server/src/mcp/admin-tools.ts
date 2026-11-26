@@ -277,6 +277,9 @@ export function registerAdminTools(tool: Tool, ctx: ToolContext) {
     durationMin: number;
     priceAmount: number | null;
     mode: "in_person" | "online";
+    bufferBeforeMin: number;
+    bufferAfterMin: number;
+    listed: boolean;
     active: boolean;
   }) => ({
     id: service.id,
@@ -285,6 +288,9 @@ export function registerAdminTools(tool: Tool, ctx: ToolContext) {
     duration_minutes: service.durationMin,
     ...priceView(service.priceAmount, business.currency),
     online: service.mode === "online",
+    margin_before_minutes: service.bufferBeforeMin,
+    margin_after_minutes: service.bufferAfterMin,
+    on_booking_page: service.listed,
     active: service.active,
   });
 
@@ -302,6 +308,24 @@ export function registerAdminTools(tool: Tool, ctx: ToolContext) {
           .boolean()
           .optional()
           .describe("On a Google Meet video call made by the professional's connected calendar"),
+        margin_before_minutes: z
+          .number()
+          .int()
+          .min(0)
+          .max(240)
+          .optional()
+          .describe("Minutes the professional keeps free before it"),
+        margin_after_minutes: z
+          .number()
+          .int()
+          .min(0)
+          .max(240)
+          .optional()
+          .describe("Minutes the professional keeps free after it"),
+        on_booking_page: z
+          .boolean()
+          .optional()
+          .describe("false: only bookable through the business's booking links"),
       }),
     },
     async (args) => {
@@ -314,6 +338,13 @@ export function registerAdminTools(tool: Tool, ctx: ToolContext) {
           priceAmount: money(args.price),
           description: args.description ?? null,
           ...(args.online ? { mode: "online" } : {}),
+          ...(args.margin_before_minutes !== undefined
+            ? { bufferBeforeMin: args.margin_before_minutes }
+            : {}),
+          ...(args.margin_after_minutes !== undefined
+            ? { bufferAfterMin: args.margin_after_minutes }
+            : {}),
+          ...(args.on_booking_page !== undefined ? { listed: args.on_booking_page } : {}),
         },
       );
       return serviceResult(service);
@@ -333,6 +364,24 @@ export function registerAdminTools(tool: Tool, ctx: ToolContext) {
         price: z.number().min(0).optional(),
         description: z.string().nullable().optional(),
         online: z.boolean().optional(),
+        margin_before_minutes: z
+          .number()
+          .int()
+          .min(0)
+          .max(240)
+          .optional()
+          .describe("Minutes the professional keeps free before it"),
+        margin_after_minutes: z
+          .number()
+          .int()
+          .min(0)
+          .max(240)
+          .optional()
+          .describe("Minutes the professional keeps free after it"),
+        on_booking_page: z
+          .boolean()
+          .optional()
+          .describe("false: only bookable through the business's booking links"),
         active: z.boolean().optional(),
       }),
     },
@@ -344,6 +393,9 @@ export function registerAdminTools(tool: Tool, ctx: ToolContext) {
           priceAmount: args.price === undefined ? undefined : money(args.price),
           description: args.description,
           mode: args.online === undefined ? undefined : args.online ? "online" : "in_person",
+          bufferBeforeMin: args.margin_before_minutes,
+          bufferAfterMin: args.margin_after_minutes,
+          listed: args.on_booking_page,
           active: args.active,
         }).filter(([, value]) => value !== undefined),
       );

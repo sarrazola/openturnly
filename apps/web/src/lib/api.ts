@@ -89,6 +89,10 @@ export type Business = {
   slotIntervalMin: number;
   minNoticeMin: number;
   maxAdvanceDays: number;
+  /** Of the free times, how many the booking page hides (percent) to look busier. */
+  hiddenSlotsPercent: number;
+  /** Most appointments a day per professional on the booking page; null: no limit. */
+  maxDailyAppointments: number | null;
   /** Follows the time zone: holidays and the default phone country come from it. */
   country: string | null;
   /** The logo uploaded in Settings → Booking page, or null. */
@@ -130,6 +134,11 @@ export type Service = {
   depositAmount: number | null;
   /** In person, or on a video call made by the professional's connected calendar. */
   mode: ServiceMode;
+  /** Minutes the professional keeps free before and after it. */
+  bufferBeforeMin: number;
+  bufferAfterMin: number;
+  /** On the main booking page; otherwise only through the booking links that offer it. */
+  listed: boolean;
   active: boolean;
   /** Locations that offer it. */
   locationIds: string[];
@@ -148,6 +157,8 @@ export type Professional = {
   /** Percent of the services and products they sell that is theirs. */
   serviceCommission: number;
   productCommission: number;
+  /** Most appointments a day on the booking page; null: the business's limit. */
+  maxDailyAppointments: number | null;
 };
 
 /** A place the business works from, with what it offers and who works there. */
@@ -198,6 +209,8 @@ export type Appointment = {
   mode: ServiceMode;
   /** An online appointment's video call, once the professional's calendar made it. */
   meetingUrl: string | null;
+  /** The booking link it came through (its name when booked); null: the main page or the team. */
+  bookingLinkName: string | null;
   createdAt: string;
   cancelledAt: string | null;
   answers: BookingAnswer[];
@@ -242,6 +255,8 @@ export type PublicBusiness = Pick<
 
 export type PublicCatalog = {
   business: PublicBusiness;
+  /** The booking link the page was opened through; null for the main page. */
+  link: { slug: string; name: string; description: string | null } | null;
   services: Omit<Service, "active" | "locationIds">[];
   professionals: { id: string; name: string; photoUrl: string | null; serviceIds: string[] }[];
   /** Locations taking bookings, with what each offers and who works there. */
@@ -275,6 +290,17 @@ export type BookedAppointment = {
   mode: ServiceMode;
   /** An online appointment's video call; null until it's made. */
   meetingUrl: string | null;
+};
+
+/** Another way into the business's agenda: `/<business>/<slug>`, with its own services. */
+export type BookingLink = {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  serviceIds: string[];
+  active: boolean;
+  createdAt: string;
 };
 
 /** The signed-in person's connected calendar, and which businesses go to it. */

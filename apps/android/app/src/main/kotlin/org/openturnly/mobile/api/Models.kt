@@ -148,6 +148,8 @@ data class Appointment(
     /** "online": on a video call; its link arrives once the professional's calendar made it. */
     val mode: String = "in_person",
     val meetingUrl: String? = null,
+    /** The booking link it came through, by its name when it was booked. */
+    val bookingLinkName: String? = null,
     val createdAt: String? = null,
     val cancelledAt: String? = null,
     val customer: AppointmentCustomer = AppointmentCustomer(),

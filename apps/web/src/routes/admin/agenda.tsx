@@ -452,6 +452,11 @@ function EventCard({ info }: { info: EventContentArg }) {
       <span className="truncate text-[11px] text-zinc-600">
         <span className="tabular-nums">{start}</span> · {appointment.serviceName}
       </span>
+      {appointment.bookingLinkName && (
+        <span className="truncate text-[11px] font-medium text-brand-700">
+          {appointment.bookingLinkName}
+        </span>
+      )}
       {minutes > 30 && appointment.resourceName && (
         <span className="truncate text-[11px] text-zinc-500">{appointment.resourceName}</span>
       )}
@@ -598,6 +603,9 @@ function AppointmentDetails({
     // Answers to the business's own questions.
     ...appointment.answers.map((answer) => ({ label: answer.label, value: answer.value })),
     { label: t("agenda.bookedVia"), value: bookedVia(t, appointment) },
+    ...(appointment.bookingLinkName
+      ? [{ label: t("bookingLinks.bookedThrough"), value: appointment.bookingLinkName }]
+      : []),
   ];
 
   const cancelAppointment = async () => {

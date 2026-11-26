@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { hoursProblem } from "./availability.ts";
+import { hoursProblem, MAX_HIDDEN_PERCENT } from "./availability.ts";
 import { EMAIL_PORTS, EMAIL_PROVIDER_IDS, EMAIL_TEMPLATE_NAMES } from "./email.ts";
 import { SERVICE_PAYMENT_MODES } from "./payments.ts";
 import { normalizePhone } from "./phone.ts";
@@ -217,6 +217,12 @@ const optionalText = (max: number) =>
     .nullable()
     .optional();
 
+/** Most appointments a day: a count, or null for no limit. */
+const dailyLimit = z.number().int().min(1).max(200).nullable().optional();
+
+/** Minutes kept free before or after a service: up to four hours. */
+const margin = z.number().int().min(0).max(240).optional();
+
 export const slugSchema = z
   .string()
   .trim()
@@ -339,6 +345,10 @@ export const businessUpdateSchema = businessCreateSchema.partial().extend({
     .max(60 * 24 * 30)
     .optional(),
   maxAdvanceDays: z.number().int().min(1).max(365).optional(),
+  /** Of the free times, how many the booking page hides (percent) to look busier. */
+  hiddenSlotsPercent: z.number().int().min(0).max(MAX_HIDDEN_PERCENT).optional(),
+  /** Most appointments a day per professional on the booking page; null: no limit. */
+  maxDailyAppointments: dailyLimit,
   closedOnHolidays: z.boolean().optional(),
   /** Minutes before an appointment that customers can still change it; null: never. */
   customerChangeNoticeMin: z
@@ -378,6 +388,11 @@ export const serviceSchema = z.object({
   /** With `paymentMode` "deposit": how much, in minor units. */
   depositAmount: z.number().int().min(0).max(1e12).nullable().optional(),
   mode: z.enum(SERVICE_MODES).optional(),
+  /** Minutes the professional keeps free before and after it. */
+  bufferBeforeMin: margin,
+  bufferAfterMin: margin,
+  /** On the main booking page; otherwise only through the booking links that offer it. */
+  listed: z.boolean().optional(),
   active: z.boolean().default(true),
   /** Where it is offered. Left out when creating: every location. */
   locationIds: z.array(z.string().min(1)).max(200).optional(),
@@ -393,8 +408,24 @@ export const professionalSchema = z.object({
   /** What they earn of each service and each product they sell, in percent. */
   serviceCommission: z.number().min(0).max(100).default(0),
   productCommission: z.number().min(0).max(100).default(0),
+  /** Most appointments a day on the booking page; null: the business's limit. */
+  maxDailyAppointments: dailyLimit,
 });
 export type ProfessionalInput = z.infer<typeof professionalSchema>;
+
+/**
+ * Another way into the same agenda: `/<business>/<slug>`, with its own name and description,
+ * offering some of the business's services. Availability is the professionals' own, so a
+ * booking through any link takes that time everywhere.
+ */
+export const bookingLinkSchema = z.object({
+  name: z.string().trim().min(1).max(80),
+  slug: slugSchema,
+  description: optionalText(500),
+  serviceIds: z.array(z.string().min(1)).min(1).max(200),
+  active: z.boolean().default(true),
+});
+export type BookingLinkInput = z.infer<typeof bookingLinkSchema>;
 
 /** A location of the business, with the services it offers and the people who work there. */
 export const locationSchema = z.object({
@@ -692,6 +723,8 @@ export function bookingDetailsSchema(
 export type BookingDetails = z.output<ReturnType<typeof bookingDetailsSchema>>;
 
 export const bookingSchema = z.object({
+  /** The booking link it's made through (its slug); left out: the main booking page. */
+  link: z.string().trim().toLowerCase().max(60).optional(),
   /** Needed when the business has more than one active location. */
   locationId: z.string().min(1).optional(),
   serviceId: z.string().min(1),
@@ -799,6 +832,7 @@ export const AUTOMATION_FIELDS = {
     "appointment.previous_time",
     "appointment.survey_link",
     "appointment.meeting_link",
+    "appointment.booking_link",
   ],
   customer: [
     "customer.name",

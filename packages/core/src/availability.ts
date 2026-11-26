@@ -14,8 +14,12 @@ export type ResourceSchedule = {
   hours: readonly WeeklyRange[];
   /** Dates ("YYYY-MM-DD") when this resource takes no bookings: holidays, days off. */
   closedDates: ReadonlySet<string>;
-  /** Existing appointments and other blocked times, as instants. */
+  /** Existing appointments and other blocked times, as instants, margins included. */
   busy: readonly Interval[];
+  /** Most appointments a day, or null for no limit. */
+  dailyLimit?: number | null;
+  /** Appointments already booked on each date ("YYYY-MM-DD"), for `dailyLimit`. */
+  dailyCounts?: ReadonlyMap<string, number>;
 };
 
 export type BookingRules = {
@@ -26,6 +30,18 @@ export type BookingRules = {
   minNoticeMin: number;
   /** How many days ahead customers can book. */
   maxAdvanceDays: number;
+  /**
+   * Whether each schedule's `dailyLimit` applies. On for customers; off for the business's own
+   * people, who can book over it.
+   */
+  dailyLimits?: boolean;
+};
+
+/** How long a service takes, and the margins it keeps free before and after it. */
+export type ServiceTiming = {
+  durationMin: number;
+  bufferBeforeMin?: number;
+  bufferAfterMin?: number;
 };
 
 export type Slot = {
@@ -39,16 +55,24 @@ export type Slot = {
 
 const MINUTE = 60_000;
 
-/** Free start times on one date for a service lasting `durationMin`. */
+/**
+ * Free start times on one date for a service lasting `durationMin` (or with margins: the
+ * professional must also be free during them; opening hours only bound the service itself).
+ */
 export function slotsForDate(
   date: string,
-  durationMin: number,
+  timing: number | ServiceTiming,
   schedules: readonly ResourceSchedule[],
   rules: BookingRules,
   now: number,
 ): Slot[] {
   const today = todayIn(rules.timeZone, now);
   if (date < today || date > addDays(today, rules.maxAdvanceDays)) return [];
+  const {
+    durationMin,
+    bufferBeforeMin = 0,
+    bufferAfterMin = 0,
+  } = typeof timing === "number" ? { durationMin: timing } : timing;
 
   const earliestStart = now + rules.minNoticeMin * MINUTE;
   const weekday = weekdayOf(date);
@@ -56,6 +80,8 @@ export function slotsForDate(
 
   for (const schedule of schedules) {
     if (schedule.closedDates.has(date)) continue;
+    const limit = rules.dailyLimits === false ? null : schedule.dailyLimit;
+    if (limit != null && (schedule.dailyCounts?.get(date) ?? 0) >= limit) continue;
     for (const range of schedule.hours) {
       if (range.weekday !== weekday) continue;
       const rangeEnd = parseTime(range.end);
@@ -67,7 +93,9 @@ export function slotsForDate(
         const start = zonedTimeToInstant(date, minute, rules.timeZone);
         const end = start + durationMin * MINUTE;
         if (start < earliestStart) continue;
-        if (schedule.busy.some((busy) => start < busy.end && end > busy.start)) continue;
+        const from = start - bufferBeforeMin * MINUTE;
+        const to = end + bufferAfterMin * MINUTE;
+        if (schedule.busy.some((busy) => from < busy.end && to > busy.start)) continue;
 
         const time = formatTime(minute);
         const slot = byTime.get(time) ?? { time, start, end, resourceIds: [] };
@@ -86,7 +114,7 @@ export function slotsForDate(
 export function slotsBetween(
   from: string,
   to: string,
-  durationMin: number,
+  durationMin: number | ServiceTiming,
   schedules: readonly ResourceSchedule[],
   rules: BookingRules,
   now: number,
@@ -103,7 +131,7 @@ export function slotsBetween(
 export function availabilityBetween(
   from: string,
   to: string,
-  durationMin: number,
+  durationMin: number | ServiceTiming,
   schedules: readonly ResourceSchedule[],
   rules: BookingRules,
   now: number,
@@ -112,6 +140,38 @@ export function availabilityBetween(
   return Object.fromEntries(
     Object.entries(slots).map(([date, list]) => [date, list.map((slot) => slot.time)]),
   );
+}
+
+/** Most of the booking page's free times a business can hide to look busier. */
+export const MAX_HIDDEN_PERCENT = 90;
+
+/** 32-bit FNV-1a: a stable number for a text, the same on every server. */
+function stableHash(text: string) {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash;
+}
+
+/**
+ * The free times a booking page shows when the business hides `percent` % of them to look
+ * busier. The same times are hidden for a date on every load, so nothing flickers, and a day
+ * that has free times keeps at least one.
+ */
+export function visibleSlots<T extends { time: string }>(
+  slots: readonly T[],
+  date: string,
+  percent: number,
+  seed: string,
+): T[] {
+  if (percent <= 0 || slots.length === 0) return [...slots];
+  const scored = slots.map((slot) => ({ slot, score: stableHash(`${seed}|${date}|${slot.time}`) }));
+  const shown = scored.filter((item) => item.score % 100 >= percent).map((item) => item.slot);
+  if (shown.length > 0) return shown;
+  const kept = scored.reduce((best, item) => (item.score < best.score ? item : best));
+  return [kept.slot];
 }
 
 /** Checks that ranges are well formed and do not overlap on the same weekday. */

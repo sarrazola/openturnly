@@ -52,6 +52,7 @@ object AgendaCopy {
     val bookedVia get() = tr("Booked via", "Agendada por")
     val meeting get() = tr("Google Meet video call", "Videollamada de Google Meet")
     val joinMeeting get() = tr("Join", "Unirse")
+    val bookingLink get() = tr("Booking link", "Enlace de reserva")
     val meetingMissing get() = tr(
         "This appointment is online and has no video call yet: it's made once the staff member connects Google Calendar in My account on the web.",
         "Esta cita es en línea y aún no tiene videollamada: se crea cuando el profesional conecta Google Calendar en Mi cuenta, en la web.",

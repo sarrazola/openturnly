@@ -35,6 +35,11 @@ import { errorMessage, type FieldErrors, fieldMessage, validate } from "../../li
 import { usePayments } from "../../lib/payments.ts";
 import { useBusinessContext } from "./business.tsx";
 
+/** Minutes a service can keep free before or after it. */
+const MARGINS = [0, 5, 10, 15, 20, 30, 45, 60, 90, 120];
+const marginOptions = (current: number) =>
+  MARGINS.includes(current) ? MARGINS : [...MARGINS, current].sort((a, b) => a - b);
+
 /** A price in the business's currency. */
 function MoneyInput({
   currency,
@@ -76,6 +81,7 @@ export function ServicesPage() {
           <div className="flex items-center gap-2">
             <span className="truncate font-medium text-zinc-900">{service.name}</span>
             {service.mode === "online" && <Badge tone="brand">{t("services.modes.online")}</Badge>}
+            {!service.listed && <Badge>{t("services.onlyLinks")}</Badge>}
           </div>
           {(service.category || service.description) && (
             <div className="truncate text-[13px] text-zinc-500">
@@ -204,6 +210,9 @@ function ServiceForm({ service, onClose }: { service: Service | null; onClose: (
   );
   const [active, setActive] = useState(service?.active ?? true);
   const [mode, setMode] = useState<ServiceMode>(service?.mode ?? "in_person");
+  const [bufferBeforeMin, setBufferBefore] = useState(service?.bufferBeforeMin ?? 0);
+  const [bufferAfterMin, setBufferAfter] = useState(service?.bufferAfterMin ?? 0);
+  const [listed, setListed] = useState(service?.listed ?? true);
   // Online services need calendars that can make the call: offered where the install has them.
   const canMeet = useCalendar().data?.available === true || service?.mode === "online";
   const payments = usePayments(business.id);
@@ -238,6 +247,9 @@ function ServiceForm({ service, onClose }: { service: Service | null; onClose: (
       paymentMode,
       depositAmount,
       mode,
+      bufferBeforeMin,
+      bufferAfterMin,
+      listed,
       active,
       ...(locations.length > 1 ? { locationIds } : {}),
     };
@@ -395,6 +407,38 @@ function ServiceForm({ service, onClose }: { service: Service | null; onClose: (
             )}
           </Field>
         )}
+        <div className="grid grid-cols-2 gap-4">
+          <Field label={t("services.bufferBefore")} hint={t("services.bufferHint")}>
+            {(props) => (
+              <Select
+                {...props}
+                value={bufferBeforeMin}
+                onChange={(event) => setBufferBefore(Number(event.target.value))}
+              >
+                {marginOptions(bufferBeforeMin).map((minutes) => (
+                  <option key={minutes} value={minutes}>
+                    {minutes === 0 ? t("services.bufferNone") : formatDuration(minutes)}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
+          <Field label={t("services.bufferAfter")}>
+            {(props) => (
+              <Select
+                {...props}
+                value={bufferAfterMin}
+                onChange={(event) => setBufferAfter(Number(event.target.value))}
+              >
+                {marginOptions(bufferAfterMin).map((minutes) => (
+                  <option key={minutes} value={minutes}>
+                    {minutes === 0 ? t("services.bufferNone") : formatDuration(minutes)}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
+        </div>
         {locations.length > 1 && (
           <fieldset className="space-y-2">
             <legend className="text-sm font-medium text-zinc-800">
@@ -453,12 +497,18 @@ function ServiceForm({ service, onClose }: { service: Service | null; onClose: (
             </Field>
           )}
         </div>
-        <div className="border-t border-zinc-100 pt-4">
+        <div className="space-y-4 border-t border-zinc-100 pt-4">
           <Switch
             checked={active}
             onChange={setActive}
             label={t("services.active")}
             description={t("services.activeHint")}
+          />
+          <Switch
+            checked={listed}
+            onChange={setListed}
+            label={t("services.listed")}
+            description={t("services.listedHint")}
           />
         </div>
       </form>

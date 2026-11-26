@@ -317,7 +317,8 @@ export function createCalendarSync({ db, config }: { db: Db; config: Config }) {
       hosting ? null : `${text.agenda}: ${config.appUrl}/admin/${business.shortId}`,
     ];
     return {
-      summary: `${name} · ${appointment.serviceName}${someoneElses}`,
+      // Booked through a booking link: its name leads, so the agenda shows where it came from.
+      summary: `${appointment.bookingLinkName ? `${appointment.bookingLinkName}: ` : ""}${name} · ${appointment.serviceName}${someoneElses}`,
       description: lines.filter(Boolean).join("\n"),
       location: online ? (hosting ? "" : (appointment.meetingUrl ?? "")) : place,
       start: { dateTime: appointment.startsAt.toISOString(), timeZone: business.timezone },
