@@ -26,6 +26,7 @@ import {
   ShieldAlert,
   UserCheck,
   UserX,
+  Video,
 } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -451,6 +452,11 @@ function EventCard({ info }: { info: EventContentArg }) {
       <span className="truncate text-[11px] text-zinc-600">
         <span className="tabular-nums">{start}</span> · {appointment.serviceName}
       </span>
+      {appointment.bookingLinkName && (
+        <span className="truncate text-[11px] font-medium text-brand-700">
+          {appointment.bookingLinkName}
+        </span>
+      )}
       {minutes > 30 && appointment.resourceName && (
         <span className="truncate text-[11px] text-zinc-500">{appointment.resourceName}</span>
       )}
@@ -597,6 +603,9 @@ function AppointmentDetails({
     // Answers to the business's own questions.
     ...appointment.answers.map((answer) => ({ label: answer.label, value: answer.value })),
     { label: t("agenda.bookedVia"), value: bookedVia(t, appointment) },
+    ...(appointment.bookingLinkName
+      ? [{ label: t("bookingLinks.bookedThrough"), value: appointment.bookingLinkName }]
+      : []),
   ];
 
   const cancelAppointment = async () => {
@@ -716,6 +725,29 @@ function AppointmentDetails({
           </div>
         ))}
       </dl>
+      {appointment.mode === "online" && !cancelled && (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-brand-100 bg-brand-50 px-4 py-3">
+          {appointment.meetingUrl ? (
+            <>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-brand-700">{t("agenda.meeting")}</p>
+                <p className="truncate text-[13px] text-brand-700/80">{appointment.meetingUrl}</p>
+              </div>
+              <a
+                href={appointment.meetingUrl}
+                target="_blank"
+                rel="noreferrer"
+                className={buttonClass({ size: "sm" })}
+              >
+                <Video className="size-4" aria-hidden />
+                {t("agenda.joinMeeting")}
+              </a>
+            </>
+          ) : (
+            <p className="text-sm text-brand-700">{t("agenda.meetingMissing")}</p>
+          )}
+        </div>
+      )}
       {unpaid && <p className="mt-4 text-sm text-zinc-500">{t("agenda.pendingPaymentHint")}</p>}
       {!isProfessional && !cancelled && !noShow && !unpaid && (
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-zinc-200 px-4 py-3">

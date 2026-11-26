@@ -9,7 +9,7 @@ import { useConfirm } from "../../components/confirm.tsx";
 import { EmptyState, Modal, PageHeader, Switch } from "../../components/controls.tsx";
 import { type Column, DataTable, IdentityCell } from "../../components/data-table.tsx";
 import { toast } from "../../components/toast.tsx";
-import { Alert, Badge, Button, Field, Input, Spinner } from "../../components/ui.tsx";
+import { Alert, Badge, Button, Field, Input, Select, Spinner } from "../../components/ui.tsx";
 import { WeeklyHoursEditor } from "../../components/weekly-hours.tsx";
 import type { Professional, WeeklyRange } from "../../lib/api.ts";
 import {
@@ -201,6 +201,9 @@ function ProfessionalForm({
   const [locationIds, setLocationIds] = useState<string[]>(
     professional?.locationIds ?? locations.map((location) => location.id),
   );
+  const [maxDailyAppointments, setDailyLimit] = useState(
+    professional?.maxDailyAppointments ?? null,
+  );
   /** Their own hours at a location, or none when they follow the location's. */
   const ownAt = (locationId: string) =>
     (professional && hours[locationId]?.professionals[professional.id]) || [];
@@ -229,6 +232,7 @@ function ProfessionalForm({
       locationIds,
       serviceCommission: Number(serviceCommission.replace(",", ".")) || 0,
       productCommission: Number(productCommission.replace(",", ".")) || 0,
+      maxDailyAppointments,
     };
     const result = validate(professionalSchema, values);
     setErrors(result.errors ?? {});
@@ -373,6 +377,32 @@ function ProfessionalForm({
             </Field>
           ))}
         </div>
+
+        <Field
+          label={t("professionals.dailyLimit")}
+          hint={
+            business.maxDailyAppointments === null
+              ? t("professionals.dailyLimitHint")
+              : t("professionals.dailyLimitBusiness", { count: business.maxDailyAppointments })
+          }
+        >
+          {(props) => (
+            <Select
+              {...props}
+              value={maxDailyAppointments ?? "business"}
+              onChange={(event) =>
+                setDailyLimit(event.target.value === "business" ? null : Number(event.target.value))
+              }
+            >
+              <option value="business">{t("professionals.dailyLimitDefault")}</option>
+              {[1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20].map((count) => (
+                <option key={count} value={count}>
+                  {t("hours.dailyLimitCount", { count })}
+                </option>
+              ))}
+            </Select>
+          )}
+        </Field>
 
         {severalLocations && (
           <fieldset className="space-y-2">

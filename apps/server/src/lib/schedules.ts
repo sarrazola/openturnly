@@ -1,4 +1,9 @@
-import { addDays, type BookingRules, type ResourceSchedule } from "@openturnly/core";
+import {
+  addDays,
+  type BookingRules,
+  instantToZoned,
+  type ResourceSchedule,
+} from "@openturnly/core";
 import { and, eq, gt, gte, inArray, lt, lte, ne } from "drizzle-orm";
 import type { Db } from "../db/client.ts";
 import {
@@ -24,6 +29,7 @@ export function bookingRules(business: Business): BookingRules {
     slotIntervalMin: business.slotIntervalMin,
     minNoticeMin: business.minNoticeMin,
     maxAdvanceDays: business.maxAdvanceDays,
+    dailyLimits: true,
   };
 }
 
@@ -44,6 +50,11 @@ export async function loadSchedules(
   toDate: string,
   /** An appointment being moved: its own time doesn't count as busy. */
   ignoreAppointmentId?: string,
+  /**
+   * Only these professionals (`null`: nobody in particular, for a location without them).
+   * Online services are limited to who can host their call.
+   */
+  onlyResources?: ReadonlySet<string | null>,
 ): Promise<ResourceSchedule[]> {
   const [offeredHere] = await db
     .select({ id: locationServices.serviceId })
@@ -54,7 +65,7 @@ export async function loadSchedules(
   if (!offeredHere) return [];
 
   const team = await db
-    .select({ id: resources.id })
+    .select({ id: resources.id, maxDailyAppointments: resources.maxDailyAppointments })
     .from(resources)
     .innerJoin(resourceLocations, eq(resourceLocations.resourceId, resources.id))
     .where(
@@ -85,6 +96,7 @@ export async function loadSchedules(
     ).map((row) => row.id);
     candidates = resourceId === null ? offering : offering.filter((id) => id === resourceId);
   }
+  if (onlyResources) candidates = candidates.filter((id) => onlyResources.has(id));
   if (candidates.length === 0) return [];
 
   const hours = await db
@@ -155,6 +167,8 @@ export async function loadSchedules(
       resourceId: appointments.resourceId,
       start: appointments.startsAt,
       end: appointments.endsAt,
+      before: appointments.bufferBeforeMin,
+      after: appointments.bufferAfterMin,
     })
     .from(appointments)
     .where(
@@ -172,6 +186,16 @@ export async function loadSchedules(
 
   return candidates.map((candidate) => {
     const own = hours.filter((range) => candidate !== null && range.resourceId === candidate);
+    // Without professionals the location takes one appointment at a time.
+    const theirs = booked.filter((row) =>
+      candidate === null ? row.locationId === locationId : row.resourceId === candidate,
+    );
+    const dailyCounts = new Map<string, number>();
+    for (const row of theirs) {
+      const day = instantToZoned(row.start.getTime(), business.timezone).date;
+      dailyCounts.set(day, (dailyCounts.get(day) ?? 0) + 1);
+    }
+    const ownLimit = team.find((member) => member.id === candidate)?.maxDailyAppointments;
     return {
       resourceId: candidate,
       hours: own.length > 0 ? own : locationHours,
@@ -181,12 +205,13 @@ export async function loadSchedules(
           .filter((row) => row.resourceId === null || row.resourceId === candidate)
           .map((row) => row.date),
       ]),
-      busy: booked
-        // Without professionals the location takes one appointment at a time.
-        .filter((row) =>
-          candidate === null ? row.locationId === locationId : row.resourceId === candidate,
-        )
-        .map((row) => ({ start: row.start.getTime(), end: row.end.getTime() })),
+      // Each appointment keeps its own margins free too.
+      busy: theirs.map((row) => ({
+        start: row.start.getTime() - row.before * 60_000,
+        end: row.end.getTime() + row.after * 60_000,
+      })),
+      dailyLimit: ownLimit ?? business.maxDailyAppointments,
+      dailyCounts,
     };
   });
 }

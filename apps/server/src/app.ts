@@ -8,6 +8,7 @@ import { logger } from "hono/logger";
 import { secureHeaders } from "hono/secure-headers";
 import { createAutomations, type DefaultAccountMeter } from "./lib/automations.ts";
 import { createBookingGuard } from "./lib/booking-guard.ts";
+import { createCalendarSync } from "./lib/calendar-sync.ts";
 import { clientIp, hasProxyHeaders, networkKey, withClientIp } from "./lib/client-ip.ts";
 import { createEmail } from "./lib/email.ts";
 import type { AppEnv, Deps } from "./lib/http.ts";
@@ -19,6 +20,7 @@ import { createRateLimiter } from "./lib/rate-limit.ts";
 import { createSms } from "./lib/sms.ts";
 import { createWhatsapp } from "./lib/whatsapp.ts";
 import { businessRoutes } from "./routes/businesses.ts";
+import { calendarAccountRoutes, googleConsentRoutes } from "./routes/calendar.ts";
 import { channelRoutes } from "./routes/channels.ts";
 import { deliveryRoutes } from "./routes/deliveries.ts";
 import { invitationRoutes } from "./routes/invitations.ts";
@@ -53,15 +55,26 @@ export function createApp({
   const email = createEmail({ db, config });
   const sms = createSms({ db, config });
   const notifications = createNotifications({ db, push });
+  const calendar = createCalendarSync({ db, config });
   const payments = createPayments({
     db,
     config,
     onConfirmed: async (appointmentId) => {
+      await calendar.appointmentChanged(appointmentId);
       await automations.emit(appointmentId, "created");
       await notifications.appointmentBooked(appointmentId, null);
     },
   });
-  const automations = createAutomations({ db, config, whatsapp, email, sms, payments, meter });
+  const automations = createAutomations({
+    db,
+    config,
+    whatsapp,
+    email,
+    sms,
+    payments,
+    calendar,
+    meter,
+  });
   const deps: Deps = {
     db,
     auth,
@@ -73,6 +86,7 @@ export function createApp({
     sms,
     payments,
     notifications,
+    calendar,
   };
   const app = new Hono<AppEnv>();
 
@@ -149,7 +163,9 @@ export function createApp({
   });
 
   app.route("/api/setup", setupRoutes(deps));
+  app.route("/api/me/calendar", calendarAccountRoutes(deps));
   app.route("/api/me", meRoutes(deps));
+  app.route("/api/integrations/google", googleConsentRoutes(deps));
   app.route("/api/mobile", mobileRoutes(deps));
   app.route("/api/meta", metaRoutes());
   app.route("/api/businesses", businessRoutes(deps));
@@ -174,10 +190,14 @@ export function createApp({
   return Object.assign(app, { automations });
 }
 
-/** "/studio-central": a business's booking page, never an app page like /admin or /login. */
+/**
+ * "/studio-central", or one of its booking links ("/studio-central/clientes"): a booking page,
+ * never an app page like /admin or /<slug>/login.
+ */
 function isBookingPagePath(pathname: string) {
-  const match = /^\/([^/]+)\/?$/.exec(pathname);
-  return match?.[1] !== undefined && checkSlug(match[1]) === null;
+  const match = /^\/([^/]+)(?:\/([^/]+))?\/?$/.exec(pathname);
+  if (match?.[1] === undefined || checkSlug(match[1]) !== null) return false;
+  return match[2] === undefined || checkSlug(match[2]) === null;
 }
 
 /** Serves the built React app. Any unknown path gets index.html so client routing works. */

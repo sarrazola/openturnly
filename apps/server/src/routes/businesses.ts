@@ -53,7 +53,7 @@ async function adminViewOf(db: Db, business: Business, access: BusinessAccess) {
   return adminView(business, (await logoUrls(db, [business])).get(business.id) ?? null, access);
 }
 
-export function businessRoutes({ db, config, auth, guard }: Deps) {
+export function businessRoutes({ db, config, auth, guard, calendar }: Deps) {
   return (
     new Hono<AppEnv>()
       .get("/", async (c) => {
@@ -155,6 +155,7 @@ export function businessRoutes({ db, config, auth, guard }: Deps) {
           if (!updated) throw apiError(404, "business_not_found");
           return updated;
         });
+        if (business.name !== current.name) await calendar.businessRenamed(business.id);
         return c.json({ business: await adminViewOf(db, business, access) });
       })
 
@@ -335,6 +336,7 @@ export function businessRoutes({ db, config, auth, guard }: Deps) {
           )
           .returning({ userId: businessMembers.userId });
         if (updated.length === 0) throw apiError(404, "member_not_found");
+        await calendar.memberChanged(business.id, userId);
         return c.json({ ok: true });
       })
 
@@ -383,6 +385,7 @@ export function businessRoutes({ db, config, auth, guard }: Deps) {
               eq(businessMembers.userId, c.req.param("userId")),
             ),
           );
+        await calendar.memberChanged(business.id, c.req.param("userId"));
         return c.body(null, 204);
       })
 

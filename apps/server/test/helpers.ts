@@ -47,6 +47,8 @@ export async function createTestApp(
     whatsapp?: Config["whatsapp"];
     whatsappApiUrl?: string;
     mercadopagoApiUrl?: string;
+    google?: Config["google"];
+    googleUrl?: string;
     whatsappCallbackTag?: string;
     email?: Config["email"];
     sms?: Config["sms"];
@@ -71,6 +73,9 @@ export async function createTestApp(
     whatsapp: options.whatsapp ?? null,
     whatsappApiUrl: options.whatsappApiUrl ?? "http://127.0.0.1:1",
     mercadopagoApiUrl: options.mercadopagoApiUrl ?? "http://127.0.0.1:1",
+    google: options.google ?? null,
+    googleOauthUrl: options.googleUrl ?? "http://127.0.0.1:1",
+    googleApiUrl: options.googleUrl ?? "http://127.0.0.1:1",
     whatsappCallbackTag: options.whatsappCallbackTag ?? null,
     email: options.email ?? null,
     sms: options.sms ?? null,

@@ -5,6 +5,7 @@ import {
   hoursProblem,
   type ResourceSchedule,
   slotsForDate,
+  visibleSlots,
 } from "../src/availability.ts";
 import { zonedTimeToInstant } from "../src/time.ts";
 
@@ -108,5 +109,48 @@ describe("hoursProblem", () => {
         { weekday: 2, start: "11:00", end: "13:00" },
       ]),
     ).toBeNull();
+  });
+});
+
+describe("margins, daily limits and hidden times", () => {
+  it("keeps the professional free during the margins of both appointments", () => {
+    // 09:30–10:00 booked with 15 minutes after it.
+    const busy = [{ start: at("09:30"), end: at("10:15") }];
+    expect(times(SATURDAY, 30, [schedule({ busy })])).toEqual(["09:00", "10:30", "11:00", "11:30"]);
+    // The new one needs 30 minutes free before it, too: 10:30 would start 15 minutes after
+    // the other one's margin ends.
+    const slots = slotsForDate(
+      SATURDAY,
+      { durationMin: 30, bufferBeforeMin: 30 },
+      [schedule({ busy })],
+      rules,
+      NOW,
+    ).map((slot) => slot.time);
+    expect(slots).toEqual(["09:00", "11:00", "11:30"]);
+    // Margins don't have to fit inside the opening hours.
+    expect(
+      slotsForDate(SATURDAY, { durationMin: 30, bufferAfterMin: 60 }, [schedule()], rules, NOW).map(
+        (slot) => slot.time,
+      ),
+    ).toContain("11:30");
+  });
+
+  it("stops at the daily limit for customers, not for the business's people", () => {
+    const full = schedule({ dailyLimit: 2, dailyCounts: new Map([[SATURDAY, 2]]) });
+    expect(times(SATURDAY, 60, [full])).toEqual([]);
+    expect(times(SATURDAY, 60, [full], { ...rules, dailyLimits: false })).not.toEqual([]);
+    expect(
+      times(SATURDAY, 60, [schedule({ dailyLimit: 3, dailyCounts: full.dailyCounts })]),
+    ).not.toEqual([]);
+  });
+
+  it("hides the same times on every load and never a whole day", () => {
+    const all = slotsForDate(SATURDAY, 30, [schedule()], rules, NOW);
+    const shown = visibleSlots(all, SATURDAY, 50, "business-1");
+    expect(shown.length).toBeLessThan(all.length);
+    expect(visibleSlots(all, SATURDAY, 50, "business-1")).toEqual(shown);
+    expect(visibleSlots(all, SATURDAY, 0, "business-1")).toEqual(all);
+    expect(visibleSlots(all, SATURDAY, 90, "business-1").length).toBeGreaterThanOrEqual(1);
+    expect(visibleSlots(all.slice(0, 1), SATURDAY, 90, "business-1")).toHaveLength(1);
   });
 });

@@ -13,6 +13,7 @@ import type {
   ProductUnit,
   SaleItemKind,
   SalePaymentMethod,
+  ServiceMode,
   ServicePaymentMode,
   StockMovementKind,
 } from "@openturnly/core";
@@ -88,6 +89,10 @@ export type Business = {
   slotIntervalMin: number;
   minNoticeMin: number;
   maxAdvanceDays: number;
+  /** Of the free times, how many the booking page hides (percent) to look busier. */
+  hiddenSlotsPercent: number;
+  /** Most appointments a day per professional on the booking page; null: no limit. */
+  maxDailyAppointments: number | null;
   /** Follows the time zone: holidays and the default phone country come from it. */
   country: string | null;
   /** The logo uploaded in Settings → Booking page, or null. */
@@ -127,6 +132,13 @@ export type Service = {
   paymentMode: ServicePaymentMode;
   /** With `paymentMode` "deposit": how much. */
   depositAmount: number | null;
+  /** In person, or on a video call made by the professional's connected calendar. */
+  mode: ServiceMode;
+  /** Minutes the professional keeps free before and after it. */
+  bufferBeforeMin: number;
+  bufferAfterMin: number;
+  /** On the main booking page; otherwise only through the booking links that offer it. */
+  listed: boolean;
   active: boolean;
   /** Locations that offer it. */
   locationIds: string[];
@@ -145,6 +157,8 @@ export type Professional = {
   /** Percent of the services and products they sell that is theirs. */
   serviceCommission: number;
   productCommission: number;
+  /** Most appointments a day on the booking page; null: the business's limit. */
+  maxDailyAppointments: number | null;
 };
 
 /** A place the business works from, with what it offers and who works there. */
@@ -192,6 +206,11 @@ export type Appointment = {
   source: AppointmentSource;
   /** For agent bookings: the name of the access key used. */
   sourceLabel: string | null;
+  mode: ServiceMode;
+  /** An online appointment's video call, once the professional's calendar made it. */
+  meetingUrl: string | null;
+  /** The booking link it came through (its name when booked); null: the main page or the team. */
+  bookingLinkName: string | null;
   createdAt: string;
   cancelledAt: string | null;
   answers: BookingAnswer[];
@@ -236,6 +255,8 @@ export type PublicBusiness = Pick<
 
 export type PublicCatalog = {
   business: PublicBusiness;
+  /** The booking link the page was opened through; null for the main page. */
+  link: { slug: string; name: string; description: string | null } | null;
   services: Omit<Service, "active" | "locationIds">[];
   professionals: { id: string; name: string; photoUrl: string | null; serviceIds: string[] }[];
   /** Locations taking bookings, with what each offers and who works there. */
@@ -266,6 +287,45 @@ export type BookedAppointment = {
   discountAmount: number;
   currency: string;
   location: { name: string; address: string | null };
+  mode: ServiceMode;
+  /** An online appointment's video call; null until it's made. */
+  meetingUrl: string | null;
+};
+
+/** Another way into the business's agenda: `/<business>/<slug>`, with its own services. */
+export type BookingLink = {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  serviceIds: string[];
+  active: boolean;
+  createdAt: string;
+};
+
+/** The signed-in person's connected calendar, and which businesses go to it. */
+export type CalendarOverview = {
+  /** Whether this install can connect calendars at all. */
+  available: boolean;
+  connection: {
+    provider: "google";
+    email: string | null;
+    /** "disconnected": Google stopped accepting the access; it takes connecting again. */
+    status: "connected" | "disconnected";
+    connectedAt: string;
+  } | null;
+  businesses: {
+    id: string;
+    name: string;
+    role: BusinessAccess["role"];
+    enabled: boolean;
+    /** Owners and admins: whose appointments; null: everyone's. */
+    resourceIds: string[] | null;
+    /** Appointments Google hasn't taken yet. */
+    failing: number;
+    /** Owners and admins: who they can choose from. */
+    professionals: { id: string; name: string }[];
+  }[];
 };
 
 /** What booking returns: `payment` is set when the customer has to pay to confirm it. */

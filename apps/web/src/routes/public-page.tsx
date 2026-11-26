@@ -27,6 +27,7 @@ import {
   RotateCcw,
   Search,
   Users,
+  Video,
   X,
 } from "lucide-react";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
@@ -103,10 +104,10 @@ function useEmbedded(embedded: boolean) {
 
 /** The page a business shares with its customers: /<slug>. */
 export function PublicBookingPage() {
-  const { slug = "" } = useParams();
+  const { slug = "", link } = useParams();
   const [searchParams] = useSearchParams();
   const embedded = searchParams.has("embed");
-  const catalog = usePublicCatalog(slug);
+  const catalog = usePublicCatalog(slug, link);
   const { i18n } = useTranslation();
   // Shown in the business's language, without changing the visitor's saved preference.
   const locale = catalog.data?.business.locale ?? i18n.resolvedLanguage ?? "es";
@@ -114,7 +115,10 @@ export function PublicBookingPage() {
   const frame = useEmbedded(embedded && catalog.isSuccess);
 
   useEffect(() => {
-    if (catalog.data) document.title = catalog.data.business.name;
+    if (catalog.data) {
+      const { business, link } = catalog.data;
+      document.title = link ? `${link.name} · ${business.name}` : business.name;
+    }
   }, [catalog.data]);
 
   if (catalog.isPending) return <Spinner className={embedded ? "py-24" : "min-h-screen"} />;
@@ -138,6 +142,7 @@ export function PublicBookingPage() {
             searchParams.get("embed") !== "popup" && "rounded-2xl ring-1 ring-zinc-950/10",
           )}
         >
+          <LinkIntro catalog={catalog.data} />
           <BookingWizard slug={slug} catalog={catalog.data} t={t} locale={locale} />
         </main>
       </div>
@@ -156,8 +161,23 @@ export function PublicBookingPage() {
         )}
       >
         <BookingHeader business={business} />
+        <LinkIntro catalog={catalog.data} />
         <BookingWizard slug={slug} catalog={catalog.data} t={t} locale={locale} />
       </main>
+    </div>
+  );
+}
+
+/** Opened through one of the business's booking links: its name and what it's for. */
+function LinkIntro({ catalog }: { catalog: PublicCatalog }) {
+  const { link } = catalog;
+  if (!link) return null;
+  return (
+    <div className="border-b border-zinc-100 px-5 py-4 sm:px-8">
+      <h2 className="text-base font-semibold text-zinc-900">{link.name}</h2>
+      {link.description && (
+        <p className="mt-1 text-sm whitespace-pre-line text-zinc-600">{link.description}</p>
+      )}
     </div>
   );
 }
@@ -386,6 +406,7 @@ function BookingWizard({
     if (!service || !date || !time || !details) return;
     book.mutate(
       {
+        ...(catalog.link ? { link: catalog.link.slug } : {}),
         ...(location ? { locationId: location.id } : {}),
         serviceId: service.id,
         resourceId,
@@ -699,14 +720,16 @@ function BookingWizard({
         {step === "confirm" && service && date && time && details && (
           <Summary
             rows={[
-              ...(severalLocations && location
-                ? [
-                    {
-                      label: t("booking.location"),
-                      value: [location.name, location.address].filter(Boolean).join(" · "),
-                    },
-                  ]
-                : []),
+              ...(service.mode === "online"
+                ? [{ label: t("booking.place"), value: t("booking.onlinePlace") }]
+                : severalLocations && location
+                  ? [
+                      {
+                        label: t("booking.location"),
+                        value: [location.name, location.address].filter(Boolean).join(" · "),
+                      },
+                    ]
+                  : []),
               { label: t("booking.date"), value: `${formatDay(date, locale)} · ${time}` },
               ...(professional || team.length > 1
                 ? [
@@ -1203,6 +1226,13 @@ function ServiceMenu({
                       <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[13px] text-zinc-500">
                         <Clock className="size-3 shrink-0" aria-hidden />
                         <span className="shrink-0">{formatDuration(item.durationMin)}</span>
+                        {item.mode === "online" && (
+                          <>
+                            <span aria-hidden>·</span>
+                            <Video className="size-3 shrink-0 text-brand-600" aria-hidden />
+                            <span className="shrink-0 text-brand-700">{t("booking.online")}</span>
+                          </>
+                        )}
                         {item.description && (
                           <>
                             <span aria-hidden>·</span>
@@ -1324,6 +1354,7 @@ function DateTimeStep({
     resourceId: preferredId,
     from,
     to,
+    link: catalog.link?.slug ?? null,
   });
   const days = availability.data?.days ?? {};
   const available = useMemo(() => new Set(Object.keys(days)), [days]);
@@ -1657,6 +1688,7 @@ function AddToCalendar({
     serviceName: appointment.serviceName,
     resourceName: appointment.resourceName,
     location: appointment.location,
+    meetingUrl: appointment.meetingUrl,
     startsAt: appointment.startsAt,
     endsAt: appointment.endsAt,
     language: locale,
@@ -1726,20 +1758,47 @@ function BookingDone({
           {appointment.code}
         </p>
       </div>
+      {appointment.mode === "online" && (
+        <div className="mt-5 w-full max-w-md rounded-xl border border-brand-100 bg-brand-50 px-4 py-3 text-left">
+          <p className="flex items-center gap-1.5 text-sm font-medium text-brand-700">
+            <Video className="size-4" aria-hidden />
+            {t("booking.onlinePlace")}
+          </p>
+          {appointment.meetingUrl ? (
+            <>
+              <p className="mt-1 truncate text-[13px] text-brand-700/80">
+                {appointment.meetingUrl}
+              </p>
+              <a
+                href={appointment.meetingUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={buttonClass({ size: "sm", className: "mt-3 w-full" })}
+              >
+                {t("booking.joinMeeting")}
+              </a>
+            </>
+          ) : (
+            <p className="mt-1 text-[13px] text-brand-700/80">{t("booking.meetingSoon")}</p>
+          )}
+        </div>
+      )}
       <AddToCalendar appointment={appointment} business={business} t={t} locale={locale} />
       <div className="mt-7 w-full max-w-md text-left">
         <Summary
           rows={[
-            ...(showLocation
-              ? [
-                  {
-                    label: t("booking.location"),
-                    value: [appointment.location.name, appointment.location.address]
-                      .filter(Boolean)
-                      .join(" · "),
-                  },
-                ]
-              : []),
+            ...(appointment.mode === "online"
+              ? []
+              : showLocation
+                ? [
+                    {
+                      label: t("booking.location"),
+                      value: [appointment.location.name, appointment.location.address]
+                        .filter(Boolean)
+                        .join(" · "),
+                    },
+                  ]
+                : []),
             {
               label: t("booking.date"),
               value: `${formatDay(appointment.date, locale)} · ${appointment.time}`,

@@ -118,7 +118,11 @@ updates, read the [self-hosting guide](docs/self-hosting.md), or follow the
   services and team. Staff can work at several locations and are never booked at two at
   once.
 - **Services, staff and hours**: split shifts, closures, automatic public holidays per
-  country and booking rules, all time-zone aware.
+  country and booking rules (margins between appointments, most appointments a day, showing
+  fewer free times), all time-zone aware.
+- **Booking links**: several pages into the same agenda, each with its own services, and the
+  agenda shows which one each appointment came through
+  ([docs/booking-links.md](docs/booking-links.md)).
 - **Team access** with admin and professional roles, and a branded sign-in page per business.
 - **Phone apps** for iPhone and Android, native on each, for the owner, admins and staff: the
   agenda, booking, checkout, customers, sales and reports ([docs/mobile.md](docs/mobile.md)).
@@ -133,6 +137,9 @@ updates, read the [self-hosting guide](docs/self-hosting.md), or follow the
   ([docs/sms.md](docs/sms.md)).
 - **Online payments** at booking, a deposit or the full price, straight to the business's own
   Mercado Pago account ([docs/payments.md](docs/payments.md)).
+- **Google Calendar** for each person on the team, in a calendar per business, and **online
+  services** with a Google Meet call made when they're booked
+  ([docs/google-calendar.md](docs/google-calendar.md)).
 - **Protection against fake bookings**: self-hosted proof of work (ALTCHA), rate limits and
   a surge brake per business. No third-party service needed.
 

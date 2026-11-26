@@ -50,7 +50,7 @@ const rescheduleSchema = z.object({
 });
 
 /** The business calendar: appointments between two instants, with who booked them. */
-export function appointmentRoutes({ db, automations, notifications }: Deps) {
+export function appointmentRoutes({ db, automations, notifications, calendar }: Deps) {
   /** An appointment of the business, whatever its status; professionals only reach their own. */
   const findAny = async (businessId: string, appointmentId: string, access: BusinessAccess) => {
     const [appointment] = await db
@@ -110,7 +110,7 @@ export function appointmentRoutes({ db, automations, notifications }: Deps) {
       ignoreAppointmentId,
     );
     const own = access.role === "professional" ? access.resourceId : null;
-    return slotsForDate(date, service.durationMin, schedules, staffRules(business), Date.now())
+    return slotsForDate(date, service, schedules, staffRules(business), Date.now())
       .map((slot) => ({
         time: slot.time,
         resourceIds: slot.resourceIds.filter(
@@ -158,6 +158,9 @@ export function appointmentRoutes({ db, automations, notifications }: Deps) {
             answers: appointments.answers,
             source: appointments.source,
             sourceLabel: appointments.sourceLabel,
+            mode: appointments.mode,
+            meetingUrl: appointments.meetingUrl,
+            bookingLinkName: appointments.bookingLinkName,
             createdAt: appointments.createdAt,
             cancelledAt: appointments.cancelledAt,
             customer: {
@@ -315,7 +318,7 @@ export function appointmentRoutes({ db, automations, notifications }: Deps) {
           );
           const slot = slotsForDate(
             input.date,
-            service.durationMin,
+            service,
             schedules,
             staffRules(business),
             Date.now(),
@@ -342,6 +345,9 @@ export function appointmentRoutes({ db, automations, notifications }: Deps) {
               serviceName: service.name,
               resourceName: resource?.name ?? null,
               priceAmount: service.priceAmount,
+              mode: service.mode,
+              bufferBeforeMin: service.bufferBeforeMin,
+              bufferAfterMin: service.bufferAfterMin,
               // Booked by an AI agent with the business's admin key, or by its people.
               source: access.apiKey ? "agent" : "admin",
               sourceLabel: access.apiKey?.name ?? null,
@@ -350,6 +356,8 @@ export function appointmentRoutes({ db, automations, notifications }: Deps) {
           return created;
         });
         if (appointment) {
+          // First, so an online appointment's call link is in what goes out next.
+          appointment.meetingUrl = (await calendar.appointmentChanged(appointment.id)).meetingUrl;
           await automations.emit(appointment.id, "created");
           await notifications.appointmentBooked(appointment.id, c.get("user")?.id ?? null);
         }
@@ -383,6 +391,7 @@ export function appointmentRoutes({ db, automations, notifications }: Deps) {
           input,
           staffRules(business),
         );
+        appointment.meetingUrl = (await calendar.appointmentChanged(appointment.id)).meetingUrl;
         await automations.emit(appointment.id, "rescheduled", current.startsAt);
         await notifications.appointmentRescheduled(
           appointment.id,
@@ -476,6 +485,7 @@ export function appointmentRoutes({ db, automations, notifications }: Deps) {
           )
           .returning({ id: appointments.id, status: appointments.status });
         if (cancelled) {
+          await calendar.appointmentChanged(cancelled.id);
           await automations.emit(cancelled.id, "cancelled");
           await notifications.appointmentCancelled(cancelled.id, c.get("user")?.id ?? null);
           return c.json({ appointment: cancelled });

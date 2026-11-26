@@ -55,6 +55,7 @@ export const router = createBrowserRouter([
           { path: "customers", lazy: page("CustomersPage") },
           { path: "locations", lazy: page("LocationsPage") },
           { path: "services", lazy: page("ServicesPage") },
+          { path: "booking-links", lazy: page("BookingLinksPage") },
           { path: "professionals", lazy: page("ProfessionalsPage") },
           { path: "hours", lazy: page("HoursPage") },
           { path: "settings", lazy: page("SettingsPage") },
@@ -68,6 +69,8 @@ export const router = createBrowserRouter([
   // Must stay last: any other single segment is a business booking page.
   { path: "/e/:code", element: <SurveyPage /> },
   { path: "/:slug/login", lazy: page("BusinessLoginPage") },
+  // One of the business's booking links: the same page, with that link's services.
+  { path: "/:slug/:link", element: <PublicBookingPage /> },
   { path: "/:slug", element: <PublicBookingPage /> },
   { path: "*", element: <NotFoundPage /> },
 ]);

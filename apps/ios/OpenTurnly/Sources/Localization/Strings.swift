@@ -223,6 +223,15 @@ enum L {
         static var noProfessional: String { tr("No staff member", "Sin profesional") }
         static var answers: String { tr("Booking answers", "Respuestas de la reserva") }
         static var customerNotes: String { tr("Customer notes", "Notas del cliente") }
+        static var meeting: String { tr("Google Meet video call", "Videollamada de Google Meet") }
+        static var bookingLink: String { tr("Booking link", "Enlace de reserva") }
+        static var joinMeeting: String { tr("Join", "Unirse") }
+        static var meetingMissing: String {
+            tr(
+                "This appointment is online and has no video call yet: it's made once the staff member connects Google Calendar in My account on the web.",
+                "Esta cita es en línea y aún no tiene videollamada: se crea cuando el profesional conecta Google Calendar en Mi cuenta, en la web."
+            )
+        }
         static var customerNotesHint: String {
             tr("Only your team sees them. For example: \"prefers a low fade\".",
                "Solo las ve tu equipo. Por ejemplo: «prefiere degradado bajo».")

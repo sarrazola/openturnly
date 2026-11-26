@@ -19,7 +19,7 @@ import { bookingRules, loadSchedules, pickLeastBusy } from "./schedules.ts";
  * still apply, but not the customers' minimum notice or booking window.
  */
 export function staffRules(business: Business): BookingRules {
-  return { ...bookingRules(business), minNoticeMin: 0, maxAdvanceDays: 3650 };
+  return { ...bookingRules(business), minNoticeMin: 0, maxAdvanceDays: 3650, dailyLimits: false };
 }
 
 /**
@@ -47,7 +47,16 @@ export async function moveAppointment(
       input.date,
       current.id,
     );
-    const slot = slotsForDate(input.date, service.durationMin, schedules, rules, Date.now()).find(
+    // The same service keeps the margins it was booked with; another one brings its own.
+    const sameService = service.id === current.serviceId;
+    const timing = sameService
+      ? {
+          durationMin: service.durationMin,
+          bufferBeforeMin: current.bufferBeforeMin,
+          bufferAfterMin: current.bufferAfterMin,
+        }
+      : service;
+    const slot = slotsForDate(input.date, timing, schedules, rules, Date.now()).find(
       (candidate) => candidate.time === input.time,
     );
     if (!slot) throw apiError(409, "slot_taken");
@@ -69,6 +78,15 @@ export async function moveAppointment(
         priceAmount: service.id === current.serviceId ? current.priceAmount : service.priceAmount,
         resourceId,
         resourceName: resource?.name ?? null,
+        mode: sameService ? current.mode : service.mode,
+        bufferBeforeMin: sameService ? current.bufferBeforeMin : service.bufferBeforeMin,
+        bufferAfterMin: sameService ? current.bufferAfterMin : service.bufferAfterMin,
+        // A call belongs to the professional who hosts it: someone else, or another service,
+        // gets a new one (lib/calendar-sync.ts).
+        meetingUrl:
+          service.id === current.serviceId && resourceId === current.resourceId
+            ? current.meetingUrl
+            : null,
         startsAt: new Date(slot.start),
         endsAt: new Date(slot.end),
         updatedAt: new Date(),

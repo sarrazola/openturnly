@@ -6,6 +6,36 @@ All notable changes to OpenTurnly are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Google Calendar**: each person connects their own Google account in **My account**, and
+  their appointments are copied to a calendar named after each business, created in that
+  account. Professionals get their own appointments; owners and admins choose whose. New,
+  moved and cancelled appointments are written while the change is made, and retried when
+  Google doesn't answer. Only `calendar.app.created` is asked for, so the install reaches only
+  the calendars it creates. Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`
+  ([docs/google-calendar.md](docs/google-calendar.md)).
+- **Online services**: a service can happen on a Google Meet call. The professional's calendar
+  makes the call when it's booked and invites the customer; its link shows on the booking page,
+  in the agenda and the phone apps, and in messages as `{{appointment.meeting_link}}` (and in
+  place of the address). The booking page offers an online service only with professionals
+  whose calendar is connected.
+- **Booking links**: more ways into the same agenda, at `/<business>/<link>`, each with its own
+  name, description and services. Bookings through any link take the professionals' time
+  everywhere, and the appointment shows which link it came through: in the agenda, the phone
+  apps, the Google Calendar event title and messages (`{{appointment.booking_link}}`). A
+  service can be offered only through links. Embeds take `data-openturnly="<business>/<link>"`
+  ([docs/booking-links.md](docs/booking-links.md)).
+- **Margins before and after** each service: the professional stays free for them, while the
+  appointment keeps its real times. They're copied onto the appointment when it's booked.
+- **Most appointments a day** per professional on the booking page, for the business and for
+  each professional; the team can still book over it from the agenda.
+- **Show fewer times**: the booking page can hide a share of the free times (up to 90 %), the
+  same ones on every load and never a whole day.
+- MCP: services say whether they're online, `create_service` and `update_service` take
+  `online`, `margin_before_minutes`, `margin_after_minutes` and `on_booking_page`, and
+  appointments carry their `meeting_link` and `booking_link`.
+
 ## [1.5.1] - 2026-11-09
 
 ### Changed

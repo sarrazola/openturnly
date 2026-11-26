@@ -12,6 +12,7 @@ import {
   slotsBetween,
   slotsForDate,
   todayIn,
+  visibleSlots,
   zonedTimeToInstant,
 } from "@openturnly/core";
 import { and, asc, count, eq, gt, inArray, lt, sql } from "drizzle-orm";
@@ -20,8 +21,10 @@ import { z } from "zod";
 import {
   type Appointment,
   appointments,
+  type BookingLink,
   BUSY_STATUSES,
   type Business,
+  bookingLinks,
   businesses,
   locationServices,
   locations,
@@ -52,7 +55,15 @@ const MAX_ACTIVE_BOOKINGS_PER_CUSTOMER = 3;
 const giftCheckSchema = z.object({ code: z.string().min(1).max(40), serviceId: z.string().min(1) });
 
 /** Endpoints used by the public booking page. No login required. */
-export function publicRoutes({ db, config, guard, automations, payments, notifications }: Deps) {
+export function publicRoutes({
+  db,
+  config,
+  guard,
+  automations,
+  payments,
+  notifications,
+  calendar,
+}: Deps) {
   const network = (c: Context) => networkKey(clientIp(c, config.trustProxy));
 
   /**
@@ -76,12 +87,40 @@ export function publicRoutes({ db, config, guard, automations, payments, notific
     return business;
   };
 
+  /** One of the business's booking links by its slug, if it's on; null for the main page. */
+  const findLink = async (business: Business, slug: string | undefined) => {
+    if (!slug) return null;
+    const [link] = await db
+      .select()
+      .from(bookingLinks)
+      .where(
+        and(
+          eq(bookingLinks.businessId, business.id),
+          eq(bookingLinks.slug, slug.toLowerCase()),
+          eq(bookingLinks.active, true),
+        ),
+      );
+    if (!link) throw apiError(404, "link_not_found");
+    return link;
+  };
+
+  /**
+   * Whether a service can be booked here: a link offers its own services; the main page the
+   * ones listed on it. An AI agent with the business's key books any active service.
+   */
+  const offered = (
+    service: { id: string; listed: boolean },
+    link: BookingLink | null,
+    agent: boolean,
+  ) => agent || (link ? link.serviceIds.includes(service.id) : service.listed);
+
   /**
    * Active locations with the services each can actually take bookings for and who works
    * there, and the services and professionals across them. A location without
-   * professionals takes bookings on its own hours for every service it offers.
+   * professionals takes bookings on its own hours for every service it offers. Through a
+   * booking link, only the services it offers.
    */
-  const loadCatalog = async (business: Business) => {
+  const loadCatalog = async (business: Business, link: BookingLink | null = null) => {
     const places = (await listLocations(db, business.id)).filter((place) => place.active);
     const team = await db
       .select({ id: resources.id, name: resources.name })
@@ -114,15 +153,30 @@ export function publicRoutes({ db, config, guard, automations, payments, notific
         priceAmount: services.priceAmount,
         paymentMode: services.paymentMode,
         depositAmount: services.depositAmount,
+        mode: services.mode,
+        listed: services.listed,
       })
       .from(services)
       .where(and(eq(services.businessId, business.id), eq(services.active, true)))
-      .orderBy(asc(services.position), asc(services.name));
+      .orderBy(asc(services.position), asc(services.name))
+      .then((rows) =>
+        link
+          ? // The link's own order.
+            link.serviceIds.flatMap((id) => rows.filter((row) => row.id === id))
+          : rows.filter((row) => row.listed),
+      );
     // Payment settings only mean something while the business can be paid here.
     const accepting = await payments.accepting(business.id);
 
+    // An online service needs someone whose calendar can make the call.
+    const online = new Set(catalog.filter((service) => service.mode === "online").map((s) => s.id));
+    const hosts =
+      online.size > 0 ? await calendar.meetingHosts(business.id) : new Set<string | null>();
+    const hosting = (resourceId: string | null, serviceId: string) =>
+      !online.has(serviceId) || hosts.has(resourceId);
     const doing = (resourceId: string, serviceId: string) =>
-      links.some((link) => link.resourceId === resourceId && link.serviceId === serviceId);
+      links.some((link) => link.resourceId === resourceId && link.serviceId === serviceId) &&
+      hosting(resourceId, serviceId);
     const bookableLocations = places
       .map((place) => {
         const here = staffed
@@ -134,7 +188,9 @@ export function publicRoutes({ db, config, guard, automations, payments, notific
               offered.some(
                 (link) => link.locationId === place.id && link.serviceId === service.id,
               ) &&
-              (here.length === 0 || here.some((resourceId) => doing(resourceId, service.id))),
+              (here.length === 0
+                ? hosting(null, service.id)
+                : here.some((resourceId) => doing(resourceId, service.id))),
           )
           .map((service) => service.id);
         return {
@@ -207,6 +263,8 @@ export function publicRoutes({ db, config, guard, automations, payments, notific
       discountAmount: appointment.discountAmount,
       currency: business.currency,
       location,
+      mode: appointment.mode,
+      meetingUrl: appointment.meetingUrl,
     };
   };
 
@@ -244,7 +302,9 @@ export function publicRoutes({ db, config, guard, automations, payments, notific
     new Hono<AppEnv>()
       .get("/businesses/:slug", async (c) => {
         const business = await findBusiness(c.req.param("slug"));
+        const link = await findLink(business, c.req.query("link"));
         return c.json({
+          link: link ? { slug: link.slug, name: link.name, description: link.description } : null,
           business: {
             name: business.name,
             slug: business.slug,
@@ -262,7 +322,7 @@ export function publicRoutes({ db, config, guard, automations, payments, notific
             pageTheme: business.pageTheme,
             ...(await imageUrls(db, business.id, business.slug)),
           },
-          ...(await loadCatalog(business)),
+          ...(await loadCatalog(business, link)),
         });
       })
 
@@ -340,16 +400,20 @@ export function publicRoutes({ db, config, guard, automations, payments, notific
 
       .get("/businesses/:slug/availability", async (c) => {
         const business = await findBusiness(c.req.param("slug"));
-        if (!(await agentKey(c, business)) && !guard.allow.availability(network(c))) {
+        const agent = Boolean(await agentKey(c, business));
+        if (!agent && !guard.allow.availability(network(c))) {
           throw apiError(429, "too_many_requests");
         }
-        const { serviceId = "", resourceId, locationId, from = "", to = "" } = c.req.query();
+        const { serviceId = "", resourceId, locationId, from = "", to = "", link } = c.req.query();
         if (!isDateString(from) || !isDateString(to) || to < from) {
           throw apiError(400, "invalid_range");
         }
         if (to > addDays(from, MAX_AVAILABILITY_DAYS)) throw apiError(400, "invalid_range");
         const location = await resolveLocation(db, business.id, locationId, { forBooking: true });
         const service = await findActiveService(business, serviceId);
+        if (!offered(service, await findLink(business, link), agent)) {
+          throw apiError(404, "service_not_found");
+        }
         const schedules = await loadSchedules(
           db,
           business,
@@ -358,18 +422,22 @@ export function publicRoutes({ db, config, guard, automations, payments, notific
           resourceId || null,
           from,
           to,
+          undefined,
+          service.mode === "online" ? await calendar.meetingHosts(business.id) : undefined,
         );
         const slots = slotsBetween(
           from,
           to,
-          service.durationMin,
+          service,
           schedules,
           bookingRules(business),
           Date.now(),
         );
         const days: Record<string, string[]> = {};
         const staff: Record<string, Record<string, string[]>> = {};
-        for (const [date, list] of Object.entries(slots)) {
+        for (const [date, all] of Object.entries(slots)) {
+          // Some free times stay hidden when the business wants to look busier.
+          const list = visibleSlots(all, date, business.hiddenSlotsPercent, business.id);
           days[date] = list.map((slot) => slot.time);
           staff[date] = Object.fromEntries(
             list.map((slot) => [
@@ -413,9 +481,13 @@ export function publicRoutes({ db, config, guard, automations, payments, notific
           forBooking: true,
         });
         const service = await findActiveService(business, input.serviceId);
+        const link = await findLink(business, input.link);
+        if (!offered(service, link, Boolean(key))) throw apiError(404, "service_not_found");
         const now = Date.now();
         const startsAt = zonedTimeToInstant(input.date, parseTime(input.time), business.timezone);
         const endsAt = startsAt + service.durationMin * 60_000;
+        const hosts =
+          service.mode === "online" ? await calendar.meetingHosts(business.id) : undefined;
         // An AI agent books for the customer and has no way to send them to pay.
         const takesPayment =
           !key && service.paymentMode !== "none" && (await payments.accepting(business.id));
@@ -491,13 +563,15 @@ export function publicRoutes({ db, config, guard, automations, payments, notific
             input.resourceId,
             input.date,
             input.date,
+            undefined,
+            hosts,
           );
-          const slot = slotsForDate(
+          // A time hidden to look busier can't be booked either.
+          const slot = visibleSlots(
+            slotsForDate(input.date, service, schedules, bookingRules(business), now),
             input.date,
-            service.durationMin,
-            schedules,
-            bookingRules(business),
-            now,
+            business.hiddenSlotsPercent,
+            business.id,
           ).find((candidate) => candidate.time === input.time);
           if (!slot) throw apiError(409, "slot_taken");
 
@@ -541,6 +615,11 @@ export function publicRoutes({ db, config, guard, automations, payments, notific
               answers,
               source: key ? "agent" : "online",
               sourceLabel: key?.name ?? null,
+              mode: service.mode,
+              bufferBeforeMin: service.bufferBeforeMin,
+              bufferAfterMin: service.bufferAfterMin,
+              bookingLinkId: link?.id ?? null,
+              bookingLinkName: link?.name ?? null,
               status: due > 0 ? "pending_payment" : "confirmed",
             })
             .returning();
@@ -579,6 +658,8 @@ export function publicRoutes({ db, config, guard, automations, payments, notific
             resumed ? 200 : 201,
           );
         }
+        // First, so the call's link is in the confirmation and on the page.
+        view.meetingUrl = (await calendar.appointmentChanged(appointment.id)).meetingUrl;
         await automations.emit(appointment.id, "created");
         await notifications.appointmentBooked(appointment.id, null);
         return c.json({ appointment: view, payment: null }, 201);
@@ -614,6 +695,7 @@ export function publicRoutes({ db, config, guard, automations, payments, notific
             name: location?.name ?? null,
             address: location?.address ?? business.address,
           },
+          meetingUrl: appointment.meetingUrl,
           startsAt: appointment.startsAt,
           endsAt: appointment.endsAt,
           language: business.locale,

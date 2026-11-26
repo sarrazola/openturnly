@@ -17,6 +17,7 @@ import {
   PRODUCT_UNITS,
   SALE_ITEM_KINDS,
   SALE_PAYMENT_METHODS,
+  SERVICE_MODES,
   SERVICE_PAYMENT_MODES,
   STOCK_MOVEMENT_KINDS,
 } from "@openturnly/core";
@@ -167,6 +168,10 @@ export const businesses = pgTable("businesses", {
   minNoticeMin: integer("min_notice_min").notNull().default(60),
   /** Customers can book up to this many days ahead. */
   maxAdvanceDays: integer("max_advance_days").notNull().default(30),
+  /** Of the free times, how many the booking page hides (percent) to look busier. */
+  hiddenSlotsPercent: integer("hidden_slots_percent").notNull().default(0),
+  /** Most appointments a day per professional on the booking page; null: no limit. */
+  maxDailyAppointments: integer("max_daily_appointments"),
   /** Closed on public holidays unless a holiday is listed in holiday_overrides. */
   closedOnHolidays: boolean("closed_on_holidays").notNull().default(true),
   /**
@@ -311,6 +316,13 @@ export const services = pgTable(
     paymentMode: text("payment_mode", { enum: SERVICE_PAYMENT_MODES }).notNull().default("none"),
     /** With `paymentMode` "deposit": how much, in minor units. */
     depositAmount: bigint("deposit_amount", { mode: "number" }),
+    /** In person, or on a video call (see lib/calendar-sync.ts). */
+    mode: text("mode", { enum: SERVICE_MODES }).notNull().default("in_person"),
+    /** Minutes the professional keeps free before and after it. */
+    bufferBeforeMin: integer("buffer_before_min").notNull().default(0),
+    bufferAfterMin: integer("buffer_after_min").notNull().default(0),
+    /** On the main booking page; otherwise only through the booking links that offer it. */
+    listed: boolean("listed").notNull().default(true),
     active: boolean("active").notNull().default(true),
     position: integer("position").notNull().default(0),
     createdAt: createdAt(),
@@ -336,6 +348,8 @@ export const resources = pgTable(
     /** Percent of each service and each product they sell that is theirs (commissions). */
     serviceCommission: doublePrecision("service_commission").notNull().default(0),
     productCommission: doublePrecision("product_commission").notNull().default(0),
+    /** Most appointments a day on the booking page; null: the business's limit. */
+    maxDailyAppointments: integer("max_daily_appointments"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -370,6 +384,29 @@ export const resourceServices = pgTable(
     primaryKey({ columns: [table.resourceId, table.serviceId] }),
     index("resource_services_service_id_idx").on(table.serviceId),
   ],
+);
+
+/**
+ * Another way into the same agenda (`/<business>/<slug>`), offering some services. It holds no
+ * availability of its own: bookings through it take the professionals' time like any other.
+ */
+export const bookingLinks = pgTable(
+  "booking_links",
+  {
+    id: id(),
+    businessId: text("business_id")
+      .notNull()
+      .references(() => businesses.id, { onDelete: "cascade" }),
+    slug: text("slug").notNull(),
+    name: text("name").notNull(),
+    description: text("description"),
+    /** The services it offers, in this order; ids of deleted ones are skipped. */
+    serviceIds: jsonb("service_ids").$type<string[]>().notNull().default([]),
+    active: boolean("active").notNull().default(true),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [uniqueIndex("booking_links_business_slug_idx").on(table.businessId, table.slug)],
 );
 
 /** Which services each location offers. */
@@ -559,6 +596,18 @@ export const appointments = pgTable(
     source: text("source", { enum: APPOINTMENT_SOURCES }).notNull().default("online"),
     /** For agent bookings: the name of the access key used. */
     sourceLabel: text("source_label"),
+    /** The service's mode when it was booked: an online one happens on a video call. */
+    mode: text("mode", { enum: SERVICE_MODES }).notNull().default("in_person"),
+    /** The video call's link, once the professional's calendar has created it. */
+    meetingUrl: text("meeting_url"),
+    /** The service's margins when it was booked: the professional is busy during them too. */
+    bufferBeforeMin: integer("buffer_before_min").notNull().default(0),
+    bufferAfterMin: integer("buffer_after_min").notNull().default(0),
+    /** The booking link it came through, and that link's name then; null: the main page. */
+    bookingLinkId: text("booking_link_id").references((): AnyPgColumn => bookingLinks.id, {
+      onDelete: "set null",
+    }),
+    bookingLinkName: text("booking_link_name"),
     cancelledAt: instant("cancelled_at"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -1271,6 +1320,107 @@ export const surveys = pgTable(
   ],
 );
 
+// ---------------------------------------------------------------------------
+// Calendars people connect, where their appointments are copied (lib/calendar-sync.ts).
+// ---------------------------------------------------------------------------
+
+export const CALENDAR_PROVIDERS = ["google"] as const;
+/** "disconnected": the provider stopped accepting the stored grant; it takes connecting again. */
+export const CALENDAR_CONNECTION_STATUSES = ["connected", "disconnected"] as const;
+
+/**
+ * A person's own calendar account. The tokens are encrypted (see lib/secrets.ts) and never
+ * leave the server. One per person and provider.
+ */
+export const calendarConnections = pgTable(
+  "calendar_connections",
+  {
+    id: id(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    provider: text("provider", { enum: CALENDAR_PROVIDERS }).notNull().default("google"),
+    /** The provider's id for the account, and its address as shown to the person. */
+    accountId: text("account_id").notNull(),
+    accountEmail: text("account_email"),
+    encryptedRefreshToken: text("encrypted_refresh_token").notNull(),
+    encryptedAccessToken: text("encrypted_access_token"),
+    accessTokenExpiresAt: instant("access_token_expires_at"),
+    status: text("status", { enum: CALENDAR_CONNECTION_STATUSES }).notNull().default("connected"),
+    lastError: text("last_error"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("calendar_connections_user_provider_idx").on(table.userId, table.provider),
+  ],
+);
+
+/**
+ * One business whose appointments go to a connection: a calendar of its own in the person's
+ * account, named after the business.
+ */
+export const calendarTargets = pgTable(
+  "calendar_targets",
+  {
+    id: id(),
+    connectionId: text("connection_id")
+      .notNull()
+      .references(() => calendarConnections.id, { onDelete: "cascade" }),
+    businessId: text("business_id")
+      .notNull()
+      .references(() => businesses.id, { onDelete: "cascade" }),
+    /** The calendar created in the person's account; null until it exists. */
+    externalCalendarId: text("external_calendar_id"),
+    /** The name it was given, so it follows the business when it's renamed. */
+    calendarName: text("calendar_name"),
+    /** Owners and admins: only these professionals' appointments; null: everyone's. */
+    resourceIds: jsonb("resource_ids").$type<string[]>(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("calendar_targets_connection_business_idx").on(
+      table.connectionId,
+      table.businessId,
+    ),
+    index("calendar_targets_business_idx").on(table.businessId),
+  ],
+);
+
+/** An appointment's copy in one calendar, and whether that copy is behind. */
+export const calendarEvents = pgTable(
+  "calendar_events",
+  {
+    id: id(),
+    targetId: text("target_id")
+      .notNull()
+      .references(() => calendarTargets.id, { onDelete: "cascade" }),
+    appointmentId: text("appointment_id")
+      .notNull()
+      .references(() => appointments.id, { onDelete: "cascade" }),
+    externalEventId: text("external_event_id"),
+    /**
+     * This copy carries the video call and invites the customer, so the provider tells them
+     * when it moves or goes away.
+     */
+    withGuest: boolean("with_guest").notNull().default(false),
+    /** What was last written ("<starts>|<ends>|<hash>"), to skip writes that change nothing. */
+    syncedHash: text("synced_hash"),
+    /** When the copy has to be written again; null: it's up to date. */
+    dueAt: instant("due_at"),
+    attempts: integer("attempts").notNull().default(0),
+    lastError: text("last_error"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("calendar_events_target_appointment_idx").on(table.targetId, table.appointmentId),
+    index("calendar_events_appointment_idx").on(table.appointmentId),
+    index("calendar_events_due_idx").on(table.dueAt),
+  ],
+);
+
 export type User = typeof users.$inferSelect;
 export type Business = typeof businesses.$inferSelect;
 export type Location = typeof locations.$inferSelect;
@@ -1294,3 +1444,7 @@ export type SmsConnection = typeof smsConnections.$inferSelect;
 export type Device = typeof devices.$inferSelect;
 export type Notification = typeof notifications.$inferSelect;
 export type Survey = typeof surveys.$inferSelect;
+export type BookingLink = typeof bookingLinks.$inferSelect;
+export type CalendarConnection = typeof calendarConnections.$inferSelect;
+export type CalendarTarget = typeof calendarTargets.$inferSelect;
+export type CalendarEvent = typeof calendarEvents.$inferSelect;

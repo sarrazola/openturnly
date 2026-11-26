@@ -2,10 +2,14 @@ import type { BookingInput } from "@openturnly/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, api, type BookingResult, type PaymentState, type PublicCatalog } from "./api.ts";
 
-export function usePublicCatalog(slug: string) {
+/** The booking page, or one of the business's booking links (`link`, its slug). */
+export function usePublicCatalog(slug: string, link?: string) {
   return useQuery({
-    queryKey: ["public", slug],
-    queryFn: () => api<PublicCatalog>(`/api/public/businesses/${slug}`),
+    queryKey: ["public", slug, link ?? null],
+    queryFn: () =>
+      api<PublicCatalog>(
+        `/api/public/businesses/${slug}${link ? `?link=${encodeURIComponent(link)}` : ""}`,
+      ),
     retry: false,
   });
 }
@@ -18,6 +22,8 @@ export function useAvailability(
     resourceId: string | null;
     from: string;
     to: string;
+    /** Booking through one of the business's booking links. */
+    link?: string | null;
   } | null,
 ) {
   return useQuery({
@@ -30,6 +36,7 @@ export function useAvailability(
         resourceId: params?.resourceId ?? "",
         from: params?.from ?? "",
         to: params?.to ?? "",
+        ...(params?.link ? { link: params.link } : {}),
       });
       // days: free times per date; staff: who is free at each of those times.
       return api<{

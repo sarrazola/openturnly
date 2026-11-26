@@ -447,6 +447,8 @@ export const es = {
         previous_date: "Fecha anterior",
         previous_time: "Hora anterior",
         survey_link: "Enlace de la encuesta",
+        meeting_link: "Enlace de la videollamada",
+        booking_link: "Enlace de reserva usado",
       },
       customer: {
         name: "Nombre completo",
@@ -695,6 +697,7 @@ export const es = {
     sales: "Ventas",
     locations: "Locales",
     services: "Servicios",
+    bookingLinks: "Enlaces de reserva",
     customers: "Clientes",
     professionals: "Profesionales",
     hours: "Horarios",
@@ -880,6 +883,82 @@ export const es = {
       },
     },
   },
+  bookingLinks: {
+    title: "Enlaces de reserva",
+    subtitle:
+      "Más formas de entrar a la misma agenda. Cada enlace tiene su nombre y sus servicios, y lo que reservan por él aparece en tu agenda con ese nombre.",
+    new: "Nuevo enlace",
+    edit: "Editar enlace",
+    formHint:
+      "Usa la misma disponibilidad de tu equipo: lo que se reserve aquí ocupa ese horario en todas partes.",
+    colLink: "Enlace",
+    colServices: "Servicios",
+    colStatus: "Estado",
+    on: "Activo",
+    off: "Apagado",
+    search: "Buscar enlace…",
+    emptyTitle: "Aún no tienes enlaces de reserva",
+    emptyBody:
+      'Crea uno por cada tipo de cliente o de cita, como "Clientes" o "Interesados", con sus propios servicios. Todos usan la misma agenda.',
+    name: "Nombre",
+    nameHint:
+      "Así aparece en la página y en tu agenda, junto a cada cita que llegue por este enlace.",
+    namePlaceholder: "Interesados",
+    address: "Dirección",
+    copy: "Enlace para compartir",
+    description: "Descripción",
+    descriptionHint: "Lo que ve el cliente arriba de los servicios.",
+    services: "Servicios que ofrece",
+    servicesRequired: "Elige al menos un servicio.",
+    active: "Activo",
+    activeHint:
+      "Apagado, el enlace deja de funcionar. Las citas que ya llegaron por él no cambian.",
+    created: "Enlace creado",
+    deleted: "Enlace eliminado",
+    deleteTitle: "¿Eliminar el enlace {{name}}?",
+    deleteBody:
+      "Deja de funcionar. Las citas que llegaron por él conservan su nombre en la agenda.",
+    bookedThrough: "Enlace",
+  },
+  calendarSync: {
+    title: "Google Calendar",
+    description:
+      "Tus citas aparecen solas en tu Google Calendar, en un calendario con el nombre de cada negocio.",
+    pitch:
+      "Conecta tu cuenta de Google y cada cita que agenden contigo queda en tu calendario. Los servicios en línea crean su videollamada de Google Meet.",
+    connect: "Conectar Google Calendar",
+    reconnect: "Conectar otra vez",
+    reconnectHint:
+      "Google dejó de aceptar el acceso. Conéctalo otra vez para seguir recibiendo tus citas.",
+    connectedAs: "Conectado como {{email}}",
+    status: { connected: "Conectado", disconnected: "Sin acceso" },
+    toggle: "Enviar las citas de {{name}}",
+    ownAppointments: "Tus citas",
+    off: "No se envían",
+    everyone: "Las citas de todo el equipo",
+    some_one: "Las citas de {{count}} profesional",
+    some_other: "Las citas de {{count}} profesionales",
+    everyoneOption: "Todo el equipo",
+    someOption: "Elegir profesionales",
+    professionals: "Profesionales",
+    failing_one: "{{count}} cita sin copiar",
+    failing_other: "{{count}} citas sin copiar",
+    disconnect: "Desconectar",
+    disconnectTitle: "Desconectar Google Calendar",
+    disconnectHint: "Las citas dejan de llegar a tu calendario.",
+    disconnectBody:
+      "¿Qué hacemos con los calendarios de tus negocios en Google? Si los borras, se van con todas sus citas.",
+    keepCalendars: "Conservarlos",
+    deleteCalendars: "Borrarlos",
+    outcomes: {
+      connected: "Google Calendar conectado",
+      denied: "No diste el permiso en Google",
+      calendar_not_allowed: "Falta marcar el permiso del calendario en Google. Inténtalo otra vez.",
+      expired: "La conexión tardó mucho. Inténtalo otra vez.",
+      signed_out: "Entra con tu cuenta y vuelve a conectar Google Calendar.",
+      failed: "No pudimos conectar Google Calendar. Inténtalo otra vez.",
+    },
+  },
   account: {
     title: "Mi cuenta",
     subtitle: "Tus datos para entrar a OpenTurnly.",
@@ -1009,6 +1088,10 @@ export const es = {
     delete: "Eliminar negocio",
   },
   agenda: {
+    meeting: "Videollamada de Google Meet",
+    joinMeeting: "Unirse",
+    meetingMissing:
+      "Esta cita es en línea y aún no tiene videollamada: se crea cuando el profesional conecta su Google Calendar en Mi cuenta.",
     sourceAgent: "Agente IA",
     bookedVia: "Agendada por",
     surge: {
@@ -1862,6 +1945,21 @@ export const es = {
       "Lo reintentamos cada hora. Revisa que tu cuenta de Mercado Pago tenga saldo disponible.",
   },
   services: {
+    bufferBefore: "Margen antes",
+    bufferAfter: "Margen después",
+    bufferHint:
+      "Tiempo libre antes y después de cada cita, para preparar o tomar notas. Nadie puede reservar con el profesional en ese rato.",
+    bufferNone: "Sin margen",
+    listed: "En tu página de reservas",
+    listedHint: "Apagado, solo se puede reservar desde los enlaces de reserva que lo ofrezcan.",
+    onlyLinks: "Solo por enlace",
+    modeLabel: "Dónde se atiende",
+    modes: { in_person: "Presencial", online: "En línea (Google Meet)" },
+    modeHints: {
+      in_person: "En la sede donde se reserva.",
+      online:
+        "Al reservar, el Google Calendar del profesional crea la videollamada y le envía la invitación al cliente. En tu página de reservas solo aparece con quienes lo tengan conectado en Mi cuenta.",
+    },
     paymentLabel: "Cobro en línea",
     paymentConnectFirst: "Conecta Mercado Pago en Configuración → Pagos para cobrar al reservar.",
     paymentModes: {
@@ -1933,6 +2031,14 @@ export const es = {
     servicesLabel: "Servicios que realiza",
     serviceCommission: "Comisión por servicios",
     productCommission: "Comisión por productos",
+    dailyLimit: "Máximo de citas por día",
+    dailyLimitDefault: "El del negocio",
+    dailyLimitHint:
+      "En tu página de reservas. El negocio no tiene un máximo (Horarios → Reservas en línea).",
+    dailyLimitBusiness_one:
+      "En tu página de reservas. El del negocio es {{count}} cita (Horarios → Reservas en línea).",
+    dailyLimitBusiness_other:
+      "En tu página de reservas. El del negocio es {{count}} citas (Horarios → Reservas en línea).",
     locationsLabel: "Locales donde atiende",
     colLocations: "Locales",
     ownHoursAt: "Horario propio en {{name}}",
@@ -1953,6 +2059,18 @@ export const es = {
       "Hasta cuándo un cliente puede mover o cancelar su cita por su cuenta (con un agente de IA).",
     customerChangesNever: "Solo el negocio",
     customerChangesAnytime: "Hasta la hora de la cita",
+    dailyLimit: "Máximo de citas por día",
+    dailyLimitHint:
+      "Por profesional, en tu página de reservas. Al llegar al máximo no se ofrecen más horarios ese día; tu equipo sí puede agendar desde la agenda. Cada profesional puede tener el suyo.",
+    dailyLimitNone: "Sin límite",
+    dailyLimitCount_one: "{{count}} cita",
+    dailyLimitCount_other: "{{count}} citas",
+    hiddenSlots: "Mostrar menos horarios",
+    hiddenSlotsHint: "Esconde parte de tus horarios libres para que tu agenda no se vea vacía.",
+    hiddenSlotsTip:
+      "En tu página de reservas se esconde este porcentaje de tus horarios libres, siempre los mismos de cada día y nunca un día completo. Los horarios escondidos no se pueden reservar. Tu equipo sigue viendo todo en la agenda.",
+    hiddenSlotsNone: "No esconder",
+    hiddenSlotsPercent: "Esconder {{percent}} %",
     customerChangesUntil: "Hasta {{notice}} antes",
     title: "Horarios",
     tabs: {
@@ -2087,6 +2205,11 @@ export const es = {
     revoked: "Invitación cancelada",
   },
   booking: {
+    online: "En línea",
+    place: "Lugar",
+    onlinePlace: "En línea, por Google Meet",
+    joinMeeting: "Unirse a la videollamada",
+    meetingSoon: "Te enviaremos el enlace de la videollamada antes de la cita.",
     birthDay: "Día",
     birthMonth: "Mes",
     birthYear: "Año",

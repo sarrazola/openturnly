@@ -10,6 +10,7 @@ import {
   Clock3,
   Contact,
   Gift,
+  Link2,
   MapPin,
   Menu,
   Package,
@@ -210,6 +211,7 @@ function SidebarContent({ user, collapsed }: { user: User; collapsed: boolean })
                 tour: "admin",
                 children: [
                   leaf("/services", t("nav.services"), Scissors, "services"),
+                  leaf("/booking-links", t("nav.bookingLinks"), Link2, "booking-links"),
                   leaf("/professionals", t("nav.professionals"), Users, "professionals"),
                   leaf("/locations", t("nav.locations"), MapPin, "locations"),
                   leaf("/hours", t("nav.hours"), Clock3, "hours"),

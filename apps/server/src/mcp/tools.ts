@@ -1,5 +1,5 @@
 import type { McpServer } from "@modelcontextprotocol/server";
-import { addDays, slotsBetween, todayIn } from "@openturnly/core";
+import { addDays, slotsBetween, todayIn, visibleSlots } from "@openturnly/core";
 import { and, asc, eq, gte, isNull, lte } from "drizzle-orm";
 import { z } from "zod";
 import {
@@ -55,6 +55,8 @@ type Catalog = {
     description: string | null;
     durationMin: number;
     priceAmount: number | null;
+    /** "online": on a video call whose link the booking returns. */
+    mode: "in_person" | "online";
     active?: boolean;
   }[];
   professionals: { id: string; name: string; serviceIds: string[]; active?: boolean }[];
@@ -142,9 +144,23 @@ export function registerTools(server: McpServer, ctx: ToolContext) {
       professionalId ?? null,
       from,
       to,
+      undefined,
+      // Customers get online services only with whoever can host the call, as on the page.
+      !admin && service.mode === "online"
+        ? await ctx.calendar.meetingHosts(business.id)
+        : undefined,
     );
     const rules = admin ? staffRules(business) : bookingRules(business);
-    const slots = slotsBetween(from, to, service.durationMin, schedules, rules, Date.now());
+    const all = slotsBetween(from, to, service, schedules, rules, Date.now());
+    // Customers' agents see what the booking page shows: none of the times hidden to look busier.
+    const slots = admin
+      ? all
+      : Object.fromEntries(
+          Object.entries(all).map(([day, list]) => [
+            day,
+            visibleSlots(list, day, business.hiddenSlotsPercent, business.id),
+          ]),
+        );
     return {
       location: { id: location.id, name: location.name },
       service: { id: service.id, name: service.name, duration_minutes: service.durationMin },
@@ -310,6 +326,7 @@ export function registerTools(server: McpServer, ctx: ToolContext) {
         description: service.description,
         duration_minutes: service.durationMin,
         ...priceView(service.priceAmount, business.currency),
+        ...(service.mode === "online" ? { online: true } : {}),
         ...(admin ? { active: service.active } : {}),
         professionals: catalog.professionals
           .filter((member) => member.serviceIds.includes(service.id))
@@ -675,6 +692,7 @@ export function registerTools(server: McpServer, ctx: ToolContext) {
           },
           bookingRules(business),
         );
+        await ctx.calendar.appointmentChanged(moved.id);
         await ctx.automations.emit(moved.id, "rescheduled", appointment.startsAt);
         await ctx.notifications.appointmentRescheduled(moved.id, appointment, null);
         return { moved: true, ...appointmentView(business, moved) };
@@ -702,6 +720,7 @@ export function registerTools(server: McpServer, ctx: ToolContext) {
           .set({ status: "cancelled", cancelledAt: new Date() })
           .where(eq(appointments.id, appointment.id))
           .returning();
+        await ctx.calendar.appointmentChanged(appointment.id);
         await ctx.automations.emit(appointment.id, "cancelled");
         await ctx.notifications.appointmentCancelled(appointment.id, null);
         return { cancelled: true, ...appointmentView(business, cancelled ?? appointment) };

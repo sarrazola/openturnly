@@ -34,6 +34,19 @@ export type SmsDefaults = {
   sender: string;
 };
 
+/** The install's Google Cloud OAuth client, for people to connect their own Google Calendar. */
+export type GoogleSettings = {
+  clientId: string;
+  clientSecret: string;
+  /**
+   * Where Google sends people back after they allow access. Registered in the OAuth client
+   * exactly as written. By default this install's own address; an install reached under
+   * several hostnames registers one of them and passes the rest through it (see
+   * lib/google-calendar.ts, `returnOrigin`).
+   */
+  redirectUrl: string;
+};
+
 export type Config = {
   isProduction: boolean;
   port: number;
@@ -70,6 +83,12 @@ export type Config = {
   whatsappApiUrl: string;
   /** Where Mercado Pago's API lives. */
   mercadopagoApiUrl: string;
+  /** Set with GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET; null without them. */
+  google: GoogleSettings | null;
+  /** Where Google issues and revokes tokens. */
+  googleOauthUrl: string;
+  /** Where Google's APIs live (Calendar). */
+  googleApiUrl: string;
   /** How notifications reach the phone apps: PUSH_PROVIDER, "none" unless set. */
   push: PushSettings;
   /**
@@ -85,6 +104,8 @@ const VITE_DEV_ORIGIN = "http://localhost:5173";
 const WHATSAPP_API_URL = "https://graph.facebook.com/v25.0";
 const MERCADOPAGO_API_URL = "https://api.mercadopago.com";
 const TWILIO_API_URL = "https://api.twilio.com";
+const GOOGLE_OAUTH_URL = "https://oauth2.googleapis.com";
+const GOOGLE_API_URL = "https://www.googleapis.com";
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const isProduction = env.NODE_ENV === "production";
@@ -120,7 +141,20 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     whatsappApiUrl: (env.WHATSAPP_API_URL || WHATSAPP_API_URL).replace(/\/+$/, ""),
     whatsappCallbackTag: env.WHATSAPP_CALLBACK_TAG || null,
     mercadopagoApiUrl: (env.MERCADOPAGO_API_URL || MERCADOPAGO_API_URL).replace(/\/+$/, ""),
+    google: loadGoogleSettings(env, appUrl),
+    googleOauthUrl: (env.GOOGLE_OAUTH_URL || GOOGLE_OAUTH_URL).replace(/\/+$/, ""),
+    googleApiUrl: (env.GOOGLE_API_URL || GOOGLE_API_URL).replace(/\/+$/, ""),
     push: loadPushSettings(env),
+  };
+}
+
+function loadGoogleSettings(env: NodeJS.ProcessEnv, appUrl: string): GoogleSettings | null {
+  const { GOOGLE_CLIENT_ID: clientId, GOOGLE_CLIENT_SECRET: clientSecret } = env;
+  if (!clientId || !clientSecret) return null;
+  return {
+    clientId,
+    clientSecret,
+    redirectUrl: env.GOOGLE_REDIRECT_URL || `${appUrl}/api/integrations/google/callback`,
   };
 }
 

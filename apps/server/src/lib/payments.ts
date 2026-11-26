@@ -282,7 +282,12 @@ export function createPayments({
     const durationMin = (appointment.endsAt.getTime() - appointment.startsAt.getTime()) / 60_000;
     // The customer booked in time: only whether it's still free counts, not the notice.
     const rules = { ...bookingRules(business), minNoticeMin: 0 };
-    return slotsForDate(date, durationMin, schedules, rules, now).some(
+    const timing = {
+      durationMin,
+      bufferBeforeMin: appointment.bufferBeforeMin,
+      bufferAfterMin: appointment.bufferAfterMin,
+    };
+    return slotsForDate(date, timing, schedules, rules, now).some(
       (slot) => slot.start === appointment.startsAt.getTime(),
     );
   };
