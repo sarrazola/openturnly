@@ -357,6 +357,13 @@ export type BusinessUpdateInput = z.infer<typeof businessUpdateSchema>;
 
 // --- Catalog --------------------------------------------------------------
 
+/**
+ * Where a service happens: at one of the business's locations, or on a video call that
+ * the professional's connected calendar creates when it's booked.
+ */
+export const SERVICE_MODES = ["in_person", "online"] as const;
+export type ServiceMode = (typeof SERVICE_MODES)[number];
+
 export const serviceSchema = z.object({
   name: z.string().trim().min(1).max(120),
   description: optionalText(1000),
@@ -370,6 +377,7 @@ export const serviceSchema = z.object({
   paymentMode: z.enum(SERVICE_PAYMENT_MODES).optional(),
   /** With `paymentMode` "deposit": how much, in minor units. */
   depositAmount: z.number().int().min(0).max(1e12).nullable().optional(),
+  mode: z.enum(SERVICE_MODES).optional(),
   active: z.boolean().default(true),
   /** Where it is offered. Left out when creating: every location. */
   locationIds: z.array(z.string().min(1)).max(200).optional(),
@@ -790,6 +798,7 @@ export const AUTOMATION_FIELDS = {
     "appointment.previous_date",
     "appointment.previous_time",
     "appointment.survey_link",
+    "appointment.meeting_link",
   ],
   customer: [
     "customer.name",
@@ -1354,6 +1363,18 @@ export const passwordChangeSchema = z.object({
   newPassword: password,
 });
 export type PasswordChangeInput = z.input<typeof passwordChangeSchema>;
+
+/**
+ * Whether one business's appointments go to the person's connected calendar and, for its
+ * owners and admins, whose: these professionals, or everyone's when null. A professional
+ * always gets their own appointments.
+ */
+export const calendarTargetSchema = z.object({
+  businessId: z.string().min(1),
+  enabled: z.boolean(),
+  resourceIds: z.array(z.string().min(1)).max(500).nullable().optional(),
+});
+export type CalendarTargetInput = z.input<typeof calendarTargetSchema>;
 
 /**
  * The guided tours of the admin: "welcome" walks through every section the first time, and

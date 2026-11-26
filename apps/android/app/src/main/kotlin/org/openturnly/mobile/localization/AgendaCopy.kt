@@ -50,6 +50,12 @@ object AgendaCopy {
     val gone get() = tr("This appointment is no longer in the calendar.", "Esta cita ya no está en la agenda.")
     val noProfessional get() = tr("No staff member", "Sin profesional")
     val bookedVia get() = tr("Booked via", "Agendada por")
+    val meeting get() = tr("Google Meet video call", "Videollamada de Google Meet")
+    val joinMeeting get() = tr("Join", "Unirse")
+    val meetingMissing get() = tr(
+        "This appointment is online and has no video call yet: it's made once the staff member connects Google Calendar in My account on the web.",
+        "Esta cita es en línea y aún no tiene videollamada: se crea cuando el profesional conecta Google Calendar en Mi cuenta, en la web.",
+    )
     val bookedOn get() = tr("Booked on", "Reservada el")
     fun source(source: String, label: String?) = when (source) {
         "online" -> tr("Booking page", "Página de reservas")

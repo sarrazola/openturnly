@@ -450,6 +450,7 @@ export const en: Messages<typeof es> = {
         previous_date: "Previous date",
         previous_time: "Previous time",
         survey_link: "Survey link",
+        meeting_link: "Video call link",
       },
       customer: {
         name: "Full name",
@@ -881,6 +882,45 @@ export const en: Messages<typeof es> = {
       },
     },
   },
+  calendarSync: {
+    title: "Google Calendar",
+    description:
+      "Your appointments show up in your Google Calendar, in a calendar named after each business.",
+    pitch:
+      "Connect your Google account and every appointment booked with you lands in your calendar. Online services get their Google Meet video call.",
+    connect: "Connect Google Calendar",
+    reconnect: "Connect again",
+    reconnectHint:
+      "Google stopped accepting the access. Connect it again to keep getting your appointments.",
+    connectedAs: "Connected as {{email}}",
+    status: { connected: "Connected", disconnected: "No access" },
+    toggle: "Send {{name}}'s appointments",
+    ownAppointments: "Your appointments",
+    off: "Not sent",
+    everyone: "The whole team's appointments",
+    some_one: "{{count}} professional's appointments",
+    some_other: "{{count}} professionals' appointments",
+    everyoneOption: "Whole team",
+    someOption: "Choose professionals",
+    professionals: "Professionals",
+    failing_one: "{{count}} appointment not copied",
+    failing_other: "{{count}} appointments not copied",
+    disconnect: "Disconnect",
+    disconnectTitle: "Disconnect Google Calendar",
+    disconnectHint: "Appointments stop arriving in your calendar.",
+    disconnectBody:
+      "What should happen to your businesses' calendars in Google? Deleting them takes all their appointments with them.",
+    keepCalendars: "Keep them",
+    deleteCalendars: "Delete them",
+    outcomes: {
+      connected: "Google Calendar connected",
+      denied: "You didn't give the permission in Google",
+      calendar_not_allowed: "The calendar permission wasn't ticked in Google. Try again.",
+      expired: "Connecting took too long. Try again.",
+      signed_out: "Sign in and connect Google Calendar again.",
+      failed: "We couldn't connect Google Calendar. Try again.",
+    },
+  },
   account: {
     title: "My account",
     subtitle: "Your details to sign in to OpenTurnly.",
@@ -1013,6 +1053,10 @@ export const en: Messages<typeof es> = {
     delete: "Delete business",
   },
   agenda: {
+    meeting: "Google Meet video call",
+    joinMeeting: "Join",
+    meetingMissing:
+      "This appointment is online and has no video call yet: it's made once the professional connects their Google Calendar in My account.",
     sourceAgent: "AI agent",
     bookedVia: "Booked via",
     surge: {
@@ -1849,6 +1893,13 @@ export const en: Messages<typeof es> = {
       "We try again every hour. Check that your Mercado Pago account has available balance.",
   },
   services: {
+    modeLabel: "Where it happens",
+    modes: { in_person: "In person", online: "Online (Google Meet)" },
+    modeHints: {
+      in_person: "At the location where it's booked.",
+      online:
+        "When it's booked, the professional's Google Calendar makes the video call and invites the customer. Your booking page only offers it with people who connected it in My account.",
+    },
     paymentLabel: "Online payment",
     paymentConnectFirst: "Connect Mercado Pago in Settings → Payments to charge at booking.",
     paymentModes: {
@@ -2073,6 +2124,11 @@ export const en: Messages<typeof es> = {
     revoked: "Invitation cancelled",
   },
   booking: {
+    online: "Online",
+    place: "Place",
+    onlinePlace: "Online, on Google Meet",
+    joinMeeting: "Join the video call",
+    meetingSoon: "We'll send you the video call link before the appointment.",
     birthDay: "Day",
     birthMonth: "Month",
     birthYear: "Year",

@@ -267,6 +267,13 @@
       "when": 1794274147036,
       "tag": "0037_delivery_channels",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1795660276536,
+      "tag": "0038_connected_calendars",
+      "breakpoints": true
     }
   ]
 }

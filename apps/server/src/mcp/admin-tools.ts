@@ -276,6 +276,7 @@ export function registerAdminTools(tool: Tool, ctx: ToolContext) {
     description: string | null;
     durationMin: number;
     priceAmount: number | null;
+    mode: "in_person" | "online";
     active: boolean;
   }) => ({
     id: service.id,
@@ -283,6 +284,7 @@ export function registerAdminTools(tool: Tool, ctx: ToolContext) {
     description: service.description,
     duration_minutes: service.durationMin,
     ...priceView(service.priceAmount, business.currency),
+    online: service.mode === "online",
     active: service.active,
   });
 
@@ -296,6 +298,10 @@ export function registerAdminTools(tool: Tool, ctx: ToolContext) {
         duration_minutes: z.number().int().min(5).max(600),
         price: z.number().min(0),
         description: z.string().optional(),
+        online: z
+          .boolean()
+          .optional()
+          .describe("On a Google Meet video call made by the professional's connected calendar"),
       }),
     },
     async (args) => {
@@ -307,6 +313,7 @@ export function registerAdminTools(tool: Tool, ctx: ToolContext) {
           durationMin: args.duration_minutes,
           priceAmount: money(args.price),
           description: args.description ?? null,
+          ...(args.online ? { mode: "online" } : {}),
         },
       );
       return serviceResult(service);
@@ -325,6 +332,7 @@ export function registerAdminTools(tool: Tool, ctx: ToolContext) {
         duration_minutes: z.number().int().min(5).max(600).optional(),
         price: z.number().min(0).optional(),
         description: z.string().nullable().optional(),
+        online: z.boolean().optional(),
         active: z.boolean().optional(),
       }),
     },
@@ -335,6 +343,7 @@ export function registerAdminTools(tool: Tool, ctx: ToolContext) {
           durationMin: args.duration_minutes,
           priceAmount: args.price === undefined ? undefined : money(args.price),
           description: args.description,
+          mode: args.online === undefined ? undefined : args.online ? "online" : "in_person",
           active: args.active,
         }).filter(([, value]) => value !== undefined),
       );

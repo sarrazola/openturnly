@@ -179,6 +179,9 @@ struct Appointment: Decodable, Identifiable, Hashable {
     let answers: [BookingAnswer]?
     let source: String?
     let sourceLabel: String?
+    /// "online": on a video call; its link arrives once the professional's calendar made it.
+    let mode: String?
+    let meetingUrl: String?
     let createdAt: Date?
     let cancelledAt: Date?
     let customer: AppointmentCustomer

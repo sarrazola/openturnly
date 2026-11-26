@@ -133,6 +133,9 @@ updates, read the [self-hosting guide](docs/self-hosting.md), or follow the
   ([docs/sms.md](docs/sms.md)).
 - **Online payments** at booking, a deposit or the full price, straight to the business's own
   Mercado Pago account ([docs/payments.md](docs/payments.md)).
+- **Google Calendar** for each person on the team, in a calendar per business, and **online
+  services** with a Google Meet call made when they're booked
+  ([docs/google-calendar.md](docs/google-calendar.md)).
 - **Protection against fake bookings**: self-hosted proof of work (ALTCHA), rate limits and
   a surge brake per business. No third-party service needed.
 

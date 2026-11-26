@@ -6,6 +6,23 @@ All notable changes to OpenTurnly are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Google Calendar**: each person connects their own Google account in **My account**, and
+  their appointments are copied to a calendar named after each business, created in that
+  account. Professionals get their own appointments; owners and admins choose whose. New,
+  moved and cancelled appointments are written while the change is made, and retried when
+  Google doesn't answer. Only `calendar.app.created` is asked for, so the install reaches only
+  the calendars it creates. Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`
+  ([docs/google-calendar.md](docs/google-calendar.md)).
+- **Online services**: a service can happen on a Google Meet call. The professional's calendar
+  makes the call when it's booked and invites the customer; its link shows on the booking page,
+  in the agenda and the phone apps, and in messages as `{{appointment.meeting_link}}` (and in
+  place of the address). The booking page offers an online service only with professionals
+  whose calendar is connected.
+- MCP: services say whether they're online, `create_service` and `update_service` take
+  `online`, and appointments carry their `meeting_link`.
+
 ## [1.5.1] - 2026-11-09
 
 ### Changed

@@ -166,6 +166,7 @@ export function sampleValues(business: Business, event: string, language: string
       previous_date: null,
       previous_time: null,
       survey_link: `${window.location.origin}/e/K7Q4XM2P`,
+      meeting_link: null,
     },
     customer: {
       name: "Ana Pérez",

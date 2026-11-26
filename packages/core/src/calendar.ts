@@ -20,12 +20,14 @@ const TEXT = {
     professional: "Profesional",
     code: "Código de reserva",
     phone: "Teléfono",
+    meeting: "Videollamada",
   },
   en: {
     title: (service: string, business: string) => `${service} at ${business}`,
     professional: "Professional",
     code: "Booking code",
     phone: "Phone",
+    meeting: "Video call",
   },
 } as const;
 
@@ -38,6 +40,8 @@ export function appointmentEvent(input: {
   serviceName: string;
   resourceName: string | null;
   location: { name: string | null; address: string | null } | null;
+  /** An online appointment's video call: it takes the place of the address. */
+  meetingUrl?: string | null;
   startsAt: Date | string;
   endsAt: Date | string;
   language: string;
@@ -49,13 +53,16 @@ export function appointmentEvent(input: {
     uid: `${input.id}@openturnly`,
     title: text.title(input.serviceName, input.businessName),
     description: [
+      input.meetingUrl ? `${text.meeting}: ${input.meetingUrl}` : null,
       input.resourceName ? `${text.professional}: ${input.resourceName}` : null,
       `${text.code}: ${input.code}`,
       input.businessPhone ? `${text.phone}: ${input.businessPhone}` : null,
     ]
       .filter(Boolean)
       .join("\n"),
-    location: [place, input.location?.address].filter(Boolean).join(", "),
+    location: input.meetingUrl
+      ? input.meetingUrl
+      : [place, input.location?.address].filter(Boolean).join(", "),
     startsAt: input.startsAt,
     endsAt: input.endsAt,
   };

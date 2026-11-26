@@ -69,6 +69,13 @@ export async function moveAppointment(
         priceAmount: service.id === current.serviceId ? current.priceAmount : service.priceAmount,
         resourceId,
         resourceName: resource?.name ?? null,
+        mode: service.id === current.serviceId ? current.mode : service.mode,
+        // A call belongs to the professional who hosts it: someone else, or another service,
+        // gets a new one (lib/calendar-sync.ts).
+        meetingUrl:
+          service.id === current.serviceId && resourceId === current.resourceId
+            ? current.meetingUrl
+            : null,
         startsAt: new Date(slot.start),
         endsAt: new Date(slot.end),
         updatedAt: new Date(),

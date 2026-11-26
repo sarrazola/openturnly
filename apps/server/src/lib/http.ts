@@ -9,6 +9,7 @@ import type { Business } from "../db/schema.ts";
 import type { BusinessAccess } from "./access.ts";
 import type { Automations } from "./automations.ts";
 import type { BookingGuard } from "./booking-guard.ts";
+import type { CalendarSync } from "./calendar-sync.ts";
 import type { Email } from "./email.ts";
 import type { Notifications } from "./notifications.ts";
 import type { Payments } from "./payments.ts";
@@ -26,6 +27,7 @@ export type Deps = {
   sms: Sms;
   payments: Payments;
   notifications: Notifications;
+  calendar: CalendarSync;
 };
 export type AppEnv = { Variables: { user: SessionUser | null } };
 /** Routes under /api/businesses/:businessId, after access was checked. */

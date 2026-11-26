@@ -27,6 +27,7 @@ import {
   RotateCcw,
   Search,
   Users,
+  Video,
   X,
 } from "lucide-react";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
@@ -699,14 +700,16 @@ function BookingWizard({
         {step === "confirm" && service && date && time && details && (
           <Summary
             rows={[
-              ...(severalLocations && location
-                ? [
-                    {
-                      label: t("booking.location"),
-                      value: [location.name, location.address].filter(Boolean).join(" · "),
-                    },
-                  ]
-                : []),
+              ...(service.mode === "online"
+                ? [{ label: t("booking.place"), value: t("booking.onlinePlace") }]
+                : severalLocations && location
+                  ? [
+                      {
+                        label: t("booking.location"),
+                        value: [location.name, location.address].filter(Boolean).join(" · "),
+                      },
+                    ]
+                  : []),
               { label: t("booking.date"), value: `${formatDay(date, locale)} · ${time}` },
               ...(professional || team.length > 1
                 ? [
@@ -1203,6 +1206,13 @@ function ServiceMenu({
                       <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[13px] text-zinc-500">
                         <Clock className="size-3 shrink-0" aria-hidden />
                         <span className="shrink-0">{formatDuration(item.durationMin)}</span>
+                        {item.mode === "online" && (
+                          <>
+                            <span aria-hidden>·</span>
+                            <Video className="size-3 shrink-0 text-brand-600" aria-hidden />
+                            <span className="shrink-0 text-brand-700">{t("booking.online")}</span>
+                          </>
+                        )}
                         {item.description && (
                           <>
                             <span aria-hidden>·</span>
@@ -1657,6 +1667,7 @@ function AddToCalendar({
     serviceName: appointment.serviceName,
     resourceName: appointment.resourceName,
     location: appointment.location,
+    meetingUrl: appointment.meetingUrl,
     startsAt: appointment.startsAt,
     endsAt: appointment.endsAt,
     language: locale,
@@ -1726,20 +1737,47 @@ function BookingDone({
           {appointment.code}
         </p>
       </div>
+      {appointment.mode === "online" && (
+        <div className="mt-5 w-full max-w-md rounded-xl border border-brand-100 bg-brand-50 px-4 py-3 text-left">
+          <p className="flex items-center gap-1.5 text-sm font-medium text-brand-700">
+            <Video className="size-4" aria-hidden />
+            {t("booking.onlinePlace")}
+          </p>
+          {appointment.meetingUrl ? (
+            <>
+              <p className="mt-1 truncate text-[13px] text-brand-700/80">
+                {appointment.meetingUrl}
+              </p>
+              <a
+                href={appointment.meetingUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={buttonClass({ size: "sm", className: "mt-3 w-full" })}
+              >
+                {t("booking.joinMeeting")}
+              </a>
+            </>
+          ) : (
+            <p className="mt-1 text-[13px] text-brand-700/80">{t("booking.meetingSoon")}</p>
+          )}
+        </div>
+      )}
       <AddToCalendar appointment={appointment} business={business} t={t} locale={locale} />
       <div className="mt-7 w-full max-w-md text-left">
         <Summary
           rows={[
-            ...(showLocation
-              ? [
-                  {
-                    label: t("booking.location"),
-                    value: [appointment.location.name, appointment.location.address]
-                      .filter(Boolean)
-                      .join(" · "),
-                  },
-                ]
-              : []),
+            ...(appointment.mode === "online"
+              ? []
+              : showLocation
+                ? [
+                    {
+                      label: t("booking.location"),
+                      value: [appointment.location.name, appointment.location.address]
+                        .filter(Boolean)
+                        .join(" · "),
+                    },
+                  ]
+                : []),
             {
               label: t("booking.date"),
               value: `${formatDay(appointment.date, locale)} · ${appointment.time}`,

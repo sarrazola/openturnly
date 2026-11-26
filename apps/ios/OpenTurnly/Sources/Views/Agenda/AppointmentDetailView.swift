@@ -40,6 +40,9 @@ struct AppointmentDetailView: View {
                     NoticeBanner(text: L.Appointment.gone)
                 }
                 header
+                if appointment.mode == "online", appointment.status != .cancelled {
+                    meetingCard
+                }
                 if appointment.status == .pendingPayment {
                     NoticeBanner(text: L.Status.pendingPaymentHint, symbol: "clock.badge.exclamationmark")
                 }
@@ -292,6 +295,33 @@ struct AppointmentDetailView: View {
                 }
             }
         }
+    }
+
+    // MARK: Video call
+
+    @Environment(\.openURL) private var openURL
+
+    private var meetingCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label(L.Appointment.meeting, systemImage: "video.fill")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Theme.brand)
+            if let link = appointment.meetingUrl, let url = URL(string: link) {
+                Text(link).font(.footnote).foregroundStyle(Theme.muted).lineLimit(1).truncationMode(.middle)
+                Button {
+                    Haptics.tap()
+                    openURL(url)
+                } label: {
+                    Text(L.Appointment.joinMeeting).frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(Theme.brand)
+            } else {
+                Text(L.Appointment.meetingMissing).font(.footnote).foregroundStyle(Theme.muted)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .card(padding: 14)
     }
 
     // MARK: Answers and details

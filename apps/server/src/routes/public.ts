@@ -52,7 +52,15 @@ const MAX_ACTIVE_BOOKINGS_PER_CUSTOMER = 3;
 const giftCheckSchema = z.object({ code: z.string().min(1).max(40), serviceId: z.string().min(1) });
 
 /** Endpoints used by the public booking page. No login required. */
-export function publicRoutes({ db, config, guard, automations, payments, notifications }: Deps) {
+export function publicRoutes({
+  db,
+  config,
+  guard,
+  automations,
+  payments,
+  notifications,
+  calendar,
+}: Deps) {
   const network = (c: Context) => networkKey(clientIp(c, config.trustProxy));
 
   /**
@@ -114,6 +122,7 @@ export function publicRoutes({ db, config, guard, automations, payments, notific
         priceAmount: services.priceAmount,
         paymentMode: services.paymentMode,
         depositAmount: services.depositAmount,
+        mode: services.mode,
       })
       .from(services)
       .where(and(eq(services.businessId, business.id), eq(services.active, true)))
@@ -121,8 +130,15 @@ export function publicRoutes({ db, config, guard, automations, payments, notific
     // Payment settings only mean something while the business can be paid here.
     const accepting = await payments.accepting(business.id);
 
+    // An online service needs someone whose calendar can make the call.
+    const online = new Set(catalog.filter((service) => service.mode === "online").map((s) => s.id));
+    const hosts =
+      online.size > 0 ? await calendar.meetingHosts(business.id) : new Set<string | null>();
+    const hosting = (resourceId: string | null, serviceId: string) =>
+      !online.has(serviceId) || hosts.has(resourceId);
     const doing = (resourceId: string, serviceId: string) =>
-      links.some((link) => link.resourceId === resourceId && link.serviceId === serviceId);
+      links.some((link) => link.resourceId === resourceId && link.serviceId === serviceId) &&
+      hosting(resourceId, serviceId);
     const bookableLocations = places
       .map((place) => {
         const here = staffed
@@ -134,7 +150,9 @@ export function publicRoutes({ db, config, guard, automations, payments, notific
               offered.some(
                 (link) => link.locationId === place.id && link.serviceId === service.id,
               ) &&
-              (here.length === 0 || here.some((resourceId) => doing(resourceId, service.id))),
+              (here.length === 0
+                ? hosting(null, service.id)
+                : here.some((resourceId) => doing(resourceId, service.id))),
           )
           .map((service) => service.id);
         return {
@@ -207,6 +225,8 @@ export function publicRoutes({ db, config, guard, automations, payments, notific
       discountAmount: appointment.discountAmount,
       currency: business.currency,
       location,
+      mode: appointment.mode,
+      meetingUrl: appointment.meetingUrl,
     };
   };
 
@@ -358,6 +378,8 @@ export function publicRoutes({ db, config, guard, automations, payments, notific
           resourceId || null,
           from,
           to,
+          undefined,
+          service.mode === "online" ? await calendar.meetingHosts(business.id) : undefined,
         );
         const slots = slotsBetween(
           from,
@@ -416,6 +438,8 @@ export function publicRoutes({ db, config, guard, automations, payments, notific
         const now = Date.now();
         const startsAt = zonedTimeToInstant(input.date, parseTime(input.time), business.timezone);
         const endsAt = startsAt + service.durationMin * 60_000;
+        const hosts =
+          service.mode === "online" ? await calendar.meetingHosts(business.id) : undefined;
         // An AI agent books for the customer and has no way to send them to pay.
         const takesPayment =
           !key && service.paymentMode !== "none" && (await payments.accepting(business.id));
@@ -491,6 +515,8 @@ export function publicRoutes({ db, config, guard, automations, payments, notific
             input.resourceId,
             input.date,
             input.date,
+            undefined,
+            hosts,
           );
           const slot = slotsForDate(
             input.date,
@@ -541,6 +567,7 @@ export function publicRoutes({ db, config, guard, automations, payments, notific
               answers,
               source: key ? "agent" : "online",
               sourceLabel: key?.name ?? null,
+              mode: service.mode,
               status: due > 0 ? "pending_payment" : "confirmed",
             })
             .returning();
@@ -579,6 +606,8 @@ export function publicRoutes({ db, config, guard, automations, payments, notific
             resumed ? 200 : 201,
           );
         }
+        // First, so the call's link is in the confirmation and on the page.
+        view.meetingUrl = (await calendar.appointmentChanged(appointment.id)).meetingUrl;
         await automations.emit(appointment.id, "created");
         await notifications.appointmentBooked(appointment.id, null);
         return c.json({ appointment: view, payment: null }, 201);
@@ -614,6 +643,7 @@ export function publicRoutes({ db, config, guard, automations, payments, notific
             name: location?.name ?? null,
             address: location?.address ?? business.address,
           },
+          meetingUrl: appointment.meetingUrl,
           startsAt: appointment.startsAt,
           endsAt: appointment.endsAt,
           language: business.locale,

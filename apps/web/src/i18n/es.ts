@@ -447,6 +447,7 @@ export const es = {
         previous_date: "Fecha anterior",
         previous_time: "Hora anterior",
         survey_link: "Enlace de la encuesta",
+        meeting_link: "Enlace de la videollamada",
       },
       customer: {
         name: "Nombre completo",
@@ -880,6 +881,45 @@ export const es = {
       },
     },
   },
+  calendarSync: {
+    title: "Google Calendar",
+    description:
+      "Tus citas aparecen solas en tu Google Calendar, en un calendario con el nombre de cada negocio.",
+    pitch:
+      "Conecta tu cuenta de Google y cada cita que agenden contigo queda en tu calendario. Los servicios en línea crean su videollamada de Google Meet.",
+    connect: "Conectar Google Calendar",
+    reconnect: "Conectar otra vez",
+    reconnectHint:
+      "Google dejó de aceptar el acceso. Conéctalo otra vez para seguir recibiendo tus citas.",
+    connectedAs: "Conectado como {{email}}",
+    status: { connected: "Conectado", disconnected: "Sin acceso" },
+    toggle: "Enviar las citas de {{name}}",
+    ownAppointments: "Tus citas",
+    off: "No se envían",
+    everyone: "Las citas de todo el equipo",
+    some_one: "Las citas de {{count}} profesional",
+    some_other: "Las citas de {{count}} profesionales",
+    everyoneOption: "Todo el equipo",
+    someOption: "Elegir profesionales",
+    professionals: "Profesionales",
+    failing_one: "{{count}} cita sin copiar",
+    failing_other: "{{count}} citas sin copiar",
+    disconnect: "Desconectar",
+    disconnectTitle: "Desconectar Google Calendar",
+    disconnectHint: "Las citas dejan de llegar a tu calendario.",
+    disconnectBody:
+      "¿Qué hacemos con los calendarios de tus negocios en Google? Si los borras, se van con todas sus citas.",
+    keepCalendars: "Conservarlos",
+    deleteCalendars: "Borrarlos",
+    outcomes: {
+      connected: "Google Calendar conectado",
+      denied: "No diste el permiso en Google",
+      calendar_not_allowed: "Falta marcar el permiso del calendario en Google. Inténtalo otra vez.",
+      expired: "La conexión tardó mucho. Inténtalo otra vez.",
+      signed_out: "Entra con tu cuenta y vuelve a conectar Google Calendar.",
+      failed: "No pudimos conectar Google Calendar. Inténtalo otra vez.",
+    },
+  },
   account: {
     title: "Mi cuenta",
     subtitle: "Tus datos para entrar a OpenTurnly.",
@@ -1009,6 +1049,10 @@ export const es = {
     delete: "Eliminar negocio",
   },
   agenda: {
+    meeting: "Videollamada de Google Meet",
+    joinMeeting: "Unirse",
+    meetingMissing:
+      "Esta cita es en línea y aún no tiene videollamada: se crea cuando el profesional conecta su Google Calendar en Mi cuenta.",
     sourceAgent: "Agente IA",
     bookedVia: "Agendada por",
     surge: {
@@ -1862,6 +1906,13 @@ export const es = {
       "Lo reintentamos cada hora. Revisa que tu cuenta de Mercado Pago tenga saldo disponible.",
   },
   services: {
+    modeLabel: "Dónde se atiende",
+    modes: { in_person: "Presencial", online: "En línea (Google Meet)" },
+    modeHints: {
+      in_person: "En la sede donde se reserva.",
+      online:
+        "Al reservar, el Google Calendar del profesional crea la videollamada y le envía la invitación al cliente. En tu página de reservas solo aparece con quienes lo tengan conectado en Mi cuenta.",
+    },
     paymentLabel: "Cobro en línea",
     paymentConnectFirst: "Conecta Mercado Pago en Configuración → Pagos para cobrar al reservar.",
     paymentModes: {
@@ -2087,6 +2138,11 @@ export const es = {
     revoked: "Invitación cancelada",
   },
   booking: {
+    online: "En línea",
+    place: "Lugar",
+    onlinePlace: "En línea, por Google Meet",
+    joinMeeting: "Unirse a la videollamada",
+    meetingSoon: "Te enviaremos el enlace de la videollamada antes de la cita.",
     birthDay: "Día",
     birthMonth: "Mes",
     birthYear: "Año",

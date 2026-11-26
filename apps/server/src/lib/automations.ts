@@ -41,6 +41,7 @@ import {
   type Location,
   locations,
 } from "../db/schema.ts";
+import type { CalendarSync } from "./calendar-sync.ts";
 import { isInternalAddress } from "./client-ip.ts";
 import type { Email } from "./email.ts";
 import type { Payments } from "./payments.ts";
@@ -67,6 +68,9 @@ export function newAutomationSecret() {
   return `whsec_${randomBytes(24).toString("base64url")}`;
 }
 
+/** Where an online appointment happens while its call's link isn't there yet. */
+const ONLINE_PLACE = { es: "En línea", en: "Online" } as const;
+
 type AppointmentWithCustomer = {
   appointment: Pick<
     Appointment,
@@ -80,6 +84,8 @@ type AppointmentWithCustomer = {
     | "answers"
     | "source"
     | "sourceLabel"
+    | "mode"
+    | "meetingUrl"
   >;
   customer: Pick<Customer, "firstName" | "lastName" | "phone" | "email">;
   location?: Pick<Location, "name" | "address"> | null;
@@ -132,7 +138,12 @@ export function automationValues(
       ),
       professional: appointment.resourceName,
       location: location?.name ?? null,
-      location_address: location?.address ?? business.address,
+      // An online appointment happens on its call: every message that names the place says
+      // where to join instead, ready-made WhatsApp templates included.
+      location_address:
+        appointment.mode === "online"
+          ? (appointment.meetingUrl ?? ONLINE_PLACE[business.locale === "en" ? "en" : "es"])
+          : (location?.address ?? business.address),
       price:
         appointment.priceAmount === null
           ? null
@@ -148,6 +159,7 @@ export function automationValues(
       previous_date: previous?.date ?? null,
       previous_time: previous?.time ?? null,
       survey_link: surveyLink ?? null,
+      meeting_link: appointment.meetingUrl ?? null,
     },
     customer: {
       name: `${customer.firstName} ${customer.lastName}`,
@@ -327,6 +339,7 @@ export function createAutomations({
   email,
   sms,
   payments,
+  calendar,
   meter = null,
 }: {
   db: Db;
@@ -336,6 +349,8 @@ export function createAutomations({
   sms: Sms;
   /** Open payments are caught up on every sweep, which frees times nobody paid for. */
   payments?: Pick<Payments, "sweep">;
+  /** Copies Google didn't take are tried again on every sweep. */
+  calendar?: Pick<CalendarSync, "sweep">;
   /** Holds back and counts messages on the install's own accounts; none: all go out. */
   meter?: DefaultAccountMeter | null;
 }) {
@@ -809,6 +824,7 @@ export function createAutomations({
     /** Queues reminders and follow-ups that have come due (each only once per time). */
     async sweep(now = Date.now()) {
       await payments?.sweep(now);
+      await calendar?.sweep(now);
       const timed = await db
         .select()
         .from(automations)
@@ -1092,6 +1108,8 @@ export function sampleValues(business: Business, event: string, appUrl: string) 
         answers: [],
         source: "online",
         sourceLabel: null,
+        mode: "in_person",
+        meetingUrl: null,
       },
       customer: {
         firstName: "Ana",

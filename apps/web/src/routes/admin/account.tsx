@@ -32,6 +32,7 @@ import {
 import { useAccountMutations, useLogout, useMe, useVersion } from "../../lib/session.ts";
 import { setTheme, THEMES, type Theme, useTheme } from "../../lib/theme.ts";
 import { useTourMutations } from "../../lib/tours.ts";
+import { CalendarConnectionCard } from "./calendar-connection.tsx";
 
 const THEME_ICONS: Record<Theme, LucideIcon> = { light: Sun, dark: Moon, system: Monitor };
 
@@ -233,6 +234,7 @@ export function AccountPage() {
     <div className="mx-auto w-full max-w-3xl space-y-6">
       <PageHeader title={t("account.title")} subtitle={t("account.subtitle")} />
       <AccountProfile user={me.data} />
+      <CalendarConnectionCard />
     </div>
   );
 }

@@ -13,6 +13,7 @@ import type {
   ProductUnit,
   SaleItemKind,
   SalePaymentMethod,
+  ServiceMode,
   ServicePaymentMode,
   StockMovementKind,
 } from "@openturnly/core";
@@ -127,6 +128,8 @@ export type Service = {
   paymentMode: ServicePaymentMode;
   /** With `paymentMode` "deposit": how much. */
   depositAmount: number | null;
+  /** In person, or on a video call made by the professional's connected calendar. */
+  mode: ServiceMode;
   active: boolean;
   /** Locations that offer it. */
   locationIds: string[];
@@ -192,6 +195,9 @@ export type Appointment = {
   source: AppointmentSource;
   /** For agent bookings: the name of the access key used. */
   sourceLabel: string | null;
+  mode: ServiceMode;
+  /** An online appointment's video call, once the professional's calendar made it. */
+  meetingUrl: string | null;
   createdAt: string;
   cancelledAt: string | null;
   answers: BookingAnswer[];
@@ -266,6 +272,34 @@ export type BookedAppointment = {
   discountAmount: number;
   currency: string;
   location: { name: string; address: string | null };
+  mode: ServiceMode;
+  /** An online appointment's video call; null until it's made. */
+  meetingUrl: string | null;
+};
+
+/** The signed-in person's connected calendar, and which businesses go to it. */
+export type CalendarOverview = {
+  /** Whether this install can connect calendars at all. */
+  available: boolean;
+  connection: {
+    provider: "google";
+    email: string | null;
+    /** "disconnected": Google stopped accepting the access; it takes connecting again. */
+    status: "connected" | "disconnected";
+    connectedAt: string;
+  } | null;
+  businesses: {
+    id: string;
+    name: string;
+    role: BusinessAccess["role"];
+    enabled: boolean;
+    /** Owners and admins: whose appointments; null: everyone's. */
+    resourceIds: string[] | null;
+    /** Appointments Google hasn't taken yet. */
+    failing: number;
+    /** Owners and admins: who they can choose from. */
+    professionals: { id: string; name: string }[];
+  }[];
 };
 
 /** What booking returns: `payment` is set when the customer has to pay to confirm it. */

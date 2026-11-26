@@ -43,6 +43,8 @@ import androidx.compose.material.icons.outlined.PointOfSale
 import androidx.compose.material.icons.outlined.Receipt
 import androidx.compose.material.icons.outlined.Savings
 import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.Videocam
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -68,6 +70,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -169,6 +172,7 @@ fun AppointmentDetailScreen(model: AppModel, initial: Appointment) {
         ) {
             if (gone) NoticeBanner(Copy.agenda.gone)
             Header(model, appointment)
+            if (appointment.mode == "online" && appointment.status != "cancelled") MeetingCard(appointment.meetingUrl)
             if (appointment.status == "pending_payment") NoticeBanner(Copy.agenda.pendingPaymentHint, icon = Icons.Outlined.Schedule)
             CustomerCard(model, appointment, showCustomer = Appointments.Action.VIEW_CUSTOMER in actions)
             if (isAdmin && appointment.customer.id.isNotEmpty()) {
@@ -350,6 +354,30 @@ private fun CustomerCard(model: AppModel, appointment: Appointment, showCustomer
                     }
                 }
             }
+        }
+    }
+}
+
+/** An online appointment's video call: its link and «Unirse», or why there's none yet. */
+@Composable
+private fun MeetingCard(link: String?) {
+    val ext = LocalExtended.current
+    val brand = MaterialTheme.colorScheme.primary
+    val uriHandler = LocalUriHandler.current
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(ext.brand.container).padding(14.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Outlined.Videocam, null, tint = brand, modifier = Modifier.size(20.dp))
+            Text(Copy.agenda.meeting, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = brand, modifier = Modifier.padding(start = 8.dp))
+        }
+        if (link != null) {
+            Text(link, style = MaterialTheme.typography.bodySmall, color = ext.muted, maxLines = 1, modifier = Modifier.padding(top = 6.dp))
+            Button(onClick = { uriHandler.openUri(link) }, modifier = Modifier.fillMaxWidth().padding(top = 10.dp)) {
+                Text(Copy.agenda.joinMeeting)
+            }
+        } else {
+            Text(Copy.agenda.meetingMissing, style = MaterialTheme.typography.bodySmall, color = ext.muted, modifier = Modifier.padding(top = 6.dp))
         }
     }
 }

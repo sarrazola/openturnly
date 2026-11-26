@@ -44,6 +44,11 @@ export async function loadSchedules(
   toDate: string,
   /** An appointment being moved: its own time doesn't count as busy. */
   ignoreAppointmentId?: string,
+  /**
+   * Only these professionals (`null`: nobody in particular, for a location without them).
+   * Online services are limited to who can host their call.
+   */
+  onlyResources?: ReadonlySet<string | null>,
 ): Promise<ResourceSchedule[]> {
   const [offeredHere] = await db
     .select({ id: locationServices.serviceId })
@@ -85,6 +90,7 @@ export async function loadSchedules(
     ).map((row) => row.id);
     candidates = resourceId === null ? offering : offering.filter((id) => id === resourceId);
   }
+  if (onlyResources) candidates = candidates.filter((id) => onlyResources.has(id));
   if (candidates.length === 0) return [];
 
   const hours = await db

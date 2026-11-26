@@ -1,7 +1,9 @@
 import {
   formatPrice,
   fromMinorUnits,
+  SERVICE_MODES,
   SERVICE_PAYMENT_MODES,
+  type ServiceMode,
   type ServicePaymentMode,
   servicePaymentProblem,
   serviceSchema,
@@ -26,6 +28,7 @@ import {
   Textarea,
 } from "../../components/ui.tsx";
 import type { Service } from "../../lib/api.ts";
+import { useCalendar } from "../../lib/calendar.ts";
 import { useLocations, useServiceMutations, useServices } from "../../lib/catalog.ts";
 import { currencySymbol, formatDuration } from "../../lib/format.ts";
 import { errorMessage, type FieldErrors, fieldMessage, validate } from "../../lib/forms.ts";
@@ -70,7 +73,10 @@ export function ServicesPage() {
       header: t("services.colService"),
       cell: (service) => (
         <div className="min-w-0 max-w-md">
-          <div className="truncate font-medium text-zinc-900">{service.name}</div>
+          <div className="flex items-center gap-2">
+            <span className="truncate font-medium text-zinc-900">{service.name}</span>
+            {service.mode === "online" && <Badge tone="brand">{t("services.modes.online")}</Badge>}
+          </div>
           {(service.category || service.description) && (
             <div className="truncate text-[13px] text-zinc-500">
               {service.category && (
@@ -197,6 +203,9 @@ function ServiceForm({ service, onClose }: { service: Service | null; onClose: (
       : "",
   );
   const [active, setActive] = useState(service?.active ?? true);
+  const [mode, setMode] = useState<ServiceMode>(service?.mode ?? "in_person");
+  // Online services need calendars that can make the call: offered where the install has them.
+  const canMeet = useCalendar().data?.available === true || service?.mode === "online";
   const payments = usePayments(business.id);
   const [paymentMode, setPaymentMode] = useState<ServicePaymentMode>(
     service?.paymentMode ?? "none",
@@ -228,6 +237,7 @@ function ServiceForm({ service, onClose }: { service: Service | null; onClose: (
           : toMinorUnits(amount, business.currency),
       paymentMode,
       depositAmount,
+      mode,
       active,
       ...(locations.length > 1 ? { locationIds } : {}),
     };
@@ -368,6 +378,23 @@ function ServiceForm({ service, onClose }: { service: Service | null; onClose: (
             />
           )}
         </Field>
+        {canMeet && (
+          <Field label={t("services.modeLabel")} hint={t(`services.modeHints.${mode}`)}>
+            {(props) => (
+              <Select
+                {...props}
+                value={mode}
+                onChange={(event) => setMode(event.target.value as ServiceMode)}
+              >
+                {SERVICE_MODES.map((option) => (
+                  <option key={option} value={option}>
+                    {t(`services.modes.${option}`)}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
+        )}
         {locations.length > 1 && (
           <fieldset className="space-y-2">
             <legend className="text-sm font-medium text-zinc-800">
