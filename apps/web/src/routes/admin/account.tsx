@@ -234,7 +234,6 @@ export function AccountPage() {
     <div className="mx-auto w-full max-w-3xl space-y-6">
       <PageHeader title={t("account.title")} subtitle={t("account.subtitle")} />
       <AccountProfile user={me.data} />
-      <CalendarConnectionCard />
     </div>
   );
 }
@@ -383,6 +382,9 @@ export function AccountProfile({ user }: { user: User }) {
           </div>
         </form>
       </Card>
+
+      {/* Each person's own Google account, wherever their profile is shown. */}
+      <CalendarConnectionCard />
 
       <SettingsCard title={t("account.preferences")} description={t("account.preferencesHint")}>
         <div className="space-y-3">
